@@ -1,0 +1,42 @@
+# Translation file
+
+#
+# Generic
+#
+
+# Module label 'ModuleDolitraceName'
+ModuleDolitraceName = Dolitrace
+# Module description 'ModuleDolitraceDesc'
+ModuleDolitraceDesc = Dolitrace description
+
+#
+# Admin page
+#
+DolitraceSetup = Dolitrace setup
+Settings = Settings
+DolitraceSetupPage = Dolitrace setup page
+NewSection=New section
+DOLITRACE_MYPARAM1 = My param 1
+DOLITRACE_MYPARAM1Tooltip = My param 1 tooltip
+DOLITRACE_MYPARAM2=My param 2
+DOLITRACE_MYPARAM2Tooltip=My param 2 tooltip
+
+
+#
+# About page
+#
+About = About
+DolitraceAbout = About Dolitrace
+DolitraceAboutPage = Dolitrace about page
+
+#
+# Sample page
+#
+DolitraceArea = Home Dolitrace
+MyPageName = My page name
+
+#
+# Sample widget
+#
+MyWidget = My widget
+MyWidgetDescription = My widget description

@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DoliTrace Field</title>
+    <link rel="manifest" href="manifest.json">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* TEMA DOLITRACE (Industrial Orange) */
+        :root {
+            --dt-primary: #d35400;   /* Zucca Scuro */
+            --dt-accent: #e67e22;    /* Arancione Vivo */
+            --dt-dark: #2c3e50;      /* Grigio Scuro */
+        }
+
+        body { font-family: sans-serif; background-color: #f8f9fa; user-select: none; }
+        
+        /* Header */
+        .app-header { 
+            background: linear-gradient(90deg, var(--dt-primary) 0%, var(--dt-accent) 100%); 
+            color: white; 
+            padding: 15px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2); 
+        }
+
+        /* Login */
+        .login-bg { background: linear-gradient(135deg, #d35400 0%, #f39c12 100%); }
+
+        /* Cards */
+        .plot-card { 
+            border-left: 5px solid var(--dt-accent); 
+            transition: transform 0.1s; 
+        }
+        .plot-card:active { transform: scale(0.98); }
+
+        /* Scanner */
+        .scan-overlay {
+            background-color: #000;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 2000; display: flex; flex-direction: column;
+        }
+        .scan-frame {
+            width: 260px; height: 260px;
+            border: 4px solid var(--dt-accent);
+            border-radius: 20px;
+            box-shadow: 0 0 0 100vmax rgba(0,0,0,0.7);
+            pointer-events: none;
+            position: absolute;
+        }
+
+        /* Utilities */
+        [v-cloak] { display: none !important; }
+        .text-brand { color: var(--dt-primary) !important; }
+        .bg-brand { background-color: var(--dt-accent) !important; }
+        
+        /* Bottoni Azione Grandi */
+        .btn-action-lg {
+            height: 100px;
+            border-radius: 12px;
+            display: flex; flex-direction: column; 
+            align-items: center; justify-content: center;
+            font-weight: bold; border: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app" v-cloak class="h-100">
+
+        <div v-if="currentView === 'login'" class="login-bg d-flex flex-column align-items-center justify-content-center h-100">
+            <div class="bg-white p-4 rounded-4 shadow-lg text-center mx-3" style="width: 100%; max-width: 380px;">
+                <div class="mb-3 d-inline-block p-3 rounded-circle bg-light">
+                    <i class="fa-solid fa-tractor fa-3x text-brand"></i>
+                </div>
+                <h3 class="mb-1 fw-bold text-dark">DoliTrace</h3>
+                <p class="text-muted mb-4 small">Operazioni di Campo</p>
+                
+                <div v-if="errorMsg" class="alert alert-danger py-2 small">{{ errorMsg }}</div>
+
+                <form @submit.prevent="doLogin">
+                    <div class="form-floating mb-3">
+                        <input type="text" class="form-control" id="uInput" v-model="loginForm.username" placeholder="Nome Utente" required>
+                        <label for="uInput">Utente</label>
+                    </div>
+                    <div class="form-floating mb-4">
+                        <input type="password" class="form-control" id="pInput" v-model="loginForm.password" placeholder="Password">
+                        <label for="pInput">Password</label>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-dark btn-lg fw-bold" :disabled="isLoading">
+                            <span v-if="isLoading"><i class="fa fa-spinner fa-spin"></i> Loading...</span>
+                            <span v-else>ACCEDI <i class="fa fa-arrow-right ms-2"></i></span>
+                        </button>
+                    </div>
+                </form>
+                
+                <div class="mt-4 pt-3 border-top text-muted" style="font-size: 0.7rem;">
+                    Powered by <a href="https://dolifarm365.com" target="_blank" class="text-brand text-decoration-none fw-bold">dolifarm365.com</a>
+                </div>
+            </div>
+        </div>
+
+        <div v-else class="d-flex flex-column h-100">
+
+            <header class="app-header d-flex justify-content-between align-items-center sticky-top">
+                <div class="d-flex align-items-center">
+                    <div class="me-3" data-bs-toggle="offcanvas" data-bs-target="#traceMenu" style="cursor: pointer;">
+                        <i class="fa-solid fa-bars fs-4"></i>
+                    </div>
+
+                    <i v-if="currentView !== 'home'" @click="currentView = 'home'" class="fa fa-arrow-left me-3 fs-5" style="cursor:pointer"></i>
+                    
+                    <h2 class="m-0 fs-5 fw-bold"><i class="fa-solid fa-tractor me-1"></i> DoliTrace</h2>
+                </div>
+                
+                <div class="d-flex align-items-center gap-3">
+                    <div class="position-relative" @click="syncData" style="cursor: pointer;">
+                        <i class="fa fa-cloud-upload-alt fs-4" :class="{'opacity-50': actionQueue.length===0}"></i>
+                        <span v-if="actionQueue.length > 0" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-white">
+                            {{ actionQueue.length }}
+                        </span>
+                    </div>
+                </div>
+            </header>
+
+            <main class="container mt-3 pb-5 flex-grow-1 overflow-auto">
+
+                <div v-if="currentView === 'home'">
+                    
+                    <button class="btn btn-dark w-100 py-4 mb-4 rounded-4 shadow position-relative border-2 border-warning" 
+                            @click="startScan">
+                        <div class="d-flex align-items-center justify-content-center">
+                            <i class="fa-solid fa-qrcode fa-3x text-warning me-3"></i>
+                            <div class="text-start">
+                                <div class="fw-bold fs-5 text-white">SCANSIONA UUID</div>
+                                <div class="small text-white-50">Identifica Plot/Lotto</div>
+                            </div>
+                        </div>
+                    </button>
+
+                    <h6 class="text-muted fw-bold mb-3 small text-uppercase border-bottom pb-2">
+                        <i class="fa fa-list me-1"></i> Piani Assegnati a Te
+                    </h6>
+                    
+                    <div v-if="plans.length === 0" class="text-center text-muted mt-5 py-5 bg-white rounded shadow-sm">
+                        <i class="fa fa-clipboard-check fa-3x mb-3 text-secondary opacity-25"></i>
+                        <p class="mb-0">Nessun piano di produzione attivo<br>trovato per il tuo utente.</p>
+                    </div>
+
+                    <div v-for="plan in plans" :key="plan.id" class="card plot-card p-3 mb-3 border-0 shadow-sm" @click="selectPlanManually(plan)">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <span class="badge bg-dark text-warning mb-1 text-truncate" style="max-width: 200px;">
+                                <i class="fa fa-map-pin me-1"></i> {{ getPlotName(plan.fk_plot_uuid) }}
+                            </span>
+                            <small class="text-muted fw-bold">{{ plan.start_date }}</small>
+                        </div>
+                        <h5 class="fw-bold m-0 mt-2 text-dark">{{ plan.crop }}</h5>
+                        <small class="text-secondary">{{ plan.variety }}</small>
+                    </div>
+                </div>
+
+                <div v-if="currentView === 'details' && activePlan">
+                    
+                    <div class="bg-white p-3 rounded shadow-sm border-start border-4 border-warning mb-3">
+                        <small class="text-uppercase text-muted fw-bold" style="font-size:0.65rem">PLOT CORRENTE</small>
+                        <h4 class="fw-bold mb-0 text-dark">{{ activePlot?.label }}</h4>
+                        <div class="d-flex justify-content-between mt-1">
+                            <span class="badge bg-secondary">{{ activePlot?.size }}</span>
+                            <span class="font-monospace small text-muted text-truncate">{{ activePlot?.uuid.substring(0,8) }}...</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-dark text-white p-3 rounded shadow-sm mb-4 position-relative overflow-hidden">
+                        <i class="fa fa-seedling position-absolute top-0 end-0 opacity-25 fa-5x me-n3 mt-n1 text-warning"></i>
+                        <small class="text-warning fw-bold text-uppercase">Piano #{{ activePlan.id }}</small>
+                        <h2 class="fw-bold mb-0">{{ activePlan.crop }}</h2>
+                        <p class="mb-0 opacity-75">{{ activePlan.variety }}</p>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <button class="btn-action-lg w-100 bg-primary text-white" @click="openForm('operation')">
+                                <i class="fa fa-tools fa-2x mb-2"></i>
+                                OPERAZIONE
+                            </button>
+                        </div>
+                        <div class="col-6">
+                            <button class="btn-action-lg w-100 bg-success text-white" @click="openForm('harvest')">
+                                <i class="fa fa-box-open fa-2x mb-2"></i>
+                                RACCOLTA
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="currentView === 'form_op'">
+                    <h4 class="mb-3 fw-bold ps-2 border-start border-4 border-primary">Nuova Operazione</h4>
+                    <div class="card p-3 border-0 shadow-sm">
+                        <div class="mb-3">
+                            <label class="form-label text-muted small fw-bold">TIPO INTERVENTO</label>
+                            <select class="form-select form-select-lg bg-light" v-model="formData.op_type">
+                                <option v-for="op in operationsTypes" :value="op.label">{{ op.label }}</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-muted small fw-bold">DATA</label>
+                            <input type="date" class="form-control form-control-lg bg-light" v-model="formData.date">
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label text-muted small fw-bold">NOTE</label>
+                            <textarea class="form-control bg-light" rows="3" v-model="formData.note" placeholder="Dettagli operazione..."></textarea>
+                        </div>
+                        <button class="btn btn-primary w-100 py-3 fw-bold shadow" @click="saveAction">
+                            <i class="fa fa-save me-2"></i> REGISTRA
+                        </button>
+                    </div>
+                </div>
+
+                <div v-if="currentView === 'form_harvest'">
+                    <h4 class="mb-3 fw-bold ps-2 border-start border-4 border-success">Nuova Raccolta</h4>
+                    <div class="card p-3 border-0 shadow-sm">
+                        <div class="mb-3">
+                            <label class="form-label text-muted small fw-bold">QUANTITÀ (Kg)</label>
+                            <div class="input-group input-group-lg">
+                                <input type="number" class="form-control text-center fw-bold text-success" v-model="formData.qty" placeholder="0.0">
+                                <span class="input-group-text">Kg</span>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-muted small fw-bold">DATA</label>
+                            <input type="date" class="form-control form-control-lg bg-light" v-model="formData.date">
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label text-muted small fw-bold">LOTTO / COLLI</label>
+                            <input type="text" class="form-control bg-light" v-model="formData.note" placeholder="Codice lotto o casse...">
+                        </div>
+                        <button class="btn btn-success w-100 py-3 fw-bold shadow" @click="saveAction">
+                            <i class="fa fa-check me-2"></i> REGISTRA RACCOLTO
+                        </button>
+                    </div>
+                </div>
+
+            </main>
+        </div>
+
+        <div v-if="isScanning" class="scan-overlay">
+            <div class="p-3 d-flex justify-content-between align-items-center text-white bg-dark bg-opacity-50" style="position:absolute; top:0; width:100%; z-index:2002;">
+                <span class="fw-bold"><i class="fa fa-camera me-2"></i>SCANNER</span>
+                <button class="btn btn-sm btn-outline-light rounded-pill px-3" @click="stopScan">CHIUDI</button>
+            </div>
+            
+            <div class="flex-grow-1 d-flex align-items-center justify-content-center position-relative">
+                <div id="qr-reader" style="width: 100%; height: 100%;"></div>
+                <div class="scan-frame"></div> </div>
+            
+            <div class="p-4 text-center text-white bg-dark bg-opacity-75" style="position:absolute; bottom:0; width:100%; z-index:2002;">
+                <small>Inquadra il Codice QR del Plot</small>
+            </div>
+        </div>
+
+        <div class="offcanvas offcanvas-start" tabindex="-1" id="traceMenu">
+            <div class="offcanvas-header text-white" style="background-color: var(--dt-primary);">
+                <h5 class="offcanvas-title fw-bold"><i class="fa-solid fa-tractor me-2"></i> Menu</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+            </div>
+            <div class="offcanvas-body d-flex flex-column">
+                
+                <div v-if="user" class="d-flex align-items-center mb-4 p-3 bg-light rounded">
+                    <div class="bg-brand text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width:50px; height:50px; font-size:1.5rem;">
+                        {{ user.name.charAt(0) }}
+                    </div>
+                    <div>
+                        <div class="fw-bold">{{ user.name }}</div>
+                        <div class="text-muted small">ID: {{ user.id }}</div>
+                    </div>
+                </div>
+
+                <ul class="list-group list-group-flush mb-auto">
+                    <li class="list-group-item list-group-item-action py-3 border-0" @click="syncData" data-bs-dismiss="offcanvas">
+                        <i class="fa fa-sync text-primary me-3"></i> Sincronizza Dati
+                    </li>
+                    <li class="list-group-item list-group-item-action py-3 border-0">
+                        <i class="fa fa-cog text-muted me-3"></i> Impostazioni
+                    </li>
+                </ul>
+
+                <div class="text-center mt-4">
+                    <small class="text-muted">v3.0.0 - DoliTrace</small>
+                    <button class="btn btn-outline-danger w-100 mt-3 fw-bold" @click="logout" data-bs-dismiss="offcanvas">
+                        ESCI
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="assets/js/app.js"></script>
+    <script src="assets/js/app.js"></script>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then((reg) => {
+                        console.log('Service Worker registrato con successo.', reg.scope);
+                    })
+                    .catch((err) => {
+                        console.log('Errore registrazione Service Worker:', err);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>
+</body>
+</html>

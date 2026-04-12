@@ -1,0 +1,58 @@
+# Translation file
+
+#
+# Generic
+#
+
+# Module label 'ModuleDolitraceName'
+ModuleDolitraceName = Dolitrace
+# Module description 'ModuleDolitraceDesc'
+ModuleDolitraceDesc = Descrizione di Dolitrace
+
+#
+# Admin page
+#
+DolitraceSetup = Configurazione Dolitrace
+Settings = Impostazioni
+DolitraceSetupPage = Pagina di configurazione di Dolitrace
+NewSection = Nuova sezione
+DOLITRACE_MYPARAM1 = Mio parametro 1
+DOLITRACE_MYPARAM1Tooltip = Suggerimento per il mio parametro 1
+DOLITRACE_MYPARAM2 = Mio parametro 2
+DOLITRACE_MYPARAM2Tooltip = Suggerimento per il mio parametro 2
+
+#
+# About page
+#
+About = Informazioni
+DolitraceAbout = Informazioni su Dolitrace
+DolitraceAboutPage = Pagina informativa di Dolitrace
+
+#
+# Sample page
+#
+DolitraceArea = Quaderni di Campagna (QdC)
+MyPageName = Nome della mia pagina
+
+#
+# Sample widget
+#
+MyWidget = Mio widget
+MyWidgetDescription = Descrizione del mio widget
+
+#
+# Menu
+#
+Dolitrace = QdC
+DoliTraceHarvest=Raccolta
+DoliTraceHarvests=Raccolte
+ListDoliTraceHarvest=Lista delle Raccote
+NewDoliTraceHarvest=Nuova Raccolta
+DoliTraceOperations=Operazioni colturali
+DoliTraceOperation=Operazione colturale
+ListDoliTraceOperation=Lista delle Op.Colturali
+NewDoliTraceOperation=Nuova Op.Colturale
+DoliTraceCropplans=Piani di Produzione
+DoliTraceCropplan=Piano di Produzione
+ListDoliTraceCropplan=Lista Piani di Produzione
+NewDoliTraceCropplan=Nuovo Piano di produzione
