@@ -50,14 +50,14 @@ class modDolitrace extends DolibarrModules
 
 		// Id for module (must be unique).
 		// Use here a free id (See in Home -> System information -> Dolibarr for list of used modules id).
-		$this->numero = 500001; // TODO Go on page https://wiki.dolibarr.org/index.php/List_of_modules_id to reserve an id number for your module
+		$this->numero = 500003; // TODO Go on page https://wiki.dolibarr.org/index.php/List_of_modules_id to reserve an id number for your module
 
 		// Key text used to identify module (for permissions, menus, etc...)
-		$this->rights_class = 'dolitrace';
+		$this->rights_class = 'dolitrace'; 
 
 		// Family can be 'base' (core modules),'crm','financial','hr','projects','products','ecm','technic' (transverse modules),'interface' (link with external tools),'other','...'
 		// It is used to group modules by family in module setup page
-		$this->family = "other";
+		$this->family = "doliFARM";
 
 		// Module position in the family on 2 digits ('01', '10', '20', ...)
 		$this->module_position = '90';
@@ -90,7 +90,7 @@ class modDolitrace extends DolibarrModules
 		// If file is in theme/yourtheme/img directory under name object_pictovalue.png, use this->picto='pictovalue'
 		// If file is in module/img directory under name object_pictovalue.png, use this->picto='pictovalue@module'
 		// To use a supported fa-xxx css style of font awesome, use this->picto='xxx'
-		$this->picto = 'fa-file';
+		$this->picto = dolifarm_get_fa_icon('dolitrace');
 
 		// Define some features supported by module (triggers, login, substitutions, menus, css, etc...)
 		$this->module_parts = array(
@@ -377,6 +377,22 @@ class modDolitrace extends DolibarrModules
 		$this->menu[$r++] = array(
 			'fk_menu' => 'fk_mainmenu=dolitrace',
 			'type' => 'left',
+			'titre' => 'DolitraceArea',
+			'prefix' => img_picto('', dolifarm_get_fa_icon('dolitrace'), 'class="paddingright pictofixedwidth valignmiddle"'),
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitracecropplan',
+			'url' => '/dolitrace/dolitraceindex.php',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitracecropplan", "read")',
+			'target' => '',
+			'user' => 2,
+			'object' => 'DoliTraceCropplan'
+		);
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace',
+			'type' => 'left',
 			'titre' => 'DoliTraceCropplans',
 			'prefix' => img_picto('', dolifarm_get_fa_icon('cropplan'), 'class="paddingright pictofixedwidth valignmiddle"'),
 			'mainmenu' => 'dolitrace',
@@ -426,7 +442,7 @@ class modDolitrace extends DolibarrModules
 		$this->menu[$r++] = array(
 			'fk_menu' => 'fk_mainmenu=dolitrace',
 			'type' => 'left',
-			'titre' => 'DoliTraceHarvest',
+			'titre' => 'DoliTraceHarvests',
 			'prefix' => img_picto('', dolifarm_get_fa_icon('harvest'), 'class="paddingright pictofixedwidth valignmiddle"'),
 			'mainmenu' => 'dolitrace',
 			'leftmenu' => 'dolitraceharvest',

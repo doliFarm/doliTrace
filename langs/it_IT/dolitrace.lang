@@ -56,3 +56,44 @@ DoliTraceCropplans=Piani di Produzione
 DoliTraceCropplan=Piano di Produzione
 ListDoliTraceCropplan=Lista Piani di Produzione
 NewDoliTraceCropplan=Nuovo Piano di produzione
+
+
+##############################################
+## Piani di produzione
+##############################################
+
+Uuid = Rif. Tracciabilità
+Fkplot = Rif. Appez.
+Fkproject = Rif. Prog. 
+Datestart = Inizio
+Dateend = Fine
+Estimatedyield = Stima Prod. 
+Costmaterial = € Materiali
+Costmanpower = € Manodopera
+Costenergy = € Energia
+Actualcost = Costo Attuale
+Operations = Operazioni
+Harvest = Raccolte
+AddOperation = Registra Operazione
+AddHarvest = Registra Raccolta
+
+
+
+#############################################
+## dolitraceoperation_card
+#############################################
+CropPlan = Piano di produzione
+Dateop = Data Operazione
+OperationType = Tipo operazione
+Weathercond = Condizioni Meteo 
+Fkphenostage = Stadio della pianta
+Fkadversity = Avversità
+Fkmachine = Mezzo utilizzato
+Durationmin = Tempo impegato
+Depthcm = Profondità suolo
+Fkproduct = Prodotto utilizzato
+Batchinput = Lotto utiloizzato
+Qtyused = Quantità
+Watervolha = Q.tà/Ha
+Fkuseroperator = Operatore
+Lastmaindoc = Ultima modifica

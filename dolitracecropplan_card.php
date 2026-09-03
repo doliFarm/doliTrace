@@ -627,7 +627,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
         // -----------------------------------------------------------------
         // Buttons for Harvests and Operations
         // -----------------------------------------------------------------
-        if ($object->status == 1 && $user->rights->dolitrace->dolitracecropplan->write) {
+        if ($permissiontoadd) { //if ($object->status == 1 && $user->rights->dolitrace->dolitracecropplan->write) {
             
             // A. AGGIUNGI OPERAZIONE (Trattamento, Irrigazione, ecc.)
             // Punta alla scheda di creazione operazione, passando l'ID del piano corrente

@@ -122,7 +122,7 @@ llxHeader("", $langs->trans("DolitraceArea"), '', '', 0, 0, '', '', '', 'mod-dol
 dol_include_once('/dolifarm/lib/dolifarm_icons.lib.php');
 print load_fiche_titre($langs->trans("DolitraceArea"), '', dolifarm_get_fa_icon('dolitrace'));
 
-print '<div class="fichecenter"><div class="fichethirdleft">';
+print '<div class="fichecenter">';
 
 
 /* BEGIN MODULEBUILDER DRAFT MYOBJECT
@@ -197,7 +197,6 @@ if (isModEnabled('dolitrace') && $user->hasRight('dolitrace', 'read')) {
 END MODULEBUILDER DRAFT MYOBJECT */
 
 
-print '</div><div class="fichetwothirdright">';
 
 
 /* BEGIN MODULEBUILDER LASTMODIFIED MYOBJECT
@@ -252,7 +251,90 @@ if (isModEnabled('dolitrace') && $user->hasRight('dolitrace', 'read')) {
 }
 */
 
-print '</div></div>';
+
+
+
+// Inizio della griglia responsive per i tre riquadri principali
+print '<div class="div-table-responsive-no-minify">';
+print '<div class="grid-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px;">';
+
+// --------------------------------------------------------
+// RIQUADRO 1: PIANI DI PRODUZIONE
+// --------------------------------------------------------
+print '<div class="box" style="border: 1px solid #ddd; border-radius: 5px; padding: 15px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">';
+print '<div class="box-header" style="border-bottom: 2px solid #0073aa; padding-bottom: 10px; margin-bottom: 15px;">';
+print '<h3 style="margin: 0; color: #222;"><i class="fa fa-calendar-check-o" style="padding-right: 8px; color: #0073aa;"></i>' . $langs->trans("DoliTraceCropplans") . '</h3>';
+print '</div>';
+print '<div class="box-content">';
+print '<p style="color: #666; font-size: 0.9em; margin-bottom: 15px;">' . $langs->trans("Panoramica delle pianificazioni colturali attive.") . '</p>';
+
+// Tabella dimostrativa con dati consolidati
+print '<table class="noborder centpercent">';
+print '<tr class="liste_titre"><th>' . $langs->trans("Cultura") . '</th><th class="right">' . $langs->trans("Superficie") . '</th><th class="center">' . $langs->trans("Status") . '</th></tr>';
+
+print '<tr class="oddeven"><td>Pomodoro Ciliegino</td><td class="right">1.2 Ha</td><td class="center"><span class="badge badge-status" style="background-color: #4bca52; color: white; padding: 2px 6px; border-radius: 3px;">In Corso</span></td></tr>';
+print '<tr class="oddeven"><td>Zucchina Chiara</td><td class="right">0.8 Ha</td><td class="center"><span class="badge badge-status" style="background-color: #4bca52; color: white; padding: 2px 6px; border-radius: 3px;">In Corso</span></td></tr>';
+print '<tr class="oddeven"><td>Patata Novella</td><td class="right">2.5 Ha</td><td class="center"><span class="badge badge-status" style="background-color: #f39c12; color: white; padding: 2px 6px; border-radius: 3px;">Pianificato</span></td></tr>';
+
+print '</table>';
+print '<div style="margin-top: 15px; text-align: right;"><a class="butAction" href="dolitracecropplan_list.php">' . $langs->trans("DoliTraceCropplans") . '</a></div>';
+print '</div>';
+print '</div>';
+
+
+// --------------------------------------------------------
+// RIQUADRO 2: RACCOLTA
+// --------------------------------------------------------
+print '<div class="box" style="border: 1px solid #ddd; border-radius: 5px; padding: 15px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">';
+print '<div class="box-header" style="border-bottom: 2px solid #27ae60; padding-bottom: 10px; margin-bottom: 15px;">';
+print '<h3 style="margin: 0; color: #222;"><i class="fa fa-shopping-basket" style="padding-right: 8px; color: #27ae60;"></i>' . $langs->trans("DoliTraceHarvests") . '</h3>';
+print '</div>';
+print '<div class="box-content">';
+print '<p style="color: #666; font-size: 0.9em; margin-bottom: 15px;">' . $langs->trans("Ultimi volumi raccolti e stime correnti.") . '</p>';
+
+// Tabella dimostrativa dei volumi di raccolta
+print '<table class="noborder centpercent">';
+print '<tr class="liste_titre"><th>' . $langs->trans("Prodotto") . '</th><th class="right">' . $langs->trans("Quantità") . '</th><th class="right">' . $langs->trans("Data") . '</th></tr>';
+
+print '<tr class="oddeven"><td>Fragole</td><td class="right">120 Kg</td><td class="right">Oggi</td></tr>';
+print '<tr class="oddeven"><td>Insalata Gentile</td><td class="right">450 Cestini</td><td class="right">Ieri</td></tr>';
+print '<tr class="oddeven"><td>Melanzane</td><td class="right">80 Kg</td><td class="right">10/06/2026</td></tr>';
+
+print '</table>';
+print '<div style="margin-top: 15px; text-align: right;"><a class="butAction" href="dolitraceharvest_list.php">' . $langs->trans("DoliTraceHarvests") . '</a></div>';
+print '</div>';
+print '</div>';
+
+
+// --------------------------------------------------------
+// RIQUADRO 3: OPERAZIONI COLTURALI
+// --------------------------------------------------------
+print '<div class="box" style="border: 1px solid #ddd; border-radius: 5px; padding: 15px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">';
+print '<div class="box-header" style="border-bottom: 2px solid #e67e22; padding-bottom: 10px; margin-bottom: 15px;">';
+print '<h3 style="margin: 0; color: #222;"><i class="fa fa-wrench" style="padding-right: 8px; color: #e67e22;"></i>' . $langs->trans("DoliTraceOperations") . '</h3>';
+print '</div>';
+print '<div class="box-content">';
+print '<p style="color: #666; font-size: 0.9em; margin-bottom: 15px;">' . $langs->trans("Attività sul campo, trattamenti e irrigazione.") . '</p>';
+
+// Tabella dimostrativa con attività programmate ed effettuate
+print '<table class="noborder centpercent">';
+print '<tr class="liste_titre"><th>' . $langs->trans("Attività") . '</th><th>' . $langs->trans("Zona") . '</th><th class="center">' . $langs->trans("Priorità") . '</th></tr>';
+
+print '<tr class="oddeven"><td>Irrigazione Turno A</td><td>Appezzamento Nord</td><td class="center"><span style="color: #e74c3c; font-weight: bold;">Alta</span></td></tr>';
+print '<tr class="oddeven"><td>Concimazione Organica</td><td>Serra 2</td><td class="center"><span style="color: #f1c40f; font-weight: bold;">Media</span></td></tr>';
+print '<tr class="oddeven"><td>Trattamento Biologico</td><td>Uliveto Scarpata</td><td class="center"><span style="color: #7f8c8d;">Bassa</span></td></tr>';
+
+print '</table>';
+print '<div style="margin-top: 15px; text-align: right;"><a class="butAction" href="dolitraceoperation_list.php">' . $langs->trans("DoliTraceOperations") . '</a></div>';
+print '</div>';
+print '</div>';
+
+print '</div>'; // Fine grid-container
+
+
+
+
+print '</div>';
 
 // End of page
 llxFooter();
