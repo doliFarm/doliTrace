@@ -139,13 +139,13 @@ class InterfaceDolitraceTriggers extends DolibarrTriggers
                             $eatby_date = (dol_now() + (86400 * 180));
 
                             // 1. TROVARE UN MAGAZZINO ATTIVO
-                            // Cerchiamo 'W_PROD' (creato dall'installazione) oppure il primo disponibile
+                            // Cerchiamo il magazzino di produzione (creato all'attivazione) oppure il primo disponibile
                             $warehouse_id = 0;
-                            
-                            // Prima cerchiamo il W_PROD specifico
-                            $sql_w = "SELECT rowid FROM ".MAIN_DB_PREFIX."entrepot WHERE ref = 'W_PROD' AND entity = ".$conf->entity;
+
+                            // Prima cerchiamo il magazzino salvato in DOLITRACE_WAREHOUSE_PROD
+                            $sql_w = "SELECT rowid FROM ".MAIN_DB_PREFIX."entrepot WHERE rowid = ".getDolGlobalInt('DOLITRACE_WAREHOUSE_PROD')." AND entity = ".((int) $conf->entity);
                             $res_w = $this->db->query($sql_w);
-                            if ($obj_w = $this->db->fetch_object($res_w)) {
+                            if ($res_w && ($obj_w = $this->db->fetch_object($res_w))) {
                                 $warehouse_id = $obj_w->rowid;
                             } else {
                                 // Fallback: Primo magazzino attivo qualunque
