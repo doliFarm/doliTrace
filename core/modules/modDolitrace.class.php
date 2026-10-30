@@ -720,39 +720,8 @@ class modDolitrace extends DolibarrModules
 				));
 			}
 		}
-		 // =========================================================================
-        // [DOLITRACE] AUTO-CHECK: Creazione Magazzino di Produzione
-        // Eseguito ogni volta che il modulo viene caricato.
-        // La query SELECT è leggerissima, quindi non impatta le performance.
-        // =========================================================================
-        // TODO dare al magazzino un nome dalla inerfaccia di admin
-        // 1. Controllo veloce se esiste il magazzino W_PROD
-        $sqlCheck = "SELECT rowid FROM ".MAIN_DB_PREFIX."entrepot WHERE ref = 'W_PROD' LIMIT 1";
-        $resCheck = $this->db->query($sqlCheck);
+		$this->initProductionWarehouse();
 
-        if ($resCheck) {
-            if ($this->db->num_rows($resCheck) == 0) {
-                // 2. Se non esiste, lo creo via PHP (Metodo Robusto)
-                require_once DOL_DOCUMENT_ROOT . '/product/stock/class/entrepot.class.php';
-                global $user, $langs; // Usiamo l'utente corrente (Admin)
-
-                $newWarehouse = new Entrepot($this->db);
-                $newWarehouse->ref = "W_PROD";
-                $newWarehouse->label = "Magazzino Produzione";
-                $newWarehouse->lieu = "Virtuale";
-                $newWarehouse->description = "Magazzino tecnico per la gestione dei lotti di campagna (Creato da DoliTrace)";
-                $newWarehouse->statut = 1; // Attivo
-                
-                // Creazione
-                $res = $newWarehouse->create($user);
-                
-                if ($res > 0) {
-                   dol_syslog("DOLITRACE: Magazzino W_PROD creato con successo via PHP.");
-                } else {
-                   dol_syslog("DOLITRACE ERROR: Fallita creazione magazzino W_PROD: " . $newWarehouse->error, LOG_ERR);
-                }
-            }
-        }
 		return $this->_init($sql, $options);
 	}
 
@@ -768,5 +737,64 @@ class modDolitrace extends DolibarrModules
 	{
 		$sql = array();
 		return $this->_remove($sql, $options);
+	}
+
+	/**
+	 *	Find or create the production warehouse of the harvest lots, and save its id in DOLITRACE_WAREHOUSE_PROD.
+	 *	Entrepot::create() saves the label in the ref column, so the warehouse is found by id, not by ref.
+	 *
+	 *	@return	int		Id of the warehouse, <0 if KO
+	 */
+	public function initProductionWarehouse()
+	{
+		global $conf, $user;
+
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
+		require_once DOL_DOCUMENT_ROOT.'/product/stock/class/entrepot.class.php';
+
+		$label = 'Magazzino Produzione';
+		$warehouseid = 0;
+
+		// 1. Warehouse already saved in the constant, if it still exists
+		$savedid = getDolGlobalInt('DOLITRACE_WAREHOUSE_PROD');
+		if ($savedid > 0) {
+			$sql = "SELECT rowid FROM ".$this->db->prefix()."entrepot WHERE rowid = ".((int) $savedid)." AND entity IN (".getEntity('stock').")";
+			$resql = $this->db->query($sql);
+			if ($resql && ($obj = $this->db->fetch_object($resql))) {
+				$warehouseid = (int) $obj->rowid;
+			}
+		}
+
+		// 2. Warehouse created by an earlier version (ref 'Magazzino Produzione' or 'W_PROD')
+		if (!$warehouseid) {
+			$sql = "SELECT rowid FROM ".$this->db->prefix()."entrepot";
+			$sql .= " WHERE ref IN ('".$this->db->escape($label)."', 'W_PROD') AND entity = ".((int) $conf->entity);
+			$sql .= " ORDER BY rowid LIMIT 1";
+			$resql = $this->db->query($sql);
+			if ($resql && ($obj = $this->db->fetch_object($resql))) {
+				$warehouseid = (int) $obj->rowid;
+			}
+		}
+
+		// 3. New warehouse
+		if (!$warehouseid) {
+			$warehouse = new Entrepot($this->db);
+			$warehouse->label = $label;
+			$warehouse->lieu = 'Virtuale';
+			$warehouse->description = 'Magazzino tecnico per la gestione dei lotti di campagna (creato da doliTrace)';
+			$warehouse->statut = Entrepot::STATUS_OPEN_ALL;
+			$warehouseid = $warehouse->create($user);
+			if ($warehouseid <= 0) {
+				dol_syslog(__METHOD__." production warehouse not created: ".$warehouse->error, LOG_ERR);
+				return -1;
+			}
+			dol_syslog(__METHOD__." production warehouse created, id ".$warehouseid);
+		}
+
+		if ($warehouseid != $savedid) {
+			dolibarr_set_const($this->db, 'DOLITRACE_WAREHOUSE_PROD', $warehouseid, 'chaine', 0, 'Production warehouse of the harvest lots', $conf->entity);
+		}
+
+		return $warehouseid;
 	}
 }
