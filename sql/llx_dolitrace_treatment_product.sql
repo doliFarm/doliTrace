@@ -37,7 +37,8 @@ CREATE TABLE IF NOT EXISTS llx_dolitrace_treatment_product(
 	qty_auto			smallint DEFAULT 1 NOT NULL,		-- 1 computed, 0 entered by the user
 	n_applied			double(24,8),						-- kg of nitrogen per hectare
 	batch				varchar(128),
-	stock_status		smallint DEFAULT 0 NOT NULL,		-- 0 not needed, 1 moved, 2 to regularize
+	stock_status		smallint DEFAULT 0 NOT NULL,		-- 0 not needed, 1 moved, 2 to regularize, 3 put back (canceled or replaced)
+	stock_error			varchar(255),						-- reason of a movement to regularize
 	fk_warehouse		integer,
 	fk_stock_movement	integer
 ) ENGINE=innodb;

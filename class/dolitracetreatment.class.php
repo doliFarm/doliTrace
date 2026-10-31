@@ -842,6 +842,13 @@ class DoliTraceTreatment extends CommonObject
 			$this->oldref = $oldref;
 			$this->status = self::STATUS_VALIDATED;
 			$this->db->commit();
+
+			// Stock: never blocks the register (products to regularize are shown on the card)
+			if ($previous) {
+				$previous->status = self::STATUS_REPLACED;
+				$previous->reverseStock($user);
+			}
+			$this->moveStock($user);
 			return 1;
 		} else {
 			$this->ref = $oldref;
@@ -1324,7 +1331,165 @@ class DoliTraceTreatment extends CommonObject
 			return -1;
 		}
 		$this->db->commit();
+		$this->reverseStock($user);
 		return 1;
+	}
+
+	/**
+	 * Take the products of a validated record out of the inputs warehouse of the farm
+	 *
+	 * Each product is moved in its own transaction, after the validation: an error of the stock never blocks the register,
+	 * the product stays "to regularize" with the reason and the movement can be tried again.
+	 *
+	 * @param	User	$user	User that validates
+	 * @return	int				Number of products moved, <0 if at least one product is to regularize
+	 */
+	public function moveStock(User $user)
+	{
+		return $this->stockMovements($user, false);
+	}
+
+	/**
+	 * Put back in stock the products taken out by a record that is canceled or replaced
+	 *
+	 * @param	User	$user	User that cancels or replaces
+	 * @return	int				Number of products put back, <0 if KO
+	 */
+	public function reverseStock(User $user)
+	{
+		return $this->stockMovements($user, true);
+	}
+
+	/**
+	 * Stock movements of the products of the record (MouvementStock, never SQL on the stock tables)
+	 *
+	 * @param	User	$user		User of the action
+	 * @param	bool	$reverse	False to take the products out, true to put back what was taken out
+	 * @return	int					Number of products moved, <0 if at least one movement failed
+	 */
+	private function stockMovements(User $user, $reverse)
+	{
+		global $langs;
+
+		if (!isModEnabled('stock') || $this->fetchLines() < 0) {
+			return 0;
+		}
+		require_once DOL_DOCUMENT_ROOT.'/product/stock/class/mouvementstock.class.php';
+		require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
+		dol_include_once('/dolifarm/lib/dolifarm_warehouse.lib.php');
+		$langs->load('dolitrace@dolitrace');
+
+		$warehouseid = ($reverse ? 0 : dolifarmGetFarmWarehouse($this->db, (int) $this->fk_soc, 'inputs'));
+		$moved = 0;
+		$failed = 0;
+		$changes = array();
+		foreach ($this->products as $product) {
+			$status = (int) $product->stock_status;
+			$movementid = $product->fk_stock_movement;
+			$rowwarehouse = $product->fk_warehouse;
+			$error = '';
+			if ($reverse) {
+				// Only what was taken out goes back; nothing is left to regularize on a canceled record
+				if ($status == DoliTraceTreatmentProduct::STOCK_TO_REGULARIZE) {
+					$status = DoliTraceTreatmentProduct::STOCK_NONE;
+				}
+				if ($status != DoliTraceTreatmentProduct::STOCK_MOVED) {
+					if ($status != $product->stock_status) {
+						$this->saveStockStatus($product, $status, '', $rowwarehouse, $movementid);
+					}
+					continue;
+				}
+			} elseif ($status == DoliTraceTreatmentProduct::STOCK_MOVED || $status == DoliTraceTreatmentProduct::STOCK_REVERSED) {
+				continue;
+			}
+
+			$prod = new Product($this->db);
+			if (empty($product->fk_product) || $prod->fetch($product->fk_product) <= 0 || $prod->type != Product::TYPE_PRODUCT) {
+				// No product of the stock: nothing to move
+				if ($status != DoliTraceTreatmentProduct::STOCK_NONE || (string) $product->stock_error !== '') {
+					$this->saveStockStatus($product, DoliTraceTreatmentProduct::STOCK_NONE, '', null, null);
+				}
+				continue;
+			}
+			$batch = ($prod->hasbatch() ? (string) $product->batch : '');
+			if (!$reverse) {
+				$rowwarehouse = $warehouseid;
+				if ($warehouseid <= 0) {
+					$error = $langs->trans('ErrorTreatmentNoWarehouse');
+				} elseif (!($product->qty_total > 0)) {
+					$error = $langs->trans('ErrorTreatmentQtyTotal', $product->product_label);
+				} elseif ($prod->hasbatch() && $batch === '') {
+					$error = $langs->trans('ErrorTreatmentBatchRequired');
+				}
+			}
+
+			if ($error === '') {
+				$this->db->begin();
+				$mouv = new MouvementStock($this->db);
+				$mouv->setOrigin($this->element.'@dolitrace', $this->id);
+				if ($reverse) {
+					$label = $langs->trans('TreatmentStockReversal', $this->ref);
+					$result = $mouv->reception($user, $prod->id, $rowwarehouse, (float) $product->qty_total, (float) $prod->pmp, $label, '', '', $batch, dol_now());
+				} else {
+					$label = $langs->trans('TreatmentStockTaken', $this->ref);
+					$result = $mouv->livraison($user, $prod->id, $rowwarehouse, (float) $product->qty_total, (float) $prod->pmp, $label, $this->date_start, '', '', $batch);
+				}
+				if ($result > 0) {
+					$this->db->commit();
+					$status = ($reverse ? DoliTraceTreatmentProduct::STOCK_REVERSED : DoliTraceTreatmentProduct::STOCK_MOVED);
+					$movementid = ($reverse ? $movementid : (int) $result);
+					$moved++;
+				} else {
+					$this->db->rollback();
+					$error = dol_string_nohtmltag(dol_html_entity_decode($mouv->error ? $mouv->error : implode(', ', $mouv->errors), ENT_QUOTES | ENT_HTML5));
+					if ($error === '') {
+						$error = $langs->trans('ErrorTreatmentStockMovement');
+					}
+				}
+			}
+			if ($error !== '') {
+				$failed++;
+				if (!$reverse) {
+					$status = DoliTraceTreatmentProduct::STOCK_TO_REGULARIZE;
+				}
+				dol_syslog(__METHOD__.' record '.$this->id.' product '.$product->id.': '.$error, LOG_WARNING);
+			}
+			$this->saveStockStatus($product, $status, $error, $rowwarehouse, $movementid);
+			$changes[] = array('product' => $product->product_label, 'qty' => $product->qty_total, 'unit' => $product->qty_unit, 'batch' => $batch,
+				'warehouse' => (int) $rowwarehouse, 'movement' => ($error === '' && !$reverse ? (int) $movementid : 0), 'reverse' => $reverse ? 1 : 0, 'error' => $error);
+		}
+		if (count($changes)) {
+			$this->addLog($user, 'STOCK', '', $changes);
+		}
+		return ($failed ? -1 : $moved);
+	}
+
+	/**
+	 * Save the state of the stock of a product of the record (these columns are not part of the content of the register)
+	 *
+	 * @param	DoliTraceTreatmentProduct	$product		Product of the record
+	 * @param	int							$status			State of the stock
+	 * @param	string						$error			Reason of a movement to regularize
+	 * @param	int|null					$warehouseid	Warehouse
+	 * @param	int|null					$movementid		Movement that took the product out
+	 * @return	void
+	 */
+	private function saveStockStatus($product, $status, $error, $warehouseid, $movementid)
+	{
+		$sql = "UPDATE ".$this->db->prefix()."dolitrace_treatment_product SET";
+		$sql .= " stock_status = ".((int) $status);
+		$sql .= ", stock_error = ".($error !== '' ? "'".$this->db->escape(dol_trunc($error, 250, 'right', 'UTF-8', 1))."'" : "NULL");
+		$sql .= ", fk_warehouse = ".($warehouseid > 0 ? ((int) $warehouseid) : "NULL");
+		$sql .= ", fk_stock_movement = ".($movementid > 0 ? ((int) $movementid) : "NULL");
+		$sql .= " WHERE rowid = ".((int) $product->id);
+		if (!$this->db->query($sql)) {
+			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
+			return;
+		}
+		$product->stock_status = $status;
+		$product->stock_error = ($error !== '' ? $error : null);
+		$product->fk_warehouse = $warehouseid;
+		$product->fk_stock_movement = $movementid;
 	}
 
 	/**
@@ -2035,6 +2200,7 @@ class DoliTraceTreatmentProduct extends DoliTraceTreatmentRow
 	const STOCK_NONE = 0;
 	const STOCK_MOVED = 1;
 	const STOCK_TO_REGULARIZE = 2;
+	const STOCK_REVERSED = 3;
 
 	/**
 	 * @inheritdoc
@@ -2062,7 +2228,8 @@ class DoliTraceTreatmentProduct extends DoliTraceTreatmentRow
 		'qty_auto' => array('type' => 'integer', 'label' => 'TreatmentQtyAuto', 'enabled' => 1, 'position' => 35, 'notnull' => 1, 'visible' => 0, 'default' => '1'),
 		'n_applied' => array('type' => 'double(24,8)', 'label' => 'TreatmentNApplied', 'enabled' => 1, 'position' => 35, 'notnull' => 0, 'visible' => 1),
 		'batch' => array('type' => 'varchar(128)', 'label' => 'Batch', 'enabled' => 1, 'position' => 40, 'notnull' => 0, 'visible' => 1),
-		'stock_status' => array('type' => 'integer', 'label' => 'TreatmentStockStatus', 'enabled' => 1, 'position' => 50, 'notnull' => 1, 'visible' => 0, 'default' => '0'),
+		'stock_status' => array('type' => 'integer', 'label' => 'TreatmentStockStatus', 'enabled' => 1, 'position' => 50, 'notnull' => 1, 'visible' => 0, 'default' => '0', 'arrayofkeyval' => array('0' => 'TreatmentStockNone', '1' => 'TreatmentStockMoved', '2' => 'TreatmentStockToRegularize', '3' => 'TreatmentStockReversed')),
+		'stock_error' => array('type' => 'varchar(255)', 'label' => 'TreatmentStockError', 'enabled' => 1, 'position' => 53, 'notnull' => 0, 'visible' => 0),
 		'fk_warehouse' => array('type' => 'integer', 'label' => 'Warehouse', 'enabled' => 1, 'position' => 51, 'notnull' => 0, 'visible' => 0),
 		'fk_stock_movement' => array('type' => 'integer', 'label' => 'StockMovement', 'enabled' => 1, 'position' => 52, 'notnull' => 0, 'visible' => 0),
 	);
@@ -2166,6 +2333,11 @@ class DoliTraceTreatmentProduct extends DoliTraceTreatmentRow
 	 * @var int
 	 */
 	public $stock_status;
+
+	/**
+	 * @var ?string	Reason of a movement to regularize
+	 */
+	public $stock_error;
 
 	/**
 	 * @var ?int

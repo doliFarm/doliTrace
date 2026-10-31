@@ -99,7 +99,7 @@ dol_include_once('/dolifarm/lib/dolifarm_access.lib.php');
 dol_include_once('/dolifarm/lib/dolifarm_farm.lib.php');
 
 // Load translation files required by the page
-$langs->loadLangs(array("dolitrace@dolitrace", "dolifarm@dolifarm", "other"));
+$langs->loadLangs(array("dolitrace@dolitrace", "dolifarm@dolifarm", "productbatch", "other"));
 
 // Get parameters
 $id = GETPOSTINT('id');
@@ -214,6 +214,17 @@ if (empty($reshook)) {
 		}
 		setEventMessages($object->error, $object->errors, 'errors');
 		$action = '';
+	}
+
+	// Stock movements to regularize, tried again
+	if ($action == 'confirm_movestock' && $permissiontovalidate && $object->status == $object::STATUS_VALIDATED) {
+		if ($object->moveStock($user) < 0) {
+			setEventMessages($langs->trans('TreatmentStockStillToRegularize'), null, 'warnings');
+		} else {
+			setEventMessages($langs->trans('TreatmentStockRegularized'), null);
+		}
+		header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+		exit;
 	}
 
 	// Cancellation of a validated record, with its reason
@@ -784,9 +795,15 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	print '<td class="right">'.$langs->trans('TreatmentDose').'</td>';
 	print '<td class="right">'.$langs->trans('TreatmentQtyTotal').'</td>';
 	print '<td>'.$langs->trans('Batch').'</td>';
-	print '<td class="width50"></td>';
+	print '<td class="'.($caneditrows ? 'width50' : 'center').'">'.($caneditrows ? '' : $langs->trans('TreatmentStockStatus')).'</td>';
 	print '</tr>';
 
+	$stockbadges = array(
+		DoliTraceTreatmentProduct::STOCK_MOVED => 'status4',
+		DoliTraceTreatmentProduct::STOCK_TO_REGULARIZE => 'status8',
+		DoliTraceTreatmentProduct::STOCK_REVERSED => 'status6',
+	);
+	$toregularize = 0;
 	foreach ($object->products as $product) {
 		print '<tr class="oddeven">';
 		if ($product->fk_agrodrug > 0) {
@@ -808,11 +825,24 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		print '<td class="right nowraponall">'.price($product->dose, 0, $langs, 0, -1, -1).' '.dol_escape_htmltag($product->dose_unit_label).'</td>';
 		print '<td class="right nowraponall">'.($product->qty_total !== null && $product->qty_total !== '' ? price($product->qty_total, 0, $langs, 0, -1, -1).' '.dol_escape_htmltag($product->qty_unit) : '').'</td>';
 		print '<td>'.dol_escape_htmltag($product->batch).'</td>';
-		print '<td class="right">';
 		if ($caneditrows) {
-			print '<a class="reposition" href="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'&action=deleteproduct&lineid='.$product->id.'&token='.newToken().'">'.img_delete().'</a>';
+			print '<td class="right"><a class="reposition" href="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'&action=deleteproduct&lineid='.$product->id.'&token='.newToken().'">'.img_delete().'</a></td>';
+		} else {
+			// State of the stock: taken out of the warehouse, to regularize (with the reason) or put back
+			print '<td class="center minwidth150">';
+			if (isset($stockbadges[$product->stock_status])) {
+				$title = (string) $product->stock_error;
+				if ($product->fk_warehouse > 0) {
+					$title .= ($title ? ' - ' : '').$langs->trans('Warehouse').' '.((int) $product->fk_warehouse).($product->fk_stock_movement > 0 ? ', '.$langs->trans('StockMovement').' '.((int) $product->fk_stock_movement) : '');
+				}
+				print dolGetStatus($langs->trans($product->fields['stock_status']['arrayofkeyval'][$product->stock_status]), '', '', $stockbadges[$product->stock_status], 5, '', array('badgeParams' => array('attr' => array('title' => $title))));
+				if ($product->stock_status == DoliTraceTreatmentProduct::STOCK_TO_REGULARIZE) {
+					$toregularize++;
+					print '<br><span class="small opacitymedium">'.dol_escape_htmltag((string) $product->stock_error).'</span>';
+				}
+			}
+			print '</td>';
 		}
-		print '</td>';
 		print '</tr>';
 	}
 	if (empty($object->products) && !$caneditrows) {
@@ -853,6 +883,10 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	print '</div>';
 	print '</form>';
 
+	if ($toregularize > 0 && $object->status == $object::STATUS_VALIDATED) {
+		print info_admin($langs->trans('TreatmentStockToRegularizeInfo', $toregularize), 0, 0, 'warning');
+	}
+
 	// Buttons for actions
 
 	if ($action != 'presend' && $action != 'editline') {
@@ -892,6 +926,10 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 					print dolGetButtonAction($langs->trans('ErrorTreatmentCorrectionExists'), $langs->trans('TreatmentCorrect'), 'default', '#', '', 0);
 				} else {
 					print dolGetButtonAction('', $langs->trans('TreatmentCorrect'), 'default', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=correct&token='.newToken(), '', $permissiontovalidate);
+				}
+				// Try again the stock movements to regularize
+				if ($toregularize > 0 && isModEnabled('stock')) {
+					print dolGetButtonAction('', $langs->trans('TreatmentStockRegularize'), 'default', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=confirm_movestock&token='.newToken(), '', $permissiontovalidate);
 				}
 				// Cancel, with the reason
 				print dolGetButtonAction('', $langs->trans('TreatmentCancel'), 'danger', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=cancelrecord&token='.newToken(), '', $permissiontovalidate);
