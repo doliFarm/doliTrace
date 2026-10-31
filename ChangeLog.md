@@ -2,7 +2,7 @@
 
 ## 1.1.0
 
-Registro dei trattamenti e delle fertilizzazioni (Reg. UE 2023/564) e magazzino delle raccolte con le classi di Dolibarr. Richiede doliFarm con operatori, fertilizzanti, visibilità per commerciale e azienda unica (versione successiva alla 1.2.0). Dopo l'aggiornamento disattivare e riattivare il modulo per creare tabelle, dizionari e menu.
+Registro dei trattamenti e delle fertilizzazioni (Reg. UE 2023/564) e magazzino delle raccolte con le classi di Dolibarr. Richiede doliFarm 1.3.0 o successiva (operatori, fertilizzanti, visibilità per commerciale e azienda unica): aggiornare doliFarm prima di doliTrace. Dopo l'aggiornamento disattivare e riattivare il modulo per creare tabelle, dizionari e menu.
 
 ### Registro dei trattamenti e delle fertilizzazioni
 - Nuovo oggetto Registrazione (riferimento REG): trattamento fitosanitario o fertilizzazione, su superfici, spazi chiusi o sementi; azienda e fascicolo, date di inizio e fine, motivo, operatore, contoterzista, macchina, volume d'acqua, condizioni meteo.
