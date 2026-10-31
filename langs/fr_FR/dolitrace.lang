@@ -4,3 +4,20 @@
 HarvestStockReceived = Récolte %s
 HarvestStockCancelled = Annulation de la récolte %s
 ErrorDolitraceNoProductionWarehouse = Entrepôt de production introuvable : désactiver et réactiver le module doliTrace pour le créer
+
+# Dictionaries of the register
+DictionaryAdversity = Ennemis des cultures (codes OEPP)
+DictionaryDoseUnit = Unités de dose
+Kind = Usage
+Technical_type = Type technique
+Basis = Unité traitée
+Qty_unit = Unité du total
+Factor = Facteur
+AdversityCodeHelp = Code OEPP de l'ennemi (animal, champignon, bactérie, virus, adventice), à chercher sur gd.eppo.int ou dans l'onglet Codes OEPP de doliFarm
+AdversityCategoryHelp = FUNGUS, BACTERIUM, PHYTOPLASMA, VIRUS, INSECT, MITE, NEMATODE, MOLLUSC, WEED, OTHER
+DoseUnitCodeHelp = Code de l'unité, par exemple KG_HA
+DoseUnitKindHelp = 0 traitements et fertilisations, 1 phytosanitaire seulement, 2 fertilisation seulement
+DoseUnitTechnicalTypeHelp = 0 toutes, 1 surfaces, 2 espaces clos, 3 semences (Règl. UE 2023/564)
+DoseUnitBasisHelp = Unité de la quantité traitée : HA, M2, M3, HL (eau), KG ou T (semence ou produit)
+DoseUnitQtyUnitHelp = Unité de la quantité totale de produit : kg, l, t, m3
+DoseUnitFactorHelp = Quantité totale = dose × quantité traitée × facteur (par exemple 0.001 pour g/ha → kg)

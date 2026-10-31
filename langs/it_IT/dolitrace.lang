@@ -102,3 +102,20 @@ Lastmaindoc = Ultima modifica
 HarvestStockReceived = Raccolta %s
 HarvestStockCancelled = Annullamento della raccolta %s
 ErrorDolitraceNoProductionWarehouse = Magazzino di produzione non trovato: disattivare e riattivare il modulo doliTrace per crearlo
+
+# Dictionaries of the register
+DictionaryAdversity = Avversità (codici EPPO)
+DictionaryDoseUnit = Unità di dose
+Kind = Uso
+Technical_type = Tipologia tecnica
+Basis = Unità trattata
+Qty_unit = Unità del totale
+Factor = Fattore
+AdversityCodeHelp = Codice EPPO dell'avversità (animale, fungo, batterio, virus, pianta infestante), cercabile su gd.eppo.int o nella scheda Codici EPPO di doliFarm
+AdversityCategoryHelp = FUNGUS, BACTERIUM, PHYTOPLASMA, VIRUS, INSECT, MITE, NEMATODE, MOLLUSC, WEED, OTHER
+DoseUnitCodeHelp = Codice della unità, per esempio KG_HA
+DoseUnitKindHelp = 0 trattamenti e fertilizzazioni, 1 solo trattamenti fitosanitari, 2 solo fertilizzazioni
+DoseUnitTechnicalTypeHelp = 0 tutte, 1 superfici, 2 ambienti chiusi, 3 sementi (Reg. UE 2023/564)
+DoseUnitBasisHelp = Unità della quantità trattata: HA, M2, M3, HL (acqua), KG o T (seme o prodotto)
+DoseUnitQtyUnitHelp = Unità della quantità totale di prodotto: kg, l, t, m3
+DoseUnitFactorHelp = Quantità totale = dose × quantità trattata × fattore (per esempio 0.001 per g/ha → kg)

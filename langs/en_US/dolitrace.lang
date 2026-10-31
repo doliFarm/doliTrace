@@ -45,3 +45,20 @@ MyWidgetDescription = My widget description
 HarvestStockReceived = Harvest %s
 HarvestStockCancelled = Harvest %s cancelled
 ErrorDolitraceNoProductionWarehouse = Production warehouse not found: disable and enable the doliTrace module again to create it
+
+# Dictionaries of the register
+DictionaryAdversity = Adversities (EPPO codes)
+DictionaryDoseUnit = Units of dose
+Kind = Use
+Technical_type = Technical type
+Basis = Treated unit
+Qty_unit = Unit of the total
+Factor = Factor
+AdversityCodeHelp = EPPO code of the adversity (animal, fungus, bacterium, virus, weed), searchable on gd.eppo.int or in the EPPO Codes tab of doliFarm
+AdversityCategoryHelp = FUNGUS, BACTERIUM, PHYTOPLASMA, VIRUS, INSECT, MITE, NEMATODE, MOLLUSC, WEED, OTHER
+DoseUnitCodeHelp = Code of the unit, for example KG_HA
+DoseUnitKindHelp = 0 treatments and fertilizations, 1 plant protection only, 2 fertilization only
+DoseUnitTechnicalTypeHelp = 0 all, 1 surfaces, 2 closed spaces, 3 seeds (Reg. EU 2023/564)
+DoseUnitBasisHelp = Unit of the treated quantity: HA, M2, M3, HL (water), KG or T (seed or product)
+DoseUnitQtyUnitHelp = Unit of the total quantity of product: kg, l, t, m3
+DoseUnitFactorHelp = Total quantity = dose × treated quantity × factor (for example 0.001 for g/ha → kg)

@@ -257,7 +257,27 @@ class modDolitrace extends DolibarrModules
 		 );
 		 */
 		/* BEGIN MODULEBUILDER DICTIONARIES */
-		$this->dictionaries = array();
+		// Register of the treatments and fertilizations: adversities (EPPO codes) and units of dose
+		$this->dictionaries = array(
+			'langs' => 'dolitrace@dolitrace',
+			'tabname' => array('dolitrace_c_adversity', 'dolitrace_c_dose_unit'),
+			'tablib' => array('DictionaryAdversity', 'DictionaryDoseUnit'),
+			'tabsql' => array(
+				'SELECT rowid, code, label, category, active, position FROM '.MAIN_DB_PREFIX.'dolitrace_c_adversity',
+				'SELECT rowid, code, label, kind, technical_type, basis, qty_unit, factor, active, position FROM '.MAIN_DB_PREFIX.'dolitrace_c_dose_unit',
+			),
+			'tabsqlsort' => array('position ASC, label ASC', 'position ASC, code ASC'),
+			'tabfield' => array('code,label,category,position', 'code,label,kind,technical_type,basis,qty_unit,factor,position'),
+			'tabfieldvalue' => array('code,label,category,position', 'code,label,kind,technical_type,basis,qty_unit,factor,position'),
+			'tabfieldinsert' => array('code,label,category,position', 'code,label,kind,technical_type,basis,qty_unit,factor,position'),
+			'tabrowid' => array('rowid', 'rowid'),
+			'tabcond' => array(isModEnabled('dolitrace'), isModEnabled('dolitrace')),
+			'tabhelp' => array(
+				array('code' => $langs->trans('AdversityCodeHelp'), 'category' => $langs->trans('AdversityCategoryHelp')),
+				array('code' => $langs->trans('DoseUnitCodeHelp'), 'kind' => $langs->trans('DoseUnitKindHelp'), 'technical_type' => $langs->trans('DoseUnitTechnicalTypeHelp'),
+					'basis' => $langs->trans('DoseUnitBasisHelp'), 'qty_unit' => $langs->trans('DoseUnitQtyUnitHelp'), 'factor' => $langs->trans('DoseUnitFactorHelp')),
+			),
+		);
 		/* END MODULEBUILDER DICTIONARIES */
 
 		// Boxes/Widgets
