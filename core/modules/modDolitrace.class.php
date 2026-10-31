@@ -608,6 +608,36 @@ class modDolitrace extends DolibarrModules
 			'user' => 2,
 			'object' => 'DoliTraceTreatment'
 		);
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitracetreatment',
+			'type' => 'left',
+			'titre' => 'TreatmentExport',
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitrace_treatment_export',
+			'url' => '/dolitrace/dolitracetreatment_export.php',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitracetreatment", "read")',
+			'target' => '',
+			'user' => 2,
+			'object' => 'DoliTraceTreatment'
+		);
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitracetreatment',
+			'type' => 'left',
+			'titre' => 'TreatmentImport',
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitrace_treatment_import',
+			'url' => '/dolitrace/dolitracetreatment_import.php',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitracetreatment", "write")',
+			'target' => '',
+			'user' => 2,
+			'object' => 'DoliTraceTreatment'
+		);
 		/* END MODULEBUILDER LEFTMENU DOLITRACETREATMENT */
 		/* BEGIN MODULEBUILDER LEFTMENU MYOBJECT */
 		/*
