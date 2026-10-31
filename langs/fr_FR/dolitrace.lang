@@ -1,0 +1,6 @@
+
+
+# Stock movements of the harvests
+HarvestStockReceived = Récolte %s
+HarvestStockCancelled = Annulation de la récolte %s
+ErrorDolitraceNoProductionWarehouse = Entrepôt de production introuvable : désactiver et réactiver le module doliTrace pour le créer

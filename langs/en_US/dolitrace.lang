@@ -40,3 +40,8 @@ MyPageName = My page name
 #
 MyWidget = My widget
 MyWidgetDescription = My widget description
+
+# Stock movements of the harvests
+HarvestStockReceived = Harvest %s
+HarvestStockCancelled = Harvest %s cancelled
+ErrorDolitraceNoProductionWarehouse = Production warehouse not found: disable and enable the doliTrace module again to create it

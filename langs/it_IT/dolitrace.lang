@@ -97,3 +97,8 @@ Qtyused = Quantità
 Watervolha = Q.tà/Ha
 Fkuseroperator = Operatore
 Lastmaindoc = Ultima modifica
+
+# Stock movements of the harvests
+HarvestStockReceived = Raccolta %s
+HarvestStockCancelled = Annullamento della raccolta %s
+ErrorDolitraceNoProductionWarehouse = Magazzino di produzione non trovato: disattivare e riattivare il modulo doliTrace per crearlo
