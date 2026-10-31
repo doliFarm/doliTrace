@@ -198,10 +198,31 @@ if (empty($reshook)) {
 	$triggermodname = $object->TRIGGER_PREFIX.'_MODIFY'; // Name of trigger action code to execute when we modify record. Used in actions_addupdatedelete.inc.php
 
 	// A validated record of the register is never modified: it is corrected with a new version
-	if (!$isdraft && in_array($action, array('edit', 'update', 'confirm_delete', 'confirm_setdraft', 'confirm_reopen', 'confirm_clone', 'addtarget', 'addproduct', 'confirm_deletetarget', 'confirm_deleteproduct'))) {
+	if (!$isdraft && in_array($action, array('edit', 'update', 'confirm_delete', 'confirm_setdraft', 'confirm_reopen', 'confirm_clone', 'confirm_close', 'addtarget', 'addproduct', 'confirm_deletetarget', 'confirm_deleteproduct'))) {
 		$action = '';
 	}
-	if ($action == 'confirm_validate' && !$permissiontovalidate) {
+	if (in_array($action, array('confirm_validate', 'confirm_correct', 'confirm_cancelrecord')) && !$permissiontovalidate) {
+		$action = '';
+	}
+
+	// Correction: a new draft version of a validated record
+	if ($action == 'confirm_correct' && $confirm == 'yes') {
+		$newid = $object->createCorrection($user, GETPOST('reason', 'alphanohtml'));
+		if ($newid > 0) {
+			header('Location: '.$_SERVER['PHP_SELF'].'?id='.$newid);
+			exit;
+		}
+		setEventMessages($object->error, $object->errors, 'errors');
+		$action = '';
+	}
+
+	// Cancellation of a validated record, with its reason
+	if ($action == 'confirm_cancelrecord' && $confirm == 'yes') {
+		if ($object->cancelRecord($user, GETPOST('reason', 'alphanohtml')) > 0) {
+			header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+			exit;
+		}
+		setEventMessages($object->error, $object->errors, 'errors');
 		$action = '';
 	}
 
@@ -262,6 +283,10 @@ if (empty($reshook)) {
 		if (!$error && $target->create($user) < 0) {
 			$error++;
 			setEventMessages($target->error, $target->errors, 'errors');
+		}
+		if (!$error && ($object->fetchLines() < 0 || $object->updateAutoQuantities($user) < 0)) {
+			$error++;
+			setEventMessages($object->error, $object->errors, 'errors');
 		}
 		if (!$error) {
 			header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
@@ -327,25 +352,19 @@ if (empty($reshook)) {
 			$product->fk_dose_unit = (int) $unit->rowid;
 			$product->dose_unit_label = $unit->label;
 			$product->qty_unit = $unit->qty_unit;
-			// Total quantity: given by the user, otherwise dose x treated quantity x factor
-			if (GETPOST('qty_total', 'alpha') !== '') {
-				$product->qty_total = price2num(GETPOST('qty_total', 'alpha'));
-			} else {
-				$basisqty = dolitraceTreatmentQtyInBasis($object, $unit->basis);
-				$product->qty_total = ($basisqty !== null && $product->dose > 0) ? price2num($product->dose * $basisqty * $unit->factor, 'MS') : null;
-			}
-			// Nitrogen applied per hectare
-			$hectares = dolitraceTreatmentQtyInBasis($object, 'HA');
-			if ($product->n_content > 0 && $product->qty_total > 0 && $hectares > 0 && in_array($unit->qty_unit, array('kg', 't'))) {
-				$kg = $product->qty_total * ($unit->qty_unit == 't' ? 1000 : 1);
-				$product->n_applied = price2num($kg * $product->n_content / 100 / $hectares, 'MS');
-			}
 		}
+		// Total quantity: given by the user, otherwise computed (see DoliTraceTreatment::updateAutoQuantities())
+		$product->qty_auto = (GETPOST('qty_total', 'alpha') === '' ? 1 : 0);
+		$product->qty_total = ($product->qty_auto ? null : price2num(GETPOST('qty_total', 'alpha')));
 		$product->batch = GETPOST('batch', 'alphanohtml');
 		$product->stock_status = DoliTraceTreatmentProduct::STOCK_NONE;
 		if (!$error && $product->create($user) < 0) {
 			$error++;
 			setEventMessages($product->error, $product->errors, 'errors');
+		}
+		if (!$error && ($object->fetchLines() < 0 || $object->updateAutoQuantities($user) < 0)) {
+			$error++;
+			setEventMessages($object->error, $object->errors, 'errors');
 		}
 		if (!$error) {
 			header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
@@ -357,8 +376,8 @@ if (empty($reshook)) {
 	if (in_array($action, array('confirm_deletetarget', 'confirm_deleteproduct')) && $confirm == 'yes' && $permissiontoadd) {
 		$row = ($action == 'confirm_deletetarget' ? new DoliTraceTreatmentTarget($db) : new DoliTraceTreatmentProduct($db));
 		if ($row->fetch($lineid) > 0 && $row->fk_treatment == $object->id) {
-			if ($row->delete($user) < 0) {
-				setEventMessages($row->error, $row->errors, 'errors');
+			if ($row->delete($user) < 0 || $object->fetchLines() < 0 || $object->updateAutoQuantities($user) < 0) {
+				setEventMessages($row->error ? $row->error : $object->error, $row->error ? $row->errors : $object->errors, 'errors');
 			} else {
 				header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
 				exit;
@@ -518,6 +537,13 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		$formconfirm = $form->formconfirm($_SERVER["PHP_SELF"].'?id='.$object->id, $langs->trans('Validate'), $langs->trans('ConfirmValidateTreatment'), 'confirm_validate', '', 0, 1);
 	}
 
+	// Confirmation to correct or to cancel a validated record: the reason is required
+	if ($action == 'correct' || $action == 'cancelrecord') {
+		$formquestion = array(array('type' => 'text', 'name' => 'reason', 'label' => $langs->trans('TreatmentReason'), 'value' => '', 'morecss' => 'minwidth300'));
+		$text = $langs->trans($action == 'correct' ? 'ConfirmCorrectTreatment' : 'ConfirmCancelTreatment', $object->ref);
+		$formconfirm = $form->formconfirm($_SERVER["PHP_SELF"].'?id='.$object->id, $langs->trans($action == 'correct' ? 'TreatmentCorrect' : 'TreatmentCancel'), $text, 'confirm_'.$action, $formquestion, 0, 1, 250, 600);
+	}
+
 	// Confirmation of action xxxx (You can use it for xxx = 'close', xxx = 'reopen', ...)
 	// if ($action == 'xxx') {
 	// 	$text = $langs->trans('ConfirmActionXxx', $object->ref);
@@ -615,6 +641,24 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
 	// Other attributes. Fields from hook formObjectOptions and Extrafields.
 	include DOL_DOCUMENT_ROOT.'/core/tpl/extrafields_view.tpl.php';
+
+	// Integrity of a validated record and its correction
+	$correctionid = $object->getCorrectionId();
+	$check = ($object->status != $object::STATUS_DRAFT ? $object->checkHash() : -1);
+	if ($check >= 0) {
+		print '<tr><td>'.$form->textwithpicto($langs->trans('TreatmentIntegrity'), $langs->trans('TreatmentIntegrityHelp')).'</td><td>';
+		if ($check > 0) {
+			print img_picto('', 'fa-check-circle', 'class="pictofixedwidth" style="color: #28a745"').$langs->trans('TreatmentIntegrityOk');
+		} elseif ($check == 0) {
+			print img_picto('', 'fa-exclamation-triangle', 'class="pictofixedwidth error"').'<span class="error">'.$langs->trans('TreatmentIntegrityKo').'</span>';
+		}
+		print '</td></tr>';
+	}
+	if ($correctionid > 0) {
+		$correction = new DoliTraceTreatment($db);
+		$correction->fetch($correctionid, null, 1, 1);
+		print '<tr><td>'.$langs->trans($object->status == $object::STATUS_REPLACED ? 'TreatmentReplacedBy' : 'TreatmentCorrectionInProgress').'</td><td>'.$correction->getNomUrl(1).' '.$correction->getLibStatut(5).'</td></tr>';
+	}
 
 	print '</table>';
 	print '</div>';
@@ -841,8 +885,62 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 				$params = array();
 				print dolGetButtonAction('', $langs->trans("Delete"), 'delete', $deleteUrl, $buttonId, $permissiontodelete, $params);
 			}
+
+			if ($object->status == $object::STATUS_VALIDATED) {
+				// Correct with a new version, if no correction is already open
+				if ($correctionid > 0) {
+					print dolGetButtonAction($langs->trans('ErrorTreatmentCorrectionExists'), $langs->trans('TreatmentCorrect'), 'default', '#', '', 0);
+				} else {
+					print dolGetButtonAction('', $langs->trans('TreatmentCorrect'), 'default', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=correct&token='.newToken(), '', $permissiontovalidate);
+				}
+				// Cancel, with the reason
+				print dolGetButtonAction('', $langs->trans('TreatmentCancel'), 'danger', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=cancelrecord&token='.newToken(), '', $permissiontovalidate);
+			}
 		}
 		print '</div>'."\n";
+	}
+
+	/*
+	 * History of the record
+	 */
+	$history = $object->getHistory();
+	if (count($history)) {
+		print load_fiche_titre($langs->trans('TreatmentHistory'), '', 'fa-history');
+		print '<div class="div-table-responsive-no-min">';
+		print '<table class="noborder centpercent">';
+		print '<tr class="liste_titre">';
+		print '<td>'.$langs->trans('Date').'</td>';
+		print '<td>'.$langs->trans('User').'</td>';
+		print '<td class="center">'.$langs->trans('TreatmentVersion').'</td>';
+		print '<td>'.$langs->trans('Action').'</td>';
+		print '<td>'.$langs->trans('TreatmentReason').'</td>';
+		print '<td>'.$langs->trans('TreatmentContentHash').'</td>';
+		print '</tr>';
+		$users = array();
+		foreach ($history as $line) {
+			if (!isset($users[$line->fk_user])) {
+				$users[$line->fk_user] = new User($db);
+				$users[$line->fk_user]->fetch($line->fk_user);
+			}
+			$changes = json_decode((string) $line->changes, true);
+			$text = $langs->trans('TreatmentLog'.$line->action);
+			if ($line->action == 'REPLACE' && !empty($changes['replaced_by'])) {
+				$text .= ' <a href="'.$_SERVER['PHP_SELF'].'?id='.((int) $changes['replaced_by']).'">'.dol_escape_htmltag($changes['replaced_by_ref']).'</a>';
+			}
+			if ($line->action == 'CORRECT' && !empty($changes['previous'])) {
+				$text .= ' <a href="'.$_SERVER['PHP_SELF'].'?id='.((int) $changes['previous']).'">'.dol_escape_htmltag($changes['previous_ref']).'</a>';
+			}
+			print '<tr class="oddeven">';
+			print '<td class="nowraponall">'.dol_print_date($db->jdate($line->datec), 'dayhour').'</td>';
+			print '<td class="tdoverflowmax150">'.($users[$line->fk_user]->id > 0 ? $users[$line->fk_user]->getNomUrl(-1) : '').'</td>';
+			print '<td class="center">'.((int) $line->version).'</td>';
+			print '<td>'.$text.'</td>';
+			print '<td>'.dol_escape_htmltag((string) $line->reason).'</td>';
+			print '<td class="tdoverflowmax100" title="'.dol_escape_htmltag((string) $line->content_hash).'"><span class="opacitymedium">'.dol_escape_htmltag(dol_trunc((string) $line->content_hash, 12)).'</span></td>';
+			print '</tr>';
+		}
+		print '</table>';
+		print '</div>';
 	}
 
 

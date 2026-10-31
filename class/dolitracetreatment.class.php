@@ -25,6 +25,7 @@
 
 // Put here all includes required by your class file
 require_once DOL_DOCUMENT_ROOT.'/core/class/commonobject.class.php';
+dol_include_once('/dolitrace/lib/dolitrace_treatment.lib.php');
 //require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 //require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 
@@ -166,7 +167,7 @@ class DoliTraceTreatment extends CommonObject
 		'fk_previous' => array('type' => 'integer:DoliTraceTreatment:dolitrace/class/dolitracetreatment.class.php', 'label' => 'TreatmentPrevious', 'enabled' => 1, 'position' => 81, 'notnull' => 0, 'visible' => -5, 'noteditable' => 1),
 		'late' => array('type' => 'boolean', 'label' => 'TreatmentLate', 'enabled' => 1, 'position' => 82, 'notnull' => 0, 'visible' => -5, 'noteditable' => 1, 'help' => 'TreatmentLateHelp'),
 		'content_hash' => array('type' => 'varchar(64)', 'label' => 'TreatmentContentHash', 'enabled' => 1, 'position' => 83, 'notnull' => 0, 'visible' => 0, 'noteditable' => 1),
-		'cancel_reason' => array('type' => 'text', 'label' => 'TreatmentCancelReason', 'enabled' => 1, 'position' => 84, 'notnull' => 0, 'visible' => 0, 'noteditable' => 1),
+		'cancel_reason' => array('type' => 'text', 'label' => 'TreatmentCancelReason', 'enabled' => 1, 'position' => 84, 'notnull' => 0, 'visible' => -5, 'noteditable' => 1),
 		'note_public' => array('type' => 'html', 'label' => 'NotePublic', 'enabled' => 1, 'position' => 90, 'notnull' => 0, 'visible' => 0, 'cssview' => 'wordbreak'),
 		'note_private' => array('type' => 'html', 'label' => 'NotePrivate', 'enabled' => 1, 'position' => 91, 'notnull' => 0, 'visible' => 0, 'cssview' => 'wordbreak'),
 		'date_creation' => array('type' => 'datetime', 'label' => 'DateCreation', 'enabled' => 1, 'position' => 500, 'notnull' => 1, 'visible' => -2),
@@ -406,14 +407,13 @@ class DoliTraceTreatment extends CommonObject
 	 */
 	public function create(User $user, $notrigger = 0)
 	{
+		if (empty($this->version)) {
+			$this->version = 1;
+		}
 		$result = $this->createCommon($user, $notrigger);
-
-		// uncomment lines below if you want to validate object after creation
-		// if ($result > 0) {
-		// $this->fetch($this->id); // needed to retrieve some fields (ie date_creation for masked ref)
-		// $resultupdate = $this->validate($user, $notrigger);
-		// if ($resultupdate < 0) { return $resultupdate; }
-		// }
+		if ($result > 0 && $this->addLog($user, 'CREATE') < 0) {
+			return -1;
+		}
 
 		return $result;
 	}
@@ -657,7 +657,11 @@ class DoliTraceTreatment extends CommonObject
 			$this->error = 'ErrorTreatmentValidatedLocked';
 			return -1;
 		}
-		return $this->updateCommon($user, $notrigger);
+		$result = $this->updateCommon($user, $notrigger);
+		if ($result > 0 && ($this->fetchLines() < 0 || $this->updateAutoQuantities($user) < 0)) {
+			return -1;
+		}
+		return $result;
 	}
 
 	/**
@@ -701,125 +705,627 @@ class DoliTraceTreatment extends CommonObject
 		if ($this->fetchLines() < 0) {
 			return -1;
 		}
-		if (count($this->targets) == 0 || count($this->products) == 0) {
-			$this->error = 'ErrorTreatmentNeedsAreaAndProduct';
-			return -1;
-		}
-
-		/* if (! ((!getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('dolitrace', 'dolitracetreatment', 'write'))
-		 || (getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('dolitrace', 'dolitracetreatment_advance', 'validate')))
-		 {
-		 $this->error='NotEnoughPermissions';
-		 dol_syslog(get_class($this)."::valid ".$this->error, LOG_ERR);
-		 return -1;
-		 }*/
 
 		$now = dol_now();
+		$oldref = $this->ref;
+		$this->error = '';
+		$this->errors = array();
 
 		$this->db->begin();
 
-		// Define new ref
-		if (preg_match('/^[\(]?PROV/i', $this->ref) || empty($this->ref)) { // empty should not happened, but when it occurs, the test save life
-			$num = $this->getNextNumRef();
-		} else {
-			$num = (string) $this->ref;
+		// Copies of the registries and quantities, then the checks on what is recorded
+		if ($this->refreshCopies($user) < 0 || $this->updateAutoQuantities($user) < 0) {
+			$error++;
 		}
-		$this->newref = $num;
-
-		if (!empty($num)) {
-			// Validate
-			$sql = "UPDATE ".$this->db->prefix().$this->table_element;
-			$sql .= " SET ";
-			if (!empty($this->fields['ref'])) {
-				$sql .= " ref = '".$this->db->escape($num)."',";
-			}
-			$sql .= " status = ".self::STATUS_VALIDATED;
-			if (!empty($this->fields['date_valid'])) {
-				$sql .= ", date_valid = '".$this->db->idate($now)."'";
-			}
-			if (!empty($this->fields['fk_user_valid'])) {
-				$sql .= ", fk_user_valid = ".((int) $user->id);
-			}
-			$sql .= " WHERE rowid = ".((int) $this->id);
-
-			dol_syslog(get_class($this)."::validate()", LOG_DEBUG);
-			$resql = $this->db->query($sql);
-			if (!$resql) {
-				dol_print_error($this->db);
-				$this->error = $this->db->lasterror();
+		if (!$error) {
+			$errors = $this->checkForValidation();
+			if (count($errors)) {
+				$this->error = '';
+				$this->errors = $errors;
 				$error++;
 			}
+		}
 
-			if (!$error && !$notrigger) {
-				// Call trigger
-				$result = $this->call_trigger($this->TRIGGER_PREFIX.'_VALIDATE', $user);
-				if ($result < 0) {
+		// Define new ref: a correction keeps the ref of the first version with the number of the version
+		$previous = null;
+		if (!$error) {
+			if ($this->fk_previous > 0) {
+				$previous = new self($this->db);
+				if ($previous->fetch($this->fk_previous, null, 1, 1) <= 0 || $previous->status != self::STATUS_VALIDATED) {
+					$this->error = 'ErrorTreatmentPreviousNotValidated';
 					$error++;
+				} else {
+					$num = preg_replace('/-V[0-9]+$/', '', $previous->ref).'-V'.((int) $this->version);
 				}
-				// End call triggers
+			} elseif (preg_match('/^[\(]?PROV/i', $this->ref) || empty($this->ref)) {
+				$num = $this->getNextNumRef();
+			} else {
+				$num = (string) $this->ref;
+			}
+			if (!$error && empty($num)) {
+				$error++;
 			}
 		}
 
 		if (!$error) {
-			$this->oldref = $this->ref;
+			$this->newref = $num;
+			$this->ref = $num;
+			// Late: recorded more than 30 days after the end of the operation (Reg. EU 2023/564, art. 3)
+			$this->late = ($now - (!empty($this->date_end) ? $this->date_end : $this->date_start) > 30 * 86400 ? 1 : 0);
+			$this->date_valid = $now;
+			$this->fk_user_valid = $user->id;
+			$this->content_hash = $this->computeHash();
 
-			// Rename directory if dir was a temporary ref
-			if (preg_match('/^[\(]?PROV/i', $this->ref)) {
-				// Now we rename also files into index
-				$sql = 'UPDATE '.$this->db->prefix()."ecm_files set filename = CONCAT('".$this->db->escape($this->newref)."', SUBSTR(filename, ".(strlen($this->ref) + 1).")), filepath = 'dolitracetreatment/".$this->db->escape($this->newref)."'";
-				$sql .= " WHERE filename LIKE '".$this->db->escape($this->ref)."%' AND filepath = 'dolitracetreatment/".$this->db->escape($this->ref)."' and entity = ".((int) $conf->entity);
-				$resql = $this->db->query($sql);
-				if (!$resql) {
-					$error++;
-					$this->error = $this->db->lasterror();
-				}
-				$sql = 'UPDATE '.$this->db->prefix()."ecm_files set filepath = 'dolitracetreatment/".$this->db->escape($this->newref)."'";
-				$sql .= " WHERE filepath = 'dolitracetreatment/".$this->db->escape($this->ref)."' and entity = ".((int) $conf->entity);
-				$resql = $this->db->query($sql);
-				if (!$resql) {
-					$error++;
-					$this->error = $this->db->lasterror();
-				}
+			$sql = "UPDATE ".$this->db->prefix().$this->table_element;
+			$sql .= " SET ref = '".$this->db->escape($num)."'";
+			$sql .= ", status = ".self::STATUS_VALIDATED;
+			$sql .= ", date_valid = '".$this->db->idate($now)."'";
+			$sql .= ", fk_user_valid = ".((int) $user->id);
+			$sql .= ", late = ".((int) $this->late);
+			$sql .= ", content_hash = '".$this->db->escape($this->content_hash)."'";
+			$sql .= ", operator_name = ".($this->operator_name !== null ? "'".$this->db->escape($this->operator_name)."'" : "NULL");
+			$sql .= ", operator_license = ".($this->operator_license !== null ? "'".$this->db->escape($this->operator_license)."'" : "NULL");
+			$sql .= ", operator_license_end = ".(!empty($this->operator_license_end) ? "'".$this->db->idate($this->operator_license_end)."'" : "NULL");
+			$sql .= ", machine_label = ".($this->machine_label !== null ? "'".$this->db->escape($this->machine_label)."'" : "NULL");
+			$sql .= ", machine_check_end = ".(!empty($this->machine_check_end) ? "'".$this->db->idate($this->machine_check_end)."'" : "NULL");
+			$sql .= " WHERE rowid = ".((int) $this->id)." AND status = ".self::STATUS_DRAFT;
 
-				// We rename directory ($this->ref = old ref, $num = new ref) in order not to lose the attachments
-				$oldref = dol_sanitizeFileName($this->ref);
-				$newref = dol_sanitizeFileName($num);
-				$dirsource = $conf->dolitrace->dir_output.'/dolitracetreatment/'.$oldref;
-				$dirdest = $conf->dolitrace->dir_output.'/dolitracetreatment/'.$newref;
-				if (!$error && file_exists($dirsource)) {
-					dol_syslog(get_class($this)."::validate() rename dir ".$dirsource." into ".$dirdest);
+			dol_syslog(get_class($this)."::validate()", LOG_DEBUG);
+			$resql = $this->db->query($sql);
+			if (!$resql) {
+				$this->error = $this->db->lasterror();
+				$error++;
+			}
+		}
 
-					if (@rename($dirsource, $dirdest)) {
-						dol_syslog("Rename ok");
-						// Rename docs starting with $oldref with $newref
-						$listoffiles = dol_dir_list($conf->dolitrace->dir_output.'/dolitracetreatment/'.$newref, 'files', 1, '^'.preg_quote($oldref, '/'));
-						foreach ($listoffiles as $fileentry) {
-							$dirsource = $fileentry['name'];
-							$dirdest = preg_replace('/^'.preg_quote($oldref, '/').'/', $newref, $dirsource);
-							$dirsource = $fileentry['path'].'/'.$dirsource;
-							$dirdest = $fileentry['path'].'/'.$dirdest;
-							@rename($dirsource, $dirdest);
-						}
+		// The previous version is replaced by this one
+		if (!$error && $previous) {
+			$sql = "UPDATE ".$this->db->prefix().$this->table_element." SET status = ".self::STATUS_REPLACED;
+			$sql .= " WHERE rowid = ".((int) $previous->id)." AND status = ".self::STATUS_VALIDATED;
+			if (!$this->db->query($sql)) {
+				$this->error = $this->db->lasterror();
+				$error++;
+			} elseif ($this->addLog($user, 'REPLACE', '', array('replaced_by' => (int) $this->id, 'replaced_by_ref' => $num), $previous->id, $previous->version) < 0) {
+				$error++;
+			}
+		}
+
+		if (!$error && $this->addLog($user, 'VALIDATE', '', $this->getRegisterContent()) < 0) {
+			$error++;
+		}
+
+		if (!$error && !$notrigger) {
+			// Call trigger
+			$result = $this->call_trigger($this->TRIGGER_PREFIX.'_VALIDATE', $user);
+			if ($result < 0) {
+				$error++;
+			}
+			// End call triggers
+		}
+
+		// Rename directory if dir was a temporary ref
+		if (!$error && preg_match('/^[\(]?PROV/i', $oldref)) {
+			// Now we rename also files into index
+			$sql = 'UPDATE '.$this->db->prefix()."ecm_files set filename = CONCAT('".$this->db->escape($this->newref)."', SUBSTR(filename, ".(strlen($oldref) + 1).")), filepath = 'dolitracetreatment/".$this->db->escape($this->newref)."'";
+			$sql .= " WHERE filename LIKE '".$this->db->escape($oldref)."%' AND filepath = 'dolitracetreatment/".$this->db->escape($oldref)."' and entity = ".((int) $conf->entity);
+			if (!$this->db->query($sql)) {
+				$error++;
+				$this->error = $this->db->lasterror();
+			}
+			$sql = 'UPDATE '.$this->db->prefix()."ecm_files set filepath = 'dolitracetreatment/".$this->db->escape($this->newref)."'";
+			$sql .= " WHERE filepath = 'dolitracetreatment/".$this->db->escape($oldref)."' and entity = ".((int) $conf->entity);
+			if (!$error && !$this->db->query($sql)) {
+				$error++;
+				$this->error = $this->db->lasterror();
+			}
+
+			// We rename directory ($oldref = old ref, $num = new ref) in order not to lose the attachments
+			$oldrefdir = dol_sanitizeFileName($oldref);
+			$newrefdir = dol_sanitizeFileName($this->newref);
+			$dirsource = $conf->dolitrace->dir_output.'/dolitracetreatment/'.$oldrefdir;
+			$dirdest = $conf->dolitrace->dir_output.'/dolitracetreatment/'.$newrefdir;
+			if (!$error && file_exists($dirsource)) {
+				dol_syslog(get_class($this)."::validate() rename dir ".$dirsource." into ".$dirdest);
+				if (@rename($dirsource, $dirdest)) {
+					// Rename docs starting with $oldref with $newref
+					$listoffiles = dol_dir_list($dirdest, 'files', 1, '^'.preg_quote($oldrefdir, '/'));
+					foreach ($listoffiles as $fileentry) {
+						$filesource = $fileentry['path'].'/'.$fileentry['name'];
+						$filedest = $fileentry['path'].'/'.preg_replace('/^'.preg_quote($oldrefdir, '/').'/', $newrefdir, $fileentry['name']);
+						@rename($filesource, $filedest);
 					}
 				}
 			}
 		}
 
-		// Set new ref and current status
 		if (!$error) {
-			$this->ref = $num;
+			$this->oldref = $oldref;
 			$this->status = self::STATUS_VALIDATED;
-		}
-
-		if (!$error) {
 			$this->db->commit();
 			return 1;
 		} else {
+			$this->ref = $oldref;
 			$this->db->rollback();
 			return -1;
 		}
 	}
 
+	/**
+	 * Recompute the automatic total quantities and the nitrogen applied of the products, and save them
+	 *
+	 * The total quantity is dose x treated quantity in the basis of the unit x factor of the unit. A quantity entered by the user is kept.
+	 *
+	 * @param	User	$user	User that modifies
+	 * @return	int				Return integer <0 if KO, >0 if OK
+	 */
+	public function updateAutoQuantities(User $user)
+	{
+		$units = dolitraceTreatmentDoseUnits($this->db, (int) $this->kind, (int) $this->technical_type);
+		$hectares = dolitraceTreatmentQtyInBasis($this, 'HA');
+		foreach ($this->products as $product) {
+			$unit = isset($units[$product->fk_dose_unit]) ? $units[$product->fk_dose_unit] : null;
+			$qty = $product->qty_total;
+			$n_applied = null;
+			if ($product->qty_auto) {
+				$basisqty = $unit ? dolitraceTreatmentQtyInBasis($this, $unit->basis) : null;
+				$qty = ($basisqty !== null && $product->dose > 0) ? price2num($product->dose * $basisqty * $unit->factor, 'MS') : null;
+			}
+			if ($product->n_content > 0 && $qty > 0 && $hectares > 0 && in_array($product->qty_unit, array('kg', 't'))) {
+				$kg = $qty * ($product->qty_unit == 't' ? 1000 : 1);
+				$n_applied = price2num($kg * $product->n_content / 100 / $hectares, 'MS');
+			}
+			if ((string) $qty === (string) $product->qty_total && (string) $n_applied === (string) $product->n_applied) {
+				continue;
+			}
+			$product->qty_total = $qty;
+			$product->n_applied = $n_applied;
+			if ($product->update($user) < 0) {
+				$this->setErrorsFromObject($product);
+				return -1;
+			}
+		}
+		return 1;
+	}
+
+	/**
+	 * Copy into the record the data of the registries (operator, machine, products, adversities, units, crop plans)
+	 *
+	 * The copies keep the register as it was at the validation, even if the registries change later.
+	 *
+	 * @param	User	$user	User that validates
+	 * @return	int				Return integer <0 if KO, >0 if OK
+	 */
+	public function refreshCopies(User $user)
+	{
+		global $langs;
+
+		$langs->load('dolifarm@dolifarm');
+
+		$this->operator_name = null;
+		$this->operator_license = null;
+		$this->operator_license_end = null;
+		if ($this->fk_operator > 0) {
+			$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, label, license_number, license_end FROM ".$this->db->prefix()."dolifarm_operator WHERE rowid = ".((int) $this->fk_operator));
+			if (isset($rows[$this->fk_operator])) {
+				$this->operator_name = $rows[$this->fk_operator]->label;
+				$this->operator_license = $rows[$this->fk_operator]->license_number;
+				$this->operator_license_end = $this->db->jdate($rows[$this->fk_operator]->license_end);
+			}
+		}
+		$this->machine_label = null;
+		$this->machine_check_end = null;
+		if ($this->fk_machine > 0) {
+			$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, ref, label, date_sprayer_check_end FROM ".$this->db->prefix()."dolifarm_machine WHERE rowid = ".((int) $this->fk_machine));
+			if (isset($rows[$this->fk_machine])) {
+				$this->machine_label = trim($rows[$this->fk_machine]->ref.' - '.$rows[$this->fk_machine]->label, ' -');
+				$this->machine_check_end = $this->db->jdate($rows[$this->fk_machine]->date_sprayer_check_end);
+			}
+		}
+
+		foreach ($this->products as $product) {
+			if ($product->fk_agrodrug > 0) {
+				$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, label, reg_number, fk_product FROM ".$this->db->prefix()."dolifarm_agrodrug WHERE rowid = ".((int) $product->fk_agrodrug));
+				if (isset($rows[$product->fk_agrodrug])) {
+					$product->product_label = $rows[$product->fk_agrodrug]->label;
+					$product->reg_number = $rows[$product->fk_agrodrug]->reg_number;
+					$product->fk_product = ($rows[$product->fk_agrodrug]->fk_product > 0 ? (int) $rows[$product->fk_agrodrug]->fk_product : null);
+				}
+			}
+			if ($product->fk_fertilizer > 0) {
+				$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, label, registration_number, fk_product, n_content, p2o5_content, k2o_content FROM ".$this->db->prefix()."dolifarm_fertilizer WHERE rowid = ".((int) $product->fk_fertilizer));
+				if (isset($rows[$product->fk_fertilizer])) {
+					$fertilizer = $rows[$product->fk_fertilizer];
+					$product->product_label = $fertilizer->label;
+					$product->reg_number = $fertilizer->registration_number;
+					$product->fk_product = ($fertilizer->fk_product > 0 ? (int) $fertilizer->fk_product : null);
+					$product->n_content = $fertilizer->n_content;
+					$product->p2o5_content = $fertilizer->p2o5_content;
+					$product->k2o_content = $fertilizer->k2o_content;
+				}
+			}
+			if ($product->fk_adversity > 0) {
+				$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, code, label FROM ".$this->db->prefix()."dolitrace_c_adversity WHERE rowid = ".((int) $product->fk_adversity));
+				if (isset($rows[$product->fk_adversity])) {
+					$product->adversity_code = $rows[$product->fk_adversity]->code;
+					$product->adversity_label = $rows[$product->fk_adversity]->label;
+				}
+			}
+			if ($product->fk_dose_unit > 0) {
+				$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, label, qty_unit FROM ".$this->db->prefix()."dolitrace_c_dose_unit WHERE rowid = ".((int) $product->fk_dose_unit));
+				if (isset($rows[$product->fk_dose_unit])) {
+					$product->dose_unit_label = $rows[$product->fk_dose_unit]->label;
+					$product->qty_unit = $rows[$product->fk_dose_unit]->qty_unit;
+				}
+			}
+			if ($product->update($user) < 0) {
+				$this->setErrorsFromObject($product);
+				return -1;
+			}
+		}
+
+		$cropplans = dolitraceTreatmentCropPlans($this->db, $this);
+		foreach ($this->targets as $target) {
+			if ($target->target_type != DoliTraceTreatmentTarget::TYPE_PLOT || !isset($cropplans[$target->fk_cropplan])) {
+				continue;
+			}
+			$cropplan = $cropplans[$target->fk_cropplan];
+			$target->fk_plot = (int) $cropplan->fk_plot;
+			$target->fk_crop = (int) $cropplan->fk_crop;
+			$target->crop_label = $langs->transnoentitiesnoconv($cropplan->crop_label);
+			$target->crop_eppo = $cropplan->eppo_code;
+			$target->location_ref = $cropplan->iacs_parcel ? $cropplan->iacs_parcel : ($cropplan->cadastral_reference ? $cropplan->cadastral_reference : $cropplan->plot_ref);
+			$target->zone_zvn = (int) $cropplan->zone_zvn;
+			if ($target->update($user) < 0) {
+				$this->setErrorsFromObject($target);
+				return -1;
+			}
+		}
+		return 1;
+	}
+
+	/**
+	 * Blocking checks before the validation
+	 *
+	 * @return	string[]	Translated errors, empty if the record can be validated
+	 */
+	public function checkForValidation()
+	{
+		global $langs;
+
+		$langs->loadLangs(array('errors', 'dolitrace@dolitrace'));
+		$errors = array();
+
+		if (empty($this->date_start)) {
+			$errors[] = $langs->trans('ErrorFieldRequired', $langs->transnoentitiesnoconv('TreatmentDateStart'));
+		} elseif ($this->date_start > dol_now() + 3600) {
+			$errors[] = $langs->trans('ErrorTreatmentDateFuture');
+		}
+		if (!empty($this->date_end) && !empty($this->date_start) && $this->date_end < $this->date_start) {
+			$errors[] = $langs->trans('ErrorTreatmentDateEnd');
+		}
+		if ($this->kind == self::KIND_PLANTPROTECTION && empty($this->fk_operator)) {
+			$errors[] = $langs->trans('ErrorFieldRequired', $langs->transnoentitiesnoconv('TreatmentOperator'));
+		}
+		if (count($this->targets) == 0 || count($this->products) == 0) {
+			$errors[] = $langs->trans('ErrorTreatmentNeedsAreaAndProduct');
+		}
+
+		$cropplans = dolitraceTreatmentCropPlans($this->db, $this);
+		foreach ($this->targets as $target) {
+			$label = $target->location_ref ? $target->location_ref : $target->seed_batch;
+			if ($target->target_type != $this->technical_type) {
+				$errors[] = $langs->trans('ErrorTreatmentTargetType', $label);
+			} elseif ($target->target_type == DoliTraceTreatmentTarget::TYPE_PLOT && !isset($cropplans[$target->fk_cropplan])) {
+				$errors[] = $langs->trans('ErrorTreatmentCropPlanNotInProgress', $label, dol_print_date($this->date_start, 'day'));
+			}
+			if (!($target->treated_qty > 0)) {
+				$errors[] = $langs->trans('ErrorTreatmentTreatedQty', $label);
+			}
+		}
+
+		$units = dolitraceTreatmentDoseUnits($this->db, (int) $this->kind, (int) $this->technical_type);
+		foreach ($this->products as $product) {
+			$label = $product->product_label;
+			if ($this->kind == self::KIND_PLANTPROTECTION) {
+				if (empty($product->fk_agrodrug)) {
+					$errors[] = $langs->trans('ErrorTreatmentProductKind', $label);
+				} else {
+					if (empty($product->reg_number)) {
+						$errors[] = $langs->trans('ErrorTreatmentNoRegNumber', $label);
+					}
+					if (empty($product->fk_adversity)) {
+						$errors[] = $langs->trans('ErrorTreatmentNoAdversity', $label);
+					}
+				}
+			} elseif (empty($product->fk_fertilizer)) {
+				$errors[] = $langs->trans('ErrorTreatmentProductKind', $label);
+			}
+			if (!($product->dose > 0) || !isset($units[$product->fk_dose_unit])) {
+				$errors[] = $langs->trans('ErrorTreatmentDoseUnit', $label);
+			} elseif (!($product->qty_total > 0)) {
+				$errors[] = $langs->trans('ErrorTreatmentQtyTotal', $label);
+			}
+		}
+		return $errors;
+	}
+
+	/**
+	 * Content of the record that the register certifies: header, products and areas, without technical fields and notes
+	 *
+	 * @return	array<string,mixed>		Content with normalized values
+	 */
+	public function getRegisterContent()
+	{
+		$num = function ($value) {
+			if ($value === null || $value === '') {
+				return '';
+			}
+			return rtrim(rtrim(sprintf('%.8F', (float) $value), '0'), '.');
+		};
+		$datetime = function ($value) {
+			return empty($value) ? '' : dol_print_date($value, '%Y-%m-%d %H:%M:%S', 'gmt');
+		};
+		$date = function ($value) {
+			return empty($value) ? '' : dol_print_date($value, '%Y-%m-%d', 'tzserver');
+		};
+		$content = array(
+			'ref' => (string) $this->ref,
+			'version' => (int) $this->version,
+			'fk_previous' => (int) $this->fk_previous,
+			'kind' => (int) $this->kind,
+			'technical_type' => (int) $this->technical_type,
+			'fk_soc' => (int) $this->fk_soc,
+			'fk_dossier' => (int) $this->fk_dossier,
+			'date_start' => $datetime($this->date_start),
+			'date_end' => $datetime($this->date_end),
+			'reason' => (string) $this->reason,
+			'fk_operator' => (int) $this->fk_operator,
+			'operator_name' => (string) $this->operator_name,
+			'operator_license' => (string) $this->operator_license,
+			'operator_license_end' => $date($this->operator_license_end),
+			'fk_soc_contractor' => (int) $this->fk_soc_contractor,
+			'contractor_mode' => (int) $this->contractor_mode,
+			'delegation_ref' => (string) $this->delegation_ref,
+			'fk_machine' => (int) $this->fk_machine,
+			'machine_label' => (string) $this->machine_label,
+			'machine_check_end' => $date($this->machine_check_end),
+			'water_volume' => $num($this->water_volume),
+			'weather' => (string) $this->weather,
+			'targets' => array(),
+			'products' => array(),
+		);
+		foreach ($this->targets as $target) {
+			$content['targets'][] = array(
+				'target_type' => (int) $target->target_type,
+				'fk_plot' => (int) $target->fk_plot,
+				'fk_building' => (int) $target->fk_building,
+				'fk_cropplan' => (int) $target->fk_cropplan,
+				'location_ref' => (string) $target->location_ref,
+				'zone_zvn' => (int) $target->zone_zvn,
+				'fk_crop' => (int) $target->fk_crop,
+				'crop_eppo' => (string) $target->crop_eppo,
+				'crop_label' => (string) $target->crop_label,
+				'bbch' => (string) $target->bbch,
+				'treated_qty' => $num($target->treated_qty),
+				'treated_unit' => (string) $target->treated_unit,
+				'seed_batch' => (string) $target->seed_batch,
+			);
+		}
+		foreach ($this->products as $product) {
+			$content['products'][] = array(
+				'fk_agrodrug' => (int) $product->fk_agrodrug,
+				'fk_fertilizer' => (int) $product->fk_fertilizer,
+				'product_label' => (string) $product->product_label,
+				'reg_number' => (string) $product->reg_number,
+				'n_content' => $num($product->n_content),
+				'p2o5_content' => $num($product->p2o5_content),
+				'k2o_content' => $num($product->k2o_content),
+				'adversity_code' => (string) $product->adversity_code,
+				'adversity_label' => (string) $product->adversity_label,
+				'dose' => $num($product->dose),
+				'dose_unit_label' => (string) $product->dose_unit_label,
+				'qty_total' => $num($product->qty_total),
+				'qty_unit' => (string) $product->qty_unit,
+				'n_applied' => $num($product->n_applied),
+				'batch' => (string) $product->batch,
+			);
+		}
+		return $content;
+	}
+
+	/**
+	 * Fingerprint (SHA-256) of the content of the record
+	 *
+	 * @return	string		Hash
+	 */
+	public function computeHash()
+	{
+		return hash('sha256', json_encode($this->getRegisterContent()));
+	}
+
+	/**
+	 * Check that the content of a validated record was not changed in the database
+	 *
+	 * @return	int		1 if the content matches its fingerprint, 0 if not, -1 if the record has no fingerprint
+	 */
+	public function checkHash()
+	{
+		if (empty($this->content_hash)) {
+			return -1;
+		}
+		return (hash_equals((string) $this->content_hash, $this->computeHash()) ? 1 : 0);
+	}
+
+	/**
+	 * Add a line to the history of the record
+	 *
+	 * @param	User					$user			User of the action
+	 * @param	string					$action			CREATE, VALIDATE, CORRECT, REPLACE, CANCEL or STOCK
+	 * @param	string					$reason			Reason given by the user
+	 * @param	array<string,mixed>|null	$changes		Data of the action, saved as JSON
+	 * @param	int						$fk_treatment	Record, this one if 0
+	 * @param	int						$version		Version of the record, this one if 0
+	 * @return	int										Return integer <0 if KO, >0 if OK
+	 */
+	public function addLog(User $user, $action, $reason = '', $changes = null, $fk_treatment = 0, $version = 0)
+	{
+		$sql = "INSERT INTO ".$this->db->prefix()."dolitrace_treatment_log (fk_treatment, version, action, changes, reason, content_hash, fk_user, datec)";
+		$sql .= " VALUES (".((int) ($fk_treatment > 0 ? $fk_treatment : $this->id)).", ".((int) ($version > 0 ? $version : $this->version)).",";
+		$sql .= " '".$this->db->escape($action)."',";
+		$sql .= " ".($changes !== null ? "'".$this->db->escape(json_encode($changes))."'" : "NULL").",";
+		$sql .= " ".($reason !== '' ? "'".$this->db->escape($reason)."'" : "NULL").",";
+		$sql .= " ".($fk_treatment > 0 || empty($this->content_hash) ? "NULL" : "'".$this->db->escape($this->content_hash)."'").",";
+		$sql .= " ".((int) $user->id).", '".$this->db->idate(dol_now())."')";
+		if (!$this->db->query($sql)) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+		return 1;
+	}
+
+	/**
+	 * History of the record
+	 *
+	 * @return	array<int,stdClass>		Lines of the history, the oldest first
+	 */
+	public function getHistory()
+	{
+		$sql = "SELECT l.rowid, l.version, l.action, l.changes, l.reason, l.content_hash, l.fk_user, l.datec";
+		$sql .= " FROM ".$this->db->prefix()."dolitrace_treatment_log as l";
+		$sql .= " WHERE l.fk_treatment = ".((int) $this->id);
+		$sql .= " ORDER BY l.datec, l.rowid";
+		return dolitraceTreatmentFetchRows($this->db, $sql);
+	}
+
+	/**
+	 * Id of the record that corrects this one (draft or validated), 0 if none
+	 *
+	 * @return	int		Id of the correction
+	 */
+	public function getCorrectionId()
+	{
+		$sql = "SELECT t.rowid FROM ".$this->db->prefix().$this->table_element." as t";
+		$sql .= " WHERE t.fk_previous = ".((int) $this->id)." AND t.status IN (".self::STATUS_DRAFT.", ".self::STATUS_VALIDATED.", ".self::STATUS_REPLACED.")";
+		$sql .= " ORDER BY t.rowid DESC";
+		$rows = dolitraceTreatmentFetchRows($this->db, $sql);
+		return count($rows) ? (int) key($rows) : 0;
+	}
+
+	/**
+	 * Start the correction of a validated record: a new draft version with the same content
+	 *
+	 * The record stays valid until the new version is validated, then it becomes "replaced".
+	 *
+	 * @param	User	$user		User that corrects
+	 * @param	string	$reason		Reason of the correction
+	 * @return	int					Id of the new version, <0 if KO
+	 */
+	public function createCorrection(User $user, $reason)
+	{
+		global $langs;
+
+		if ($this->status != self::STATUS_VALIDATED) {
+			$this->error = $langs->trans('ErrorTreatmentValidatedLocked');
+			return -1;
+		}
+		if (trim($reason) === '') {
+			$this->error = $langs->trans('ErrorTreatmentReasonRequired');
+			return -1;
+		}
+		if ($this->getCorrectionId() > 0) {
+			$this->error = $langs->trans('ErrorTreatmentCorrectionExists');
+			return -1;
+		}
+		$this->fetchLines();
+
+		$this->db->begin();
+		$new = new self($this->db);
+		foreach (array('entity', 'kind', 'technical_type', 'fk_soc', 'fk_dossier', 'date_start', 'date_end', 'reason', 'fk_operator', 'fk_soc_contractor', 'contractor_mode',
+			'contractor_signed', 'date_contractor_signed', 'delegation_ref', 'fk_machine', 'water_volume', 'weather', 'note_public', 'note_private') as $key) {
+			$new->$key = $this->$key;
+		}
+		$new->ref = '(PROV)';
+		$new->version = (int) $this->version + 1;
+		$new->fk_previous = $this->id;
+		$new->status = self::STATUS_DRAFT;
+		$new->context['createcorrection'] = 'createcorrection';
+		$result = $new->createCommon($user);
+		if ($result > 0) {
+			foreach (array_merge($this->targets, $this->products) as $row) {
+				$copy = clone $row;
+				$copy->id = 0;
+				$copy->rowid = 0;
+				$copy->fk_treatment = $new->id;
+				if ($row instanceof DoliTraceTreatmentProduct) {
+					$copy->stock_status = DoliTraceTreatmentProduct::STOCK_NONE;
+					$copy->fk_stock_movement = null;
+				}
+				if ($copy->create($user) < 0) {
+					$this->setErrorsFromObject($copy);
+					$result = -1;
+					break;
+				}
+			}
+		} else {
+			$this->setErrorsFromObject($new);
+		}
+		if ($result > 0 && $new->addLog($user, 'CORRECT', $reason, array('previous' => (int) $this->id, 'previous_ref' => $this->ref)) < 0) {
+			$this->setErrorsFromObject($new);
+			$result = -1;
+		}
+		if ($result < 0) {
+			$this->db->rollback();
+			return -1;
+		}
+		$this->db->commit();
+		return $new->id;
+	}
+
+	/**
+	 * Cancel a validated record, with its reason. The record stays in the register as canceled.
+	 *
+	 * @param	User	$user		User that cancels
+	 * @param	string	$reason		Reason of the cancellation
+	 * @return	int					Return integer <0 if KO, >0 if OK
+	 */
+	public function cancelRecord(User $user, $reason)
+	{
+		global $langs;
+
+		if ($this->status != self::STATUS_VALIDATED) {
+			$this->error = $langs->trans('ErrorTreatmentValidatedLocked');
+			return -1;
+		}
+		if (trim($reason) === '') {
+			$this->error = $langs->trans('ErrorTreatmentReasonRequired');
+			return -1;
+		}
+		$this->db->begin();
+		$sql = "UPDATE ".$this->db->prefix().$this->table_element;
+		$sql .= " SET status = ".self::STATUS_CANCELED.", cancel_reason = '".$this->db->escape($reason)."', fk_user_modif = ".((int) $user->id);
+		$sql .= " WHERE rowid = ".((int) $this->id)." AND status = ".self::STATUS_VALIDATED;
+		$error = 0;
+		if (!$this->db->query($sql)) {
+			$this->error = $this->db->lasterror();
+			$error++;
+		}
+		if (!$error && $this->addLog($user, 'CANCEL', $reason) < 0) {
+			$error++;
+		}
+		if (!$error) {
+			$this->status = self::STATUS_CANCELED;
+			$this->cancel_reason = $reason;
+			if ($this->call_trigger($this->TRIGGER_PREFIX.'_CANCEL', $user) < 0) {
+				$error++;
+			}
+		}
+		if ($error) {
+			$this->db->rollback();
+			return -1;
+		}
+		$this->db->commit();
+		return 1;
+	}
 
 	/**
 	 *	Set draft status
@@ -848,19 +1354,9 @@ class DoliTraceTreatment extends CommonObject
 	 */
 	public function cancel($user, $notrigger = 0)
 	{
-		// Protection
-		if ($this->status != self::STATUS_VALIDATED) {
-			return 0;
-		}
-
-		/* if (! ((!getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('dolitrace','write'))
-		 || (getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('dolitrace','dolitrace_advance','validate'))))
-		 {
-		 $this->error='Permission denied';
-		 return -1;
-		 }*/
-
-		return $this->setStatusCommon($user, self::STATUS_CANCELED, $notrigger, 'DOLITRACE_TREATMENT_CANCEL');
+		// A record of the register is canceled with its reason: see cancelRecord()
+		$this->error = 'ErrorTreatmentReasonRequired';
+		return -1;
 	}
 
 	/**
@@ -1428,6 +1924,9 @@ abstract class DoliTraceTreatmentRow extends CommonObjectLine
 	 */
 	public function create(User $user, $notrigger = 1)
 	{
+		if (!$this->parentIsDraft()) {
+			return -1;
+		}
 		return $this->createCommon($user, 1);
 	}
 
@@ -1451,6 +1950,9 @@ abstract class DoliTraceTreatmentRow extends CommonObjectLine
 	 */
 	public function update(User $user, $notrigger = 1)
 	{
+		if (!$this->parentIsDraft()) {
+			return -1;
+		}
 		return $this->updateCommon($user, 1);
 	}
 
@@ -1463,7 +1965,27 @@ abstract class DoliTraceTreatmentRow extends CommonObjectLine
 	 */
 	public function delete(User $user, $notrigger = 1)
 	{
+		if (!$this->parentIsDraft()) {
+			return -1;
+		}
 		return $this->deleteCommon($user, 1);
+	}
+
+	/**
+	 * Check that the record of the row is a draft: the rows of a validated record are never changed
+	 *
+	 * @return	bool	True if the record is a draft
+	 */
+	public function parentIsDraft()
+	{
+		$sql = "SELECT status FROM ".$this->db->prefix()."dolitrace_treatment WHERE rowid = ".((int) $this->fk_treatment);
+		$resql = $this->db->query($sql);
+		$obj = $resql ? $this->db->fetch_object($resql) : null;
+		if (!$obj || (int) $obj->status != DoliTraceTreatment::STATUS_DRAFT) {
+			$this->error = 'ErrorTreatmentValidatedLocked';
+			return false;
+		}
+		return true;
 	}
 
 	/**
@@ -1537,6 +2059,7 @@ class DoliTraceTreatmentProduct extends DoliTraceTreatmentRow
 		'dose_unit_label' => array('type' => 'varchar(64)', 'label' => 'TreatmentDoseUnit', 'enabled' => 1, 'position' => 32, 'notnull' => 0, 'visible' => 1),
 		'qty_total' => array('type' => 'double(24,8)', 'label' => 'TreatmentQtyTotal', 'enabled' => 1, 'position' => 33, 'notnull' => 0, 'visible' => 1),
 		'qty_unit' => array('type' => 'varchar(8)', 'label' => 'Unit', 'enabled' => 1, 'position' => 34, 'notnull' => 0, 'visible' => 1),
+		'qty_auto' => array('type' => 'integer', 'label' => 'TreatmentQtyAuto', 'enabled' => 1, 'position' => 35, 'notnull' => 1, 'visible' => 0, 'default' => '1'),
 		'n_applied' => array('type' => 'double(24,8)', 'label' => 'TreatmentNApplied', 'enabled' => 1, 'position' => 35, 'notnull' => 0, 'visible' => 1),
 		'batch' => array('type' => 'varchar(128)', 'label' => 'Batch', 'enabled' => 1, 'position' => 40, 'notnull' => 0, 'visible' => 1),
 		'stock_status' => array('type' => 'integer', 'label' => 'TreatmentStockStatus', 'enabled' => 1, 'position' => 50, 'notnull' => 1, 'visible' => 0, 'default' => '0'),
@@ -1623,6 +2146,11 @@ class DoliTraceTreatmentProduct extends DoliTraceTreatmentRow
 	 * @var ?string
 	 */
 	public $qty_unit;
+
+	/**
+	 * @var int		1 if the total quantity is computed, 0 if entered by the user
+	 */
+	public $qty_auto;
 
 	/**
 	 * @var float|string|null

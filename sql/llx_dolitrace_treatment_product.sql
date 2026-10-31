@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS llx_dolitrace_treatment_product(
 	dose_unit_label		varchar(64),						-- copy
 	qty_total			double(24,8),
 	qty_unit			varchar(8),
+	qty_auto			smallint DEFAULT 1 NOT NULL,		-- 1 computed, 0 entered by the user
 	n_applied			double(24,8),						-- kg of nitrogen per hectare
 	batch				varchar(128),
 	stock_status		smallint DEFAULT 0 NOT NULL,		-- 0 not needed, 1 moved, 2 to regularize

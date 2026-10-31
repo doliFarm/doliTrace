@@ -242,7 +242,7 @@ function dolitraceTreatmentBuildings($db, $socid)
 /**
  * Treated quantity of the record in the basis of a unit of dose
  *
- * The areas are converted to the basis (ha and m², kg and t). For the basis HL the quantity is the volume of water of the record.
+ * The areas are converted to the basis (ha and m², kg and t). For the basis HL the quantity is the volume of water (l/ha) by the treated hectares.
  *
  * @param	DoliTraceTreatment	$object		Record with its areas
  * @param	string				$basis		HA, M2, M3, HL, KG or T
@@ -251,7 +251,9 @@ function dolitraceTreatmentBuildings($db, $socid)
 function dolitraceTreatmentQtyInBasis($object, $basis)
 {
 	if ($basis == 'HL') {
-		return ($object->water_volume !== null && $object->water_volume !== '') ? (float) $object->water_volume : null;
+		// Volume of water in l/ha: hectolitres = l/ha / 100 x treated hectares
+		$hectares = dolitraceTreatmentQtyInBasis($object, 'HA');
+		return ($object->water_volume > 0 && $hectares > 0) ? $object->water_volume / 100 * $hectares : null;
 	}
 	$conversions = array(
 		'HA' => array('HA' => 1, 'M2' => 0.0001),
