@@ -16,10 +16,6 @@ DolitraceSetup = Configurazione Dolitrace
 Settings = Impostazioni
 DolitraceSetupPage = Pagina di configurazione di Dolitrace
 NewSection = Nuova sezione
-DOLITRACE_MYPARAM1 = Mio parametro 1
-DOLITRACE_MYPARAM1Tooltip = Suggerimento per il mio parametro 1
-DOLITRACE_MYPARAM2 = Mio parametro 2
-DOLITRACE_MYPARAM2Tooltip = Suggerimento per il mio parametro 2
 
 #
 # About page
@@ -284,3 +280,15 @@ ErrorTreatmentImportCropPlanMany = Più piani colturali in corso per %s al %s: i
 WarningTreatmentImportOperator = Operatore non trovato (%s): indicarlo nella scheda
 WarningTreatmentImportMachine = Macchina non trovata (%s): indicarla nella scheda
 WarningTreatmentImportContractor = Contoterzista non trovato (%s): indicarlo nella scheda
+
+# Register - warnings
+TreatmentWarnings = Avvisi da controllare
+DOLITRACE_ZVN_N_LIVESTOCK_LIMIT = Limite di azoto di origine zootecnica nelle zone vulnerabili ai nitrati (kg N/ha all'anno)
+DOLITRACE_ZVN_N_LIVESTOCK_LIMITHelp = Il registro avvisa quando letame, liquame e digestato distribuiti su un appezzamento in zona vulnerabile (ZVN) superano il limite nell'anno solare (170 kg N/ha per la direttiva nitrati, salvo deroghe regionali). 0 = nessun avviso.
+WarningTreatmentLicenseExpired = Patentino dell'operatore scaduto il %s
+WarningTreatmentMachineCheckExpired = Controllo funzionale della macchina scaduto il %s
+WarningTreatmentWillBeLate = Sono passati più di 30 giorni dal trattamento: la registrazione sarà segnata come tardiva
+WarningTreatmentAuthExpired = Autorizzazione del prodotto %s scaduta il %s: verificare i termini di smaltimento e utilizzo delle scorte
+WarningTreatmentDoseAboveMax = Dose di %s pari a %s, oltre la dose massima del prodotto (%s)
+WarningTreatmentHarvestInSafety = Raccolta %s del %s entro l'intervallo di sicurezza (raccolta consentita dal %s)
+WarningTreatmentZvnNitrogen = Superficie %s in zona vulnerabile: %s kg N/ha di origine zootecnica nell'anno %s, oltre il limite di %s kg N/ha

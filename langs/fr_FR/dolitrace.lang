@@ -186,3 +186,15 @@ ErrorTreatmentImportCropPlanMany = Plusieurs plans culturaux en cours pour %s au
 WarningTreatmentImportOperator = Opérateur introuvable (%s) : l'indiquer sur la fiche
 WarningTreatmentImportMachine = Machine introuvable (%s) : l'indiquer sur la fiche
 WarningTreatmentImportContractor = Prestataire introuvable (%s) : l'indiquer sur la fiche
+
+# Register - warnings
+TreatmentWarnings = Avertissements à vérifier
+DOLITRACE_ZVN_N_LIVESTOCK_LIMIT = Limite d'azote d'origine animale en zones vulnérables aux nitrates (kg N/ha par an)
+DOLITRACE_ZVN_N_LIVESTOCK_LIMITHelp = Le registre avertit quand fumier, lisier et digestat épandus sur une parcelle en zone vulnérable dépassent la limite sur l'année civile (170 kg N/ha selon la directive nitrates, sauf dérogations). 0 = aucun avertissement.
+WarningTreatmentLicenseExpired = Certificat de l'opérateur expiré le %s
+WarningTreatmentMachineCheckExpired = Contrôle du pulvérisateur expiré le %s
+WarningTreatmentWillBeLate = Plus de 30 jours depuis le traitement : l'enregistrement sera marqué en retard
+WarningTreatmentAuthExpired = Autorisation du produit %s expirée le %s : vérifier les délais de vente et d'utilisation des stocks
+WarningTreatmentDoseAboveMax = Dose de %s égale à %s, au-dessus de la dose maximale du produit (%s)
+WarningTreatmentHarvestInSafety = Récolte %s du %s dans le délai avant récolte (récolte autorisée à partir du %s)
+WarningTreatmentZvnNitrogen = Surface %s en zone vulnérable : %s kg N/ha d'origine animale en %s, au-dessus de la limite de %s kg N/ha

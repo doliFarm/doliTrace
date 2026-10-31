@@ -90,6 +90,11 @@ class DoliTraceTreatment extends CommonObject
 	const TECHNICAL_SEEDS = 3;
 
 	/**
+	 * @var string[]	Types of fertilizer of livestock origin, counted for the limit of nitrogen in vulnerable zones
+	 */
+	public static $livestockFertTypes = array('MANURE', 'SLURRY', 'DIGEST');
+
+	/**
 	 *  'type' field format:
 	 *  	'integer', 'integer:ObjectClass:PathToClass[:AddCreateButtonOrNot[:Filter[:Sortfield]]]',
 	 *  	'select' (list of values are in 'options'. for integer list of values are in 'arrayofkeyval'),
@@ -1054,6 +1059,137 @@ class DoliTraceTreatment extends CommonObject
 			}
 		}
 		return $errors;
+	}
+
+	/**
+	 * Warnings on the record: they do not block the validation, the user checks them
+	 *
+	 * Dose above the maximum of the product, authorization of the product, license of the operator or functional check
+	 * of the machine expired at the date, record more than 30 days late, harvests within the safety interval,
+	 * nitrogen of livestock origin above the limit of the year in vulnerable zones (ZVN).
+	 * For drafts operator and machine are read from the registries, for validated records from the copies.
+	 *
+	 * @return	string[]	Warnings, translated
+	 */
+	public function getWarnings()
+	{
+		global $langs;
+
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
+
+		$langs->loadLangs(array('dolitrace@dolitrace', 'dolifarm@dolifarm'));
+		$warnings = array();
+		if (empty($this->date_start)) {
+			return $warnings;
+		}
+		$day = $this->db->jdate(dol_print_date($this->date_start, '%Y-%m-%d').' 00:00:00');
+		$dateend = !empty($this->date_end) ? $this->date_end : $this->date_start;
+
+		// Operator and machine
+		$licenseend = $this->operator_license_end;
+		$checkend = $this->machine_check_end;
+		if ($this->status == self::STATUS_DRAFT) {
+			$licenseend = null;
+			$checkend = null;
+			if ($this->fk_operator > 0) {
+				$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, license_end FROM ".$this->db->prefix()."dolifarm_operator WHERE rowid = ".((int) $this->fk_operator));
+				$licenseend = isset($rows[$this->fk_operator]) ? $this->db->jdate($rows[$this->fk_operator]->license_end) : null;
+			}
+			if ($this->fk_machine > 0) {
+				$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, date_sprayer_check_end FROM ".$this->db->prefix()."dolifarm_machine WHERE rowid = ".((int) $this->fk_machine));
+				$checkend = isset($rows[$this->fk_machine]) ? $this->db->jdate($rows[$this->fk_machine]->date_sprayer_check_end) : null;
+			}
+		}
+		if ($this->kind == self::KIND_PLANTPROTECTION && !empty($licenseend) && $licenseend < $day) {
+			$warnings[] = $langs->transnoentities('WarningTreatmentLicenseExpired', dol_print_date($licenseend, 'day'));
+		}
+		if (!empty($checkend) && $checkend < $day) {
+			$warnings[] = $langs->transnoentities('WarningTreatmentMachineCheckExpired', dol_print_date($checkend, 'day'));
+		}
+
+		// Late record: more than 30 days after the end of the operation (Reg. EU 2023/564, art. 3)
+		if ($this->status == self::STATUS_DRAFT && dol_now() - $dateend > 30 * 86400) {
+			$warnings[] = $langs->transnoentities('WarningTreatmentWillBeLate');
+		}
+
+		$hectares = ($this->technical_type == self::TECHNICAL_SURFACES ? dolitraceTreatmentQtyInBasis($this, 'HA') : null);
+		$safetydays = 0;
+		$livestockn = 0;
+		foreach ($this->products as $product) {
+			if ($product->fk_agrodrug > 0) {
+				$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, auth_expiration_date, max_dose_ha, safety_days_default FROM ".$this->db->prefix()."dolifarm_agrodrug WHERE rowid = ".((int) $product->fk_agrodrug));
+				$agrodrug = isset($rows[$product->fk_agrodrug]) ? $rows[$product->fk_agrodrug] : null;
+				if (!$agrodrug) {
+					continue;
+				}
+				$authend = $this->db->jdate($agrodrug->auth_expiration_date);
+				if (!empty($authend) && $authend < $day) {
+					$warnings[] = $langs->transnoentities('WarningTreatmentAuthExpired', $product->product_label, dol_print_date($authend, 'day'));
+				}
+				// Dose by hectare in kg or l, compared with the maximum of the product
+				if ($agrodrug->max_dose_ha > 0 && $hectares > 0 && $product->qty_total > 0 && in_array($product->qty_unit, array('kg', 'l', 't'))) {
+					$doseha = $product->qty_total * ($product->qty_unit == 't' ? 1000 : 1) / $hectares;
+					if ($doseha > $agrodrug->max_dose_ha * 1.0001) {
+						$unit = ($product->qty_unit == 'l' ? 'l' : 'kg');
+						$warnings[] = $langs->transnoentities('WarningTreatmentDoseAboveMax', $product->product_label, price(price2num($doseha, 'MS')).' '.$unit.'/ha', price(price2num($agrodrug->max_dose_ha, 'MS')).' '.$unit.'/ha');
+					}
+				}
+				$safetydays = max($safetydays, (int) $agrodrug->safety_days_default);
+			}
+			if ($product->fk_fertilizer > 0 && $product->n_applied > 0) {
+				$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, fk_fert_type FROM ".$this->db->prefix()."dolifarm_fertilizer WHERE rowid = ".((int) $product->fk_fertilizer));
+				if (isset($rows[$product->fk_fertilizer]) && in_array($rows[$product->fk_fertilizer]->fk_fert_type, self::$livestockFertTypes)) {
+					$livestockn += $product->n_applied;
+				}
+			}
+		}
+
+		// Harvests of the crop plans before the end of the safety interval
+		if ($safetydays > 0) {
+			$safetyend = dol_time_plus_duree($dateend, $safetydays, 'd');
+			$cropplans = array();
+			foreach ($this->targets as $target) {
+				if ($target->fk_cropplan > 0) {
+					$cropplans[] = (int) $target->fk_cropplan;
+				}
+			}
+			if (count($cropplans)) {
+				$sql = "SELECT h.rowid, h.ref, h.date_harvest FROM ".$this->db->prefix()."dolitrace_harvest as h";
+				$sql .= " WHERE h.fk_cropplan IN (".$this->db->sanitize(implode(',', $cropplans)).") AND h.status <> 9";
+				$sql .= " AND h.date_harvest >= '".$this->db->escape(dol_print_date($this->date_start, '%Y-%m-%d'))."'";
+				$sql .= " AND h.date_harvest < '".$this->db->escape(dol_print_date($safetyend, '%Y-%m-%d'))."'";
+				foreach (dolitraceTreatmentFetchRows($this->db, $sql) as $harvest) {
+					$warnings[] = $langs->transnoentities('WarningTreatmentHarvestInSafety', $harvest->ref, dol_print_date($this->db->jdate($harvest->date_harvest), 'day'), dol_print_date($safetyend, 'day'));
+				}
+			}
+		}
+
+		// Nitrogen of livestock origin in vulnerable zones: kg N/ha of the calendar year on each plot, this record included
+		$limit = getDolGlobalInt('DOLITRACE_ZVN_N_LIVESTOCK_LIMIT', 170);
+		if ($this->kind == self::KIND_FERTILIZATION && $livestockn > 0 && $limit > 0) {
+			$year = (int) dol_print_date($this->date_start, '%Y');
+			foreach ($this->targets as $target) {
+				if (empty($target->zone_zvn) || empty($target->fk_plot)) {
+					continue;
+				}
+				$sql = "SELECT SUM(p.n_applied) as total FROM ".$this->db->prefix()."dolitrace_treatment_product as p";
+				$sql .= " INNER JOIN ".$this->db->prefix()."dolitrace_treatment as t ON t.rowid = p.fk_treatment";
+				$sql .= " INNER JOIN ".$this->db->prefix()."dolifarm_fertilizer as f ON f.rowid = p.fk_fertilizer";
+				$sql .= " WHERE t.status = ".self::STATUS_VALIDATED." AND t.kind = ".self::KIND_FERTILIZATION;
+				$sql .= " AND t.rowid <> ".((int) $this->id).($this->fk_previous > 0 ? " AND t.rowid <> ".((int) $this->fk_previous) : "");
+				$sql .= " AND t.date_start >= '".$this->db->idate(dol_mktime(0, 0, 0, 1, 1, $year))."' AND t.date_start <= '".$this->db->idate(dol_mktime(23, 59, 59, 12, 31, $year))."'";
+				$sql .= " AND f.fk_fert_type IN ('".implode("','", array_map(array($this->db, 'escape'), self::$livestockFertTypes))."')";
+				$sql .= " AND EXISTS (SELECT 1 FROM ".$this->db->prefix()."dolitrace_treatment_target as g WHERE g.fk_treatment = t.rowid AND g.fk_plot = ".((int) $target->fk_plot).")";
+				$resql = $this->db->query($sql);
+				$obj = $resql ? $this->db->fetch_object($resql) : null;
+				$total = ($obj ? (float) $obj->total : 0) + $livestockn;
+				if ($total > $limit) {
+					$warnings[] = $langs->transnoentities('WarningTreatmentZvnNitrogen', $target->location_ref, price(price2num($total, 'MS')), $year, $limit);
+				}
+			}
+		}
+
+		return $warnings;
 	}
 
 	/**

@@ -16,10 +16,6 @@ DolitraceSetup = Dolitrace setup
 Settings = Settings
 DolitraceSetupPage = Dolitrace setup page
 NewSection=New section
-DOLITRACE_MYPARAM1 = My param 1
-DOLITRACE_MYPARAM1Tooltip = My param 1 tooltip
-DOLITRACE_MYPARAM2=My param 2
-DOLITRACE_MYPARAM2Tooltip=My param 2 tooltip
 
 
 #
@@ -227,3 +223,15 @@ ErrorTreatmentImportCropPlanMany = More crop plans in progress for %s on %s: giv
 WarningTreatmentImportOperator = Operator not found (%s): set it on the card
 WarningTreatmentImportMachine = Machine not found (%s): set it on the card
 WarningTreatmentImportContractor = Contractor not found (%s): set it on the card
+
+# Register - warnings
+TreatmentWarnings = Warnings to check
+DOLITRACE_ZVN_N_LIVESTOCK_LIMIT = Limit of nitrogen of livestock origin in nitrate vulnerable zones (kg N/ha a year)
+DOLITRACE_ZVN_N_LIVESTOCK_LIMITHelp = The register warns when manure, slurry and digestate spread on a plot in a vulnerable zone (NVZ) exceed the limit in the calendar year (170 kg N/ha under the Nitrates Directive, unless regional derogations). 0 = no warning.
+WarningTreatmentLicenseExpired = License of the operator expired on %s
+WarningTreatmentMachineCheckExpired = Functional check of the machine expired on %s
+WarningTreatmentWillBeLate = More than 30 days have passed since the treatment: the record will be marked as late
+WarningTreatmentAuthExpired = Authorization of the product %s expired on %s: check the grace periods for sale and use of stocks
+WarningTreatmentDoseAboveMax = Dose of %s is %s, above the maximum dose of the product (%s)
+WarningTreatmentHarvestInSafety = Harvest %s of %s within the pre-harvest interval (harvest allowed from %s)
+WarningTreatmentZvnNitrogen = Area %s in vulnerable zone: %s kg N/ha of livestock origin in %s, above the limit of %s kg N/ha

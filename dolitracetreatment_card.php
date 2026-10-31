@@ -543,9 +543,20 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		$formconfirm = $form->formconfirm($_SERVER["PHP_SELF"].'?id='.$object->id.'&lineid='.$lineid, $langs->trans('DeleteLine'), $langs->trans('ConfirmDeleteLine'), 'confirm_'.$action, '', 0, 1);
 	}
 
+	// Warnings of the record (dose, expiries, late record, safety interval, nitrogen in ZVN): they do not block the validation
+	$warnings = in_array($object->status, array($object::STATUS_DRAFT, $object::STATUS_VALIDATED)) ? $object->getWarnings() : array();
+	$warningshtml = '';
+	if (count($warnings)) {
+		$warningshtml = '<b>'.$langs->trans('TreatmentWarnings').'</b>';
+		foreach ($warnings as $warning) {
+			$warningshtml .= '<br>- '.dol_escape_htmltag($warning);
+		}
+	}
+
 	// Confirmation to validate: the record can no longer be modified
 	if ($action == 'validate') {
-		$formconfirm = $form->formconfirm($_SERVER["PHP_SELF"].'?id='.$object->id, $langs->trans('Validate'), $langs->trans('ConfirmValidateTreatment'), 'confirm_validate', '', 0, 1);
+		$text = $langs->trans('ConfirmValidateTreatment').($warningshtml ? '<br><br>'.$warningshtml : '');
+		$formconfirm = $form->formconfirm($_SERVER["PHP_SELF"].'?id='.$object->id, $langs->trans('Validate'), $text, 'confirm_validate', '', 0, 1, count($warnings) ? 350 : 0, 650);
 	}
 
 	// Confirmation to correct or to cancel a validated record: the reason is required
@@ -885,6 +896,9 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
 	if ($toregularize > 0 && $object->status == $object::STATUS_VALIDATED) {
 		print info_admin($langs->trans('TreatmentStockToRegularizeInfo', $toregularize), 0, 0, 'warning');
+	}
+	if ($warningshtml) {
+		print info_admin($warningshtml, 0, 0, 'warning');
 	}
 
 	// Buttons for actions
