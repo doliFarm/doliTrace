@@ -40,3 +40,6 @@ CREATE TABLE IF NOT EXISTS llx_dolitrace_harvest (
     UNIQUE INDEX uk_dolitrace_harvest_uuid (uuid),
     CONSTRAINT fk_dolitrace_harv_plan FOREIGN KEY (fk_cropplan) REFERENCES llx_dolitrace_cropplan(rowid)
 ) ENGINE=InnoDB;
+
+-- Raccolte create senza stato (status NULL): sono bozze
+UPDATE llx_dolitrace_harvest SET status = 0 WHERE status IS NULL;

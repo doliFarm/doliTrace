@@ -267,16 +267,16 @@ $help_url = '';
 llxHeader('', $title, $help_url, '', 0, 0, '', '', '', 'mod-dolitrace page-card');
 
 // ==============================================================================
-// [MOD] PREPARAZIONE FILTRO FARM (SQL Standard per select_company)
+// [MOD] PREPARAZIONE FILTRO FARM (Universal Search Filter per select_company)
 // ==============================================================================
 dol_include_once('/dolifarm/lib/dolifarm.lib.php');
 
 $farm_type_id = getFarmTypeId($db); 
 if ($farm_type_id > 0) {
-    // Usiamo SQL standard qui perché select_company non usa il parser ':=:'
-    $filter_farm_sql = "status=1 AND fk_typent = " . ((int)$farm_type_id);
+    // select_company() accepts only the Universal Search Filter syntax: raw SQL is rejected with a technical error
+    $filter_farm_sql = "(s.status:=:1) AND (s.fk_typent:=:" . ((int)$farm_type_id) . ")";
 } else {
-    $filter_farm_sql = "status=1";
+    $filter_farm_sql = "(s.status:=:1)";
 }
 
 // Part to create

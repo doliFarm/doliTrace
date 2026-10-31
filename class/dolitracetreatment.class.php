@@ -1155,7 +1155,7 @@ class DoliTraceTreatment extends CommonObject
 			}
 			if (count($cropplans)) {
 				$sql = "SELECT h.rowid, h.ref, h.date_harvest FROM ".$this->db->prefix()."dolitrace_harvest as h";
-				$sql .= " WHERE h.fk_cropplan IN (".$this->db->sanitize(implode(',', $cropplans)).") AND h.status <> 9";
+				$sql .= " WHERE h.fk_cropplan IN (".$this->db->sanitize(implode(',', $cropplans)).") AND (h.status IS NULL OR h.status <> 9)";
 				$sql .= " AND h.date_harvest >= '".$this->db->escape(dol_print_date($this->date_start, '%Y-%m-%d'))."'";
 				$sql .= " AND h.date_harvest < '".$this->db->escape(dol_print_date($safetyend, '%Y-%m-%d'))."'";
 				foreach (dolitraceTreatmentFetchRows($this->db, $sql) as $harvest) {

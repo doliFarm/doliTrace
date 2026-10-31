@@ -983,7 +983,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 				$text .= ' <a href="'.$_SERVER['PHP_SELF'].'?id='.((int) $changes['previous']).'">'.dol_escape_htmltag($changes['previous_ref']).'</a>';
 			}
 			print '<tr class="oddeven">';
-			print '<td class="nowraponall">'.dol_print_date($db->jdate($line->datec), 'dayhour').'</td>';
+			print '<td class="nowraponall">'.dol_print_date($db->jdate($line->datec), 'dayhour', 'tzuser').'</td>';
 			print '<td class="tdoverflowmax150">'.($users[$line->fk_user]->id > 0 ? $users[$line->fk_user]->getNomUrl(-1) : '').'</td>';
 			print '<td class="center">'.((int) $line->version).'</td>';
 			print '<td>'.$text.'</td>';

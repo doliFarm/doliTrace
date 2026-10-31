@@ -284,6 +284,11 @@ class DoliTraceHarvest extends CommonObject
      */
     public function create(User $user, $notrigger = 0)
     {
+        // status is not in the create form: without it createCommon() stores NULL
+        if ($this->status === null || $this->status === '') {
+            $this->status = self::STATUS_DRAFT;
+        }
+
         $result = $this->createCommon($user, $notrigger);
 
         // uncomment lines below if you want to validate object after creation
