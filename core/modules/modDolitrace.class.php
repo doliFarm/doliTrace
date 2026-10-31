@@ -368,6 +368,26 @@ class modDolitrace extends DolibarrModules
 		$this->rights[$r][4] = 'dolitracecropplan';
 		$this->rights[$r][5] = 'delete';
 		$r++;
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', (3 * 10) + 0 + 1);
+		$this->rights[$r][1] = 'Read the register of treatments and fertilizations';
+		$this->rights[$r][4] = 'dolitracetreatment';
+		$this->rights[$r][5] = 'read';
+		$r++;
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', (3 * 10) + 1 + 1);
+		$this->rights[$r][1] = 'Create/Update draft records of the register';
+		$this->rights[$r][4] = 'dolitracetreatment';
+		$this->rights[$r][5] = 'write';
+		$r++;
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', (3 * 10) + 2 + 1);
+		$this->rights[$r][1] = 'Delete draft records of the register';
+		$this->rights[$r][4] = 'dolitracetreatment';
+		$this->rights[$r][5] = 'delete';
+		$r++;
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', (3 * 10) + 3 + 1);
+		$this->rights[$r][1] = 'Validate, correct and cancel records of the register';
+		$this->rights[$r][4] = 'dolitracetreatment';
+		$this->rights[$r][5] = 'validate';
+		$r++;
 
 		/* END MODULEBUILDER PERMISSIONS */
 
@@ -556,6 +576,39 @@ class modDolitrace extends DolibarrModules
 			'object' => 'DoliTraceOperation'
 		);
 		*/
+		/* BEGIN MODULEBUILDER LEFTMENU DOLITRACETREATMENT */
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace',
+			'type' => 'left',
+			'titre' => 'TreatmentRegister',
+			'prefix' => img_picto('', 'fa-spray-can', 'class="paddingright pictofixedwidth valignmiddle"'),
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitracetreatment',
+			'url' => '/dolitrace/dolitracetreatment_list.php',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitracetreatment", "read")',
+			'target' => '',
+			'user' => 2,
+			'object' => 'DoliTraceTreatment'
+		);
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitracetreatment',
+			'type' => 'left',
+			'titre' => 'NewTreatmentRecord',
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitrace_treatment_new',
+			'url' => '/dolitrace/dolitracetreatment_card.php?action=create',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitracetreatment", "write")',
+			'target' => '',
+			'user' => 2,
+			'object' => 'DoliTraceTreatment'
+		);
+		/* END MODULEBUILDER LEFTMENU DOLITRACETREATMENT */
 		/* BEGIN MODULEBUILDER LEFTMENU MYOBJECT */
 		/*
 		$this->menu[$r++]=array(
