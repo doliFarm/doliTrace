@@ -166,7 +166,7 @@ class modDolitrace extends DolibarrModules
 		// Prerequisites
 		$this->phpmin = array(7, 2); // Minimum version of PHP required by module
 		// $this->phpmax = array(8, 0); // Maximum version of PHP required by module
-		$this->need_dolibarr_version = array(19, -3); // Minimum version of Dolibarr required by module
+		$this->need_dolibarr_version = array(23, 0); // Minimum version of Dolibarr required by module (same as doliFarm)
 		// $this->max_dolibarr_version = array(19, -3); // Maximum version of Dolibarr required by module
 		$this->need_javascript_ajax = 0;
 
@@ -257,7 +257,27 @@ class modDolitrace extends DolibarrModules
 		 );
 		 */
 		/* BEGIN MODULEBUILDER DICTIONARIES */
-		$this->dictionaries = array();
+		// Register of the treatments and fertilizations: adversities (EPPO codes) and units of dose
+		$this->dictionaries = array(
+			'langs' => 'dolitrace@dolitrace',
+			'tabname' => array('dolitrace_c_adversity', 'dolitrace_c_dose_unit'),
+			'tablib' => array('DictionaryAdversity', 'DictionaryDoseUnit'),
+			'tabsql' => array(
+				'SELECT rowid, code, label, category, active, position FROM '.MAIN_DB_PREFIX.'dolitrace_c_adversity',
+				'SELECT rowid, code, label, kind, technical_type, basis, qty_unit, factor, active, position FROM '.MAIN_DB_PREFIX.'dolitrace_c_dose_unit',
+			),
+			'tabsqlsort' => array('position ASC, label ASC', 'position ASC, code ASC'),
+			'tabfield' => array('code,label,category,position', 'code,label,kind,technical_type,basis,qty_unit,factor,position'),
+			'tabfieldvalue' => array('code,label,category,position', 'code,label,kind,technical_type,basis,qty_unit,factor,position'),
+			'tabfieldinsert' => array('code,label,category,position', 'code,label,kind,technical_type,basis,qty_unit,factor,position'),
+			'tabrowid' => array('rowid', 'rowid'),
+			'tabcond' => array(isModEnabled('dolitrace'), isModEnabled('dolitrace')),
+			'tabhelp' => array(
+				array('code' => $langs->trans('AdversityCodeHelp'), 'category' => $langs->trans('AdversityCategoryHelp')),
+				array('code' => $langs->trans('DoseUnitCodeHelp'), 'kind' => $langs->trans('DoseUnitKindHelp'), 'technical_type' => $langs->trans('DoseUnitTechnicalTypeHelp'),
+					'basis' => $langs->trans('DoseUnitBasisHelp'), 'qty_unit' => $langs->trans('DoseUnitQtyUnitHelp'), 'factor' => $langs->trans('DoseUnitFactorHelp')),
+			),
+		);
 		/* END MODULEBUILDER DICTIONARIES */
 
 		// Boxes/Widgets
@@ -347,6 +367,26 @@ class modDolitrace extends DolibarrModules
 		$this->rights[$r][1] = 'Delete DoliTraceCropplan object of Dolitrace';
 		$this->rights[$r][4] = 'dolitracecropplan';
 		$this->rights[$r][5] = 'delete';
+		$r++;
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', (3 * 10) + 0 + 1);
+		$this->rights[$r][1] = 'Read the register of treatments and fertilizations';
+		$this->rights[$r][4] = 'dolitracetreatment';
+		$this->rights[$r][5] = 'read';
+		$r++;
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', (3 * 10) + 1 + 1);
+		$this->rights[$r][1] = 'Create/Update draft records of the register';
+		$this->rights[$r][4] = 'dolitracetreatment';
+		$this->rights[$r][5] = 'write';
+		$r++;
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', (3 * 10) + 2 + 1);
+		$this->rights[$r][1] = 'Delete draft records of the register';
+		$this->rights[$r][4] = 'dolitracetreatment';
+		$this->rights[$r][5] = 'delete';
+		$r++;
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', (3 * 10) + 3 + 1);
+		$this->rights[$r][1] = 'Validate, correct and cancel records of the register';
+		$this->rights[$r][4] = 'dolitracetreatment';
+		$this->rights[$r][5] = 'validate';
 		$r++;
 
 		/* END MODULEBUILDER PERMISSIONS */
@@ -536,6 +576,69 @@ class modDolitrace extends DolibarrModules
 			'object' => 'DoliTraceOperation'
 		);
 		*/
+		/* BEGIN MODULEBUILDER LEFTMENU DOLITRACETREATMENT */
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace',
+			'type' => 'left',
+			'titre' => 'TreatmentRegister',
+			'prefix' => img_picto('', 'fa-spray-can', 'class="paddingright pictofixedwidth valignmiddle"'),
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitracetreatment',
+			'url' => '/dolitrace/dolitracetreatment_list.php',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitracetreatment", "read")',
+			'target' => '',
+			'user' => 2,
+			'object' => 'DoliTraceTreatment'
+		);
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitracetreatment',
+			'type' => 'left',
+			'titre' => 'NewTreatmentRecord',
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitrace_treatment_new',
+			'url' => '/dolitrace/dolitracetreatment_card.php?action=create',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitracetreatment", "write")',
+			'target' => '',
+			'user' => 2,
+			'object' => 'DoliTraceTreatment'
+		);
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitracetreatment',
+			'type' => 'left',
+			'titre' => 'TreatmentExport',
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitrace_treatment_export',
+			'url' => '/dolitrace/dolitracetreatment_export.php',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitracetreatment", "read")',
+			'target' => '',
+			'user' => 2,
+			'object' => 'DoliTraceTreatment'
+		);
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitracetreatment',
+			'type' => 'left',
+			'titre' => 'TreatmentImport',
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitrace_treatment_import',
+			'url' => '/dolitrace/dolitracetreatment_import.php',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitracetreatment", "write")',
+			'target' => '',
+			'user' => 2,
+			'object' => 'DoliTraceTreatment'
+		);
+		/* END MODULEBUILDER LEFTMENU DOLITRACETREATMENT */
 		/* BEGIN MODULEBUILDER LEFTMENU MYOBJECT */
 		/*
 		$this->menu[$r++]=array(

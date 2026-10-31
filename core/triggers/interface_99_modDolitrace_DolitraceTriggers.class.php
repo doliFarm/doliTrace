@@ -32,7 +32,6 @@
 require_once DOL_DOCUMENT_ROOT.'/core/triggers/dolibarrtriggers.class.php';
 dol_include_once('/dolitrace/lib/dolitrace.lib.php');
 require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
-require_once DOL_DOCUMENT_ROOT.'/product/class/productbatch.class.php';
 
 
 /**
@@ -129,79 +128,24 @@ class InterfaceDolitraceTriggers extends DolibarrTriggers
                             }
                         }
 
-                        // B. GESTIONE LOTTO
+                        // B. CODICE LOTTO DI PRODUZIONE
+                        // Only the code is saved on the plan: the lot and the stock are created by the stock
+                        // movement of each harvest (MouvementStock), never with direct SQL on the stock tables
                         if ($product_id > 0) {
                             $year_short = date('y');
-                            $crop_ref_clean = substr(preg_replace('/[^A-Z0-9]/', '', strtoupper($obj_crop->ref)), 0, 4); 
-                            $plan_ref_clean = preg_replace('/[^A-Z0-9]/', '', strtoupper($object->ref));
-                            
+                            $crop_ref_clean = substr(preg_replace('/[^A-Z0-9]/', '', strtoupper($obj_crop->ref)), 0, 4);
+                            // During the validation the final ref is in newref, ref is still the provisional one
+                            $plan_ref_clean = preg_replace('/[^A-Z0-9]/', '', strtoupper(!empty($object->newref) ? $object->newref : $object->ref));
+
                             $batch_code = sprintf("%s-%s-%s", $year_short, $crop_ref_clean, $plan_ref_clean);
-                            $eatby_date = (dol_now() + (86400 * 180));
 
-                            // 1. TROVARE UN MAGAZZINO ATTIVO
-                            // Cerchiamo il magazzino di produzione (creato all'attivazione) oppure il primo disponibile
-                            $warehouse_id = 0;
-
-                            // Prima cerchiamo il magazzino salvato in DOLITRACE_WAREHOUSE_PROD
-                            $sql_w = "SELECT rowid FROM ".MAIN_DB_PREFIX."entrepot WHERE rowid = ".getDolGlobalInt('DOLITRACE_WAREHOUSE_PROD')." AND entity = ".((int) $conf->entity);
-                            $res_w = $this->db->query($sql_w);
-                            if ($res_w && ($obj_w = $this->db->fetch_object($res_w))) {
-                                $warehouse_id = $obj_w->rowid;
-                            } else {
-                                // Fallback: Primo magazzino attivo qualunque
-                                $sql_w_any = "SELECT rowid FROM ".MAIN_DB_PREFIX."entrepot WHERE entity = ".$conf->entity." AND statut = 1 LIMIT 1";
-                                $res_w_any = $this->db->query($sql_w_any);
-                                if ($obj_w_any = $this->db->fetch_object($res_w_any)) {
-                                    $warehouse_id = $obj_w_any->rowid;
-                                }
+                            $sql_up = "UPDATE ".MAIN_DB_PREFIX."dolitrace_cropplan SET fk_output_product=".((int)$product_id).", batch_output='".$this->db->escape($batch_code)."' WHERE rowid=".((int)$object->id);
+                            if (!$this->db->query($sql_up)) {
+                                $this->error = $this->db->lasterror();
+                                return -1;
                             }
-
-                            // 2. CHECK BLOCCANTE ("Il Pianto")
-                            if ($warehouse_id == 0) {
-                                $this->error = "ERRORE CRITICO: Nessun Magazzino attivo trovato! Impossibile generare il lotto di produzione. Crea almeno un magazzino.";
-                                return -1; // <--- Blocca la validazione e mostra errore rosso all'utente
-                            }
-
-                            // 3. RECUPERO/CREAZIONE LINK STOCK (Necessario per Dolibarr)
-                            $fk_product_stock = 0;
-                            $sql_ps = "SELECT rowid FROM ".MAIN_DB_PREFIX."product_stock WHERE fk_product = ".((int)$product_id)." AND fk_entrepot = ".((int)$warehouse_id);
-                            $res_ps = $this->db->query($sql_ps);
-                            
-                            if ($obj_ps = $this->db->fetch_object($res_ps)) {
-                                $fk_product_stock = $obj_ps->rowid;
-                            } else {
-                                // Creiamo l'associazione stock a 0
-                                $sql_ins = "INSERT INTO ".MAIN_DB_PREFIX."product_stock (fk_product, fk_entrepot, reel, import_key) VALUES (".((int)$product_id).", ".((int)$warehouse_id).", 0, 'DOLITRACE_AUTO')";
-                                if ($this->db->query($sql_ins)) {
-                                    $fk_product_stock = $this->db->last_insert_id(MAIN_DB_PREFIX."product_stock");
-                                }
-                            }
-
-                            // 4. CREAZIONE LOTTO
-                            if ($fk_product_stock > 0) {
-                                // Check esistenza
-                                $sql_check_b = "SELECT rowid FROM ".MAIN_DB_PREFIX."product_batch WHERE batch = '".$this->db->escape($batch_code)."' AND fk_product_stock = ".((int)$fk_product_stock);
-                                if ($this->db->num_rows($this->db->query($sql_check_b)) == 0) {
-                                    $batch = new Productbatch($this->db);
-                                    $batch->batch = $batch_code;
-                                    $batch->fk_product_stock = $fk_product_stock;
-                                    $batch->eatby = $eatby_date; 
-                                    $batch->sellby = $eatby_date; 
-                                    $batch->datec = dol_now();
-                                    $batch->qty = 0; 
-                                    
-                                    if ($batch->create($user) > 0) {
-                                        setEventMessages("Lotto generato con successo: " . $batch_code, [], 'mesgs');
-                                    } else {
-                                        $this->error = "Errore creazione Lotto: " . $batch->error;
-                                        return -1;
-                                    }
-                                } 
-
-                                // 5. AGGIORNAMENTO CROPPLAN
-                                $sql_up = "UPDATE ".MAIN_DB_PREFIX."dolitrace_cropplan SET fk_output_product=".((int)$product_id).", batch_output='".$this->db->escape($batch_code)."' WHERE rowid=".((int)$object->id);
-                                $this->db->query($sql_up);								
-                            }
+                            $object->fk_output_product = $product_id;
+                            $object->batch_output = $batch_code;
                         }
                     }
 					/*
@@ -285,78 +229,14 @@ class InterfaceDolitraceTriggers extends DolibarrTriggers
 					}
                 }
 				break;
-			case 'DOLITRACE_HARVEST_VALIDATE': 
-				{
-					dol_syslog("DolitraceTrigger: Detected HARVEST creation. processing stock...", LOG_INFO);
-
-					// 1. Dati dalla Raccolta
-					$product_id = isset($object->fk_product_out) ? $object->fk_product_out : 0;
-					$quantity = isset($object->qty_harvested) ? $object->qty_harvested : 0;
-					$batch_number = isset($object->batch_number) ? $object->batch_number : '';
-					$date_mouv = !empty($object->date_harvest) ? $object->date_harvest : dol_now();
-
-					if (empty($product_id) || empty($quantity)) return 0;
-
-					// 2. RECUPERO MAGAZZINO DI DEFAULT
-					// Strategia:
-					// a. Cerca ID nella configurazione globale (impostato dall'init del modulo)
-					// b. Fallback: Cerca un magazzino con ref 'DOLITRACE'
-					
-					$warehouse_id = getDolGlobalInt('DOLITRACE_DEFAULT_WAREHOUSE');
-
-					if (empty($warehouse_id)) {
-						// Tentativo di fallback: Cerchiamo un magazzino chiamato 'DOLITRACE'
-						$sql_wh = "SELECT rowid FROM " . $this->db->prefix . "entrepot WHERE ref = 'DOLITRACE' LIMIT 1";
-						$res_wh = $this->db->query($sql_wh);
-						if ($res_wh && $this->db->num_rows($res_wh) > 0) {
-							$obj_wh = $this->db->fetch_object($res_wh);
-							$warehouse_id = $obj_wh->rowid;
-						}
-					}
-
-					// Se ancora non abbiamo un magazzino, ci fermiamo (loggando l'errore)
-					if (empty($warehouse_id)) {
-						dol_syslog("DolitraceTrigger Error: Default warehouse not found (Constant DOLITRACE_DEFAULT_WAREHOUSE is missing and no warehouse with ref 'DOLITRACE' exists).", LOG_ERR);
-						// Non blocchiamo la creazione della raccolta, ma avvisiamo nei log
-						return 0; 
-					}
-
-					// 3. Esecuzione Movimento Stock
-					if (isModEnabled('stock')) {
-						dol_include_once('/product/stock/class/mouvementstock.class.php');
-						
-						$mouv = new MouvementStock($this->db);
-						$label = $langs->trans("Harvest") . " " . $object->ref;
-
-						$this->db->begin();
-
-						// _create(user, product_id, warehouse_id, qty, type, price, label, date, dlc, dluo, batch, origin_type, origin_id)
-						$result = $mouv->_create(
-							$user, 
-							$product_id, 
-							$warehouse_id, 
-							$quantity, 
-							1, // Input (Carico)
-							0, 
-							$label, 
-							$date_mouv, 
-							'', '', 
-							$batch_number, 
-							$object->element, 
-							$object->id
-						);
-
-						if ($result > 0) {
-							$this->db->commit();
-							dol_syslog("DolitraceTrigger: Stock moved to Warehouse ID $warehouse_id. Batch: $batch_number", LOG_INFO);
-						} else {
-							$this->db->rollback();
-							dol_syslog("DolitraceTrigger Stock Error: " . $mouv->error, LOG_ERR);
-							// return -1; // Decommenta se vuoi bloccare tutto in caso di errore stock
-						}
-					}
-				}
-			break;
+			// Harvest: the harvested quantity is in stock while the harvest is validated
+			case 'DOLITRACE_HARVEST_VALIDATE':
+			case 'DOLITRACE_HARVEST_REOPEN':
+				return $this->harvestStockMovement($object, $user, $langs, true);
+			case 'DOLITRACE_HARVEST_UNVALIDATE':
+			case 'DOLITRACE_HARVEST_CANCEL':
+			case 'DOLITRACEHARVEST_DELETE':
+				return $this->harvestStockMovement($object, $user, $langs, false);
 			// Users
 			//case 'USER_CREATE':
 			//case 'USER_MODIFY':
@@ -579,5 +459,113 @@ class InterfaceDolitraceTriggers extends DolibarrTriggers
 		}
 
 		return 0;
+	}
+
+	/**
+	 * Put the harvested quantity in stock, or take it out again, with the stock movements of Dolibarr.
+	 * The movements already done for the harvest are summed first, so a status change never moves the quantity twice.
+	 * The lot of the harvest (or of its crop plan) is created by the movement itself.
+	 *
+	 * @param	CommonObject	$object		Harvest (DoliTraceHarvest)
+	 * @param	User			$user		User
+	 * @param	Translate		$langs		Langs
+	 * @param	bool			$instock	true = the quantity must be in stock, false = it must be out of stock
+	 * @return	int							<0 if KO (the status change is cancelled), 0 if nothing to do, >0 if moved
+	 */
+	private function harvestStockMovement($object, User $user, Translate $langs, $instock)
+	{
+		global $conf;
+
+		if (!isModEnabled('stock')) {
+			return 0;
+		}
+		require_once DOL_DOCUMENT_ROOT.'/product/stock/class/mouvementstock.class.php';
+		$langs->load('dolitrace@dolitrace');
+
+		$origintype = $object->element.'@dolitrace';
+		$product_id = (int) $object->fk_product_out;
+		$quantity = (float) $object->qty_harvested;
+
+		// Quantity already in stock for this harvest, with the warehouse and the lot of its last receipt
+		$moved = 0;
+		$moved_product_id = 0;
+		$warehouse_id = 0;
+		$batch_number = '';
+		$sql = "SELECT fk_product, fk_entrepot, batch, value FROM ".$this->db->prefix()."stock_mouvement";
+		$sql .= " WHERE origintype = '".$this->db->escape($origintype)."' AND fk_origin = ".((int) $object->id);
+		$sql .= " ORDER BY rowid";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+		while ($obj = $this->db->fetch_object($resql)) {
+			$moved += (float) $obj->value;
+			if ($obj->value > 0) {
+				$warehouse_id = (int) $obj->fk_entrepot;
+				$moved_product_id = (int) $obj->fk_product;
+				$batch_number = (string) $obj->batch;
+			}
+		}
+
+		$mouv = new MouvementStock($this->db);
+		$mouv->setOrigin($origintype, $object->id);
+
+		if ($instock) {
+			if ($moved > 0 || $product_id <= 0 || $quantity <= 0) {
+				return 0;
+			}
+
+			// Production warehouse saved at the activation of the module
+			$warehouse_id = 0;
+			$sql = "SELECT rowid FROM ".$this->db->prefix()."entrepot";
+			$sql .= " WHERE rowid = ".getDolGlobalInt('DOLITRACE_WAREHOUSE_PROD')." AND entity IN (".getEntity('stock').")";
+			$resql = $this->db->query($sql);
+			if ($resql && ($obj = $this->db->fetch_object($resql))) {
+				$warehouse_id = (int) $obj->rowid;
+			}
+			if (!$warehouse_id) {
+				$this->error = $langs->trans('ErrorDolitraceNoProductionWarehouse');
+				return -1;
+			}
+
+			// Lot of the harvest, otherwise the production lot of its crop plan (saved on the harvest for traceability)
+			$batch_number = (string) $object->batch_number;
+			if ($batch_number === '' && $object->fk_cropplan > 0) {
+				$sql = "SELECT batch_output FROM ".$this->db->prefix()."dolitrace_cropplan WHERE rowid = ".((int) $object->fk_cropplan);
+				$resql = $this->db->query($sql);
+				if ($resql && ($obj = $this->db->fetch_object($resql)) && !empty($obj->batch_output)) {
+					$batch_number = $obj->batch_output;
+					$sql = "UPDATE ".$this->db->prefix()."dolitrace_harvest SET batch_number = '".$this->db->escape($batch_number)."' WHERE rowid = ".((int) $object->id);
+					if (!$this->db->query($sql)) {
+						$this->error = $this->db->lasterror();
+						return -1;
+					}
+					$object->batch_number = $batch_number;
+				}
+			}
+
+			$label = $langs->trans('HarvestStockReceived', $object->ref);
+			$datem = !empty($object->date_harvest) ? $object->date_harvest : dol_now();
+			$result = $mouv->reception($user, $product_id, $warehouse_id, $quantity, 0, $label, '', '', $batch_number, $datem);
+		} else {
+			if ($moved <= 0) {
+				return 0;
+			}
+
+			// The quantity goes out of the product, the warehouse and the lot where it went in
+			$label = $langs->trans('HarvestStockCancelled', $object->ref);
+			$result = $mouv->livraison($user, $moved_product_id, $warehouse_id, $moved, 0, $label, dol_now(), '', '', $batch_number);
+		}
+
+		if ($result <= 0) {
+			$this->error = $mouv->error;
+			$this->errors = array_merge($this->errors, $mouv->errors);
+			dol_syslog("Trigger '".$this->name."': stock movement of harvest ".$object->id." failed: ".$mouv->error, LOG_ERR);
+			return -1;
+		}
+		dol_syslog("Trigger '".$this->name."': harvest ".$object->id." ".($instock ? 'received in' : 'taken out of')." warehouse ".$warehouse_id." lot ".$batch_number);
+
+		return 1;
 	}
 }
