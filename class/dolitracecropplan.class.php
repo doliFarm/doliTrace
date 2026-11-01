@@ -158,7 +158,7 @@ class DoliTraceCropplan extends CommonObject
         "actual_cost" => array("type" => "double(24,8)", "label" => "Actualcost", "enabled" => "1", 'position' => 85, 'notnull' => 0, "visible" => "-1",),
         
         "status" => array("type" => "int", "label" => "Status", "enabled" => "1", 'position' => 500, 'notnull' => 0, "visible" => "-1",),
-        "note_public" => array("type" => "text", "label" => "NotePrivate", "enabled" => "1", 'position' => 95, 'notnull' => 0, "visible" => "0", "cssview" => "wordbreak",),
+        "note_public" => array("type" => "text", "label" => "NotePublic", "enabled" => "1", 'position' => 95, 'notnull' => 0, "visible" => "0", "cssview" => "wordbreak",),
         
         "datec" => array("type" => "datetime", "label" => "DateCreation", "enabled" => "1", 'position' => 125, 'notnull' => 0, "visible" => "-2",),
         "date_valid" => array("type" => "datetime", "label" => "DateValidation", "enabled" => "1", 'position' => 126, 'notnull' => 0, "visible" => "-2",),

@@ -41,25 +41,25 @@ DELETE FROM llx_dolitrace_operation WHERE fk_cropplan = @id_plan;
 -- 5. Inserimento Operazioni
 -- Fix: Usata tabella corretta llx_dolitrace_operation
 INSERT INTO llx_dolitrace_operation (fk_cropplan, date_op, fk_operation_type, label, duration_min, depth_cm, cost_energy, cost_manpower)
-VALUES (@id_plan, '2025-10-20 08:00:00', 'OP_SOIL_PLOW', 'Aratura profonda', 180, 35.0, 150.00, 50.00);
+VALUES (@id_plan, '2025-10-20 08:00:00', 'SOIL_PLOWING', 'Aratura profonda', 180, 35.0, 150.00, 50.00);
 
 INSERT INTO llx_dolitrace_operation (fk_cropplan, date_op, fk_operation_type, label, duration_min, depth_cm, cost_energy, cost_manpower)
-VALUES (@id_plan, '2025-11-05 09:00:00', 'OP_SOIL_HARROW_ROT', 'Affinamento terreno', 120, 15.0, 80.00, 40.00);
+VALUES (@id_plan, '2025-11-05 09:00:00', 'SOIL_REFINING', 'Affinamento terreno', 120, 15.0, 80.00, 40.00);
 
 INSERT INTO llx_dolitrace_operation (fk_cropplan, date_op, fk_operation_type, label, fk_product, qty_used, cost_material, cost_manpower)
-VALUES (@id_plan, '2025-11-10 07:30:00', 'OP_SOWING_PRECISION', 'Semina varietà Cappelli', NULL, 220.00, 180.00, 60.00); 
+VALUES (@id_plan, '2025-11-10 07:30:00', 'PLANTING', 'Semina varietà Cappelli', NULL, 220.00, 180.00, 60.00); 
 
 INSERT INTO llx_dolitrace_operation (fk_cropplan, date_op, fk_operation_type, label, fk_product, qty_used, cost_material, cost_manpower)
-SELECT @id_plan, '2026-01-20 10:00:00', 'OP_FERT_GRANULAR', 'Copertura Azotata', @id_prod_urea, 150.00, 120.00, 30.00
+SELECT @id_plan, '2026-01-20 10:00:00', 'TT_Fertiliser', 'Copertura Azotata', @id_prod_urea, 150.00, 120.00, 30.00
 FROM DUAL WHERE @id_prod_urea IS NOT NULL;
 
 INSERT INTO llx_dolitrace_operation (fk_cropplan, date_op, fk_operation_type, label, fk_product, qty_used, cost_material, cost_energy)
-SELECT @id_plan, '2026-04-15 17:00:00', 'OP_TREAT_BIO', 'Trattamento preventivo Rame', @id_prod_rame, 4.5, 45.00, 25.00
+SELECT @id_plan, '2026-04-15 17:00:00', 'TT_Pesticide', 'Trattamento preventivo Rame', @id_prod_rame, 4.5, 45.00, 25.00
 FROM DUAL WHERE @id_prod_rame IS NOT NULL;
 
 -- Fix: Corretto nome colonna da 'note' a 'note_public'
 INSERT INTO llx_dolitrace_operation (fk_cropplan, date_op, fk_operation_type, label, note_public, cost_manpower)
-VALUES (@id_plan, '2026-05-10 09:00:00', 'OP_MONITOR_PEST', 'Ispezione visiva Fusariosi', 'Nessun sintomo rilevato.', 20.00);
+VALUES (@id_plan, '2026-05-10 09:00:00', 'SCOUTING', 'Ispezione visiva Fusariosi', 'Nessun sintomo rilevato.', 20.00);
 
 
 -- 6. Inserimento Harvest
