@@ -1,5 +1,32 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.2.0
+
+Produzione biologica nel quaderno di campagna, dati AGEA e registri bio. Richiede doliFarm 1.4.0 o successiva: aggiornare doliFarm prima di doliTrace, poi disattivare e riattivare doliTrace (colonne, dizionari e menu nuovi). Requisito minimo PHP 8.2 e Dolibarr 23; provato su PHP 8.4, MySQL 8.4 e Dolibarr 24.0.2.
+
+### Registro dei trattamenti
+- Stato bio dell'appezzamento copiato sulle superfici alla convalida; avvisi su appezzamenti bio o in conversione per agrofarmaci e fertilizzanti non ammessi o da verificare (conferma esplicita e proposta di nuova conversione), rame oltre 28 kg/ha in 7 anni (setup).
+- Giustificazione dei fitosanitari (dizionario dei tipi e riferimento).
+- Avvisi sugli usi autorizzati (coltura, avversità, dose, intervallo di sicurezza, numero di trattamenti per coltura), sulle resistenze (FRAC/IRAC) e sui prodotti revocati o sospesi.
+- Avversità cercate su tutto il database EPPO, aggiunte al dizionario se mancano.
+- Dati AGEA: metodo di applicazione, controllo dell'irroratrice, sementi in migliaia di semi, quantità AGEA, operatori e macchine, azoto dei fertilizzanti liquidi in zona vulnerabile; quantità di magazzino nell'unità del prodotto.
+- Export JSON in formato 1.4: eventi colturali e irrigazioni, siti di stoccaggio con le giacenze, operatori, macchine, sezione `organic`.
+
+### Operazioni colturali e raccolte
+- Eventi colturali e irrigazioni del quaderno, data di fine e fase BBCH; semina con stato bio del materiale e deroga BDSB.
+- Raccolte: stato bio del prodotto alla convalida, suffisso -BIO o -INCONV nel lotto, sottomagazzino dedicato allo stato, avvisi per magazzino di un altro stato e lotti misti; carico nel magazzino dei prodotti del fascicolo.
+
+### Registri bio (nuova pagina QdC → Raccolte → Registri bio, sola lettura)
+- Registro di carico e scarico per prodotto e lotto con giacenza iniziale e progressiva, origine, controparte e suo certificato bio.
+- Bilancio di massa per coltura e stato con confronto con l'anno precedente; riepilogo per appezzamento al posto del PAP.
+- Sementi e deroghe, mezzi tecnici usati con l'esito bio, trattamenti, acquisti, raccolte, vendite.
+- Fascicolo bio annuale in PDF con tutte le sezioni; PDF e CSV di ogni registro. Formato provvisorio, da adattare alle richieste dell'organismo di controllo.
+
+### Altro
+- Visibilità per commerciale negli elenchi a discesa e filtro "Commerciale" nelle liste; gruppo "Quaderno di campagna" nella Vista globale della home.
+- Licenza AGPL-3.0 o successiva, titolare Luigi Grillo - doliFarm.com.
+- Correzioni dai test di accettazione: import (duplicati), PDF del registro, fusi orari, scheda informazioni delle operazioni.
+
 ## 1.1.0
 
 Registro dei trattamenti e delle fertilizzazioni (Reg. UE 2023/564) e magazzino delle raccolte con le classi di Dolibarr. Richiede doliFarm 1.3.0 o successiva (operatori, fertilizzanti, visibilità per commerciale e azienda unica): aggiornare doliFarm prima di doliTrace. Dopo l'aggiornamento disattivare e riattivare il modulo per creare tabelle, dizionari e menu.
