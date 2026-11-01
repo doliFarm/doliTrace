@@ -38,6 +38,9 @@ CREATE TABLE IF NOT EXISTS llx_dolitrace_treatment(
 	fk_machine				integer,
 	machine_label			varchar(255),						-- copy
 	machine_check_end		date,								-- copy
+	machine_check_date		date,								-- copy
+	machine_cert_ref		varchar(64),						-- copy
+	application_method		varchar(32),
 	water_volume			double(24,8),						-- l/ha
 	weather					varchar(255),
 	version					integer DEFAULT 1 NOT NULL,

@@ -292,6 +292,7 @@ ErrorTreatmentImportNotFound = %s non trovato: %s
 ErrorTreatmentImportCropPlanMany = Più piani colturali in corso per %s al %s: indicare il codice EPPO della coltura
 WarningTreatmentImportOperator = Operatore non trovato (%s): indicarlo nella scheda
 WarningTreatmentImportMachine = Macchina non trovata (%s): indicarla nella scheda
+WarningTreatmentImportApplicationMethod = Modalità di applicazione non trovata o di un altro tipo rispetto alla registrazione (%s): indicarla nella scheda
 WarningTreatmentImportContractor = Contoterzista non trovato (%s): indicarlo nella scheda
 
 # Register - warnings
@@ -325,3 +326,17 @@ ErrorOperationFertigationRecord = La registrazione della fertirrigazione deve es
 ErrorValueMustBePositive = %s non può essere negativo
 CropPlanPcgRef = Appezzamento PCG
 CropPlanPcgRefHelp = Identificativo dell'appezzamento nel Piano Colturale Grafico (PCG) del fascicolo aziendale sul SIAN, per il quaderno di campagna (QDCA)
+
+# AGEA field notebook (circ. 21371/2024, Allegato 3)
+Agea_value = Voce AGEA
+AgeaValueHelp = Voce della lista corrispondente nel quaderno di campagna AGEA (circ. 21371/2024, Allegato 3). Vuota: non riportata ad AGEA
+Fert_group = Gruppo AGEA
+DictionaryApplicationMethod = Modalità di applicazione
+ApplicationMethodCodeHelp = Codice univoco della modalità di applicazione o distribuzione
+ApplicationMethodKindHelp = 1 difesa fitosanitaria, 2 fertilizzazione
+ApplicationMethodFertGroupHelp = Per le fertilizzazioni: ORG organica, MIN chimica
+TreatmentApplicationMethod = Modalità di applicazione
+TreatmentApplicationMethodHelp = Come è stato applicato o distribuito il prodotto (liste del quaderno di campagna AGEA). Scegliere una modalità dello stesso tipo della registrazione
+TreatmentMachineCheckDate = Ultimo controllo irroratrice
+TreatmentMachineCertRef = Certificato controllo irroratrice
+ErrorTreatmentApplicationMethodKind = La modalità di applicazione non è dello stesso tipo della registrazione (difesa o fertilizzazione)

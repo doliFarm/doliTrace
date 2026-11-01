@@ -166,8 +166,11 @@ class DoliTraceTreatment extends CommonObject
 		'fk_machine' => array('type' => 'integer:DoliFarmMachine:dolifarm/class/dolifarmmachine.class.php', 'label' => 'TreatmentMachine', 'enabled' => 1, 'position' => 60, 'notnull' => 0, 'visible' => -1, 'css' => 'maxwidth500 widthcentpercentminusxx', 'csslist' => 'tdoverflowmax150'),
 		'machine_label' => array('type' => 'varchar(255)', 'label' => 'TreatmentMachineLabel', 'enabled' => 1, 'position' => 61, 'notnull' => 0, 'visible' => 0, 'noteditable' => 1),
 		'machine_check_end' => array('type' => 'date', 'label' => 'TreatmentMachineCheckEnd', 'enabled' => 1, 'position' => 62, 'notnull' => 0, 'visible' => -5, 'noteditable' => 1),
+		'machine_check_date' => array('type' => 'date', 'label' => 'TreatmentMachineCheckDate', 'enabled' => 1, 'position' => 63, 'notnull' => 0, 'visible' => -5, 'noteditable' => 1),
+		'machine_cert_ref' => array('type' => 'varchar(64)', 'label' => 'TreatmentMachineCertRef', 'enabled' => 1, 'position' => 64, 'notnull' => 0, 'visible' => -5, 'noteditable' => 1),
 		'water_volume' => array('type' => 'double(24,8)', 'label' => 'TreatmentWaterVolume', 'enabled' => 1, 'position' => 65, 'notnull' => 0, 'visible' => -1, 'css' => 'maxwidth100', 'help' => 'TreatmentWaterVolumeHelp'),
 		'weather' => array('type' => 'varchar(255)', 'label' => 'TreatmentWeather', 'enabled' => 1, 'position' => 66, 'notnull' => 0, 'visible' => -1, 'css' => 'minwidth300'),
+		'application_method' => array('type' => 'sellist:dolitrace_c_application_method:label:code::active=1', 'label' => 'TreatmentApplicationMethod', 'enabled' => 1, 'position' => 67, 'notnull' => 0, 'visible' => -1, 'css' => 'maxwidth500 widthcentpercentminusxx', 'help' => 'TreatmentApplicationMethodHelp'),
 		'version' => array('type' => 'integer', 'label' => 'TreatmentVersion', 'enabled' => 1, 'position' => 80, 'notnull' => 1, 'visible' => 5, 'default' => '1', 'noteditable' => 1, 'csslist' => 'right'),
 		'fk_previous' => array('type' => 'integer:DoliTraceTreatment:dolitrace/class/dolitracetreatment.class.php', 'label' => 'TreatmentPrevious', 'enabled' => 1, 'position' => 81, 'notnull' => 0, 'visible' => -5, 'noteditable' => 1),
 		'late' => array('type' => 'boolean', 'label' => 'TreatmentLate', 'enabled' => 1, 'position' => 82, 'notnull' => 0, 'visible' => -5, 'noteditable' => 1, 'help' => 'TreatmentLateHelp'),
@@ -281,6 +284,21 @@ class DoliTraceTreatment extends CommonObject
 	 * @var int|string|null
 	 */
 	public $machine_check_end;
+
+	/**
+	 * @var int|string|null	Copy of the date of the last positive check of the sprayer
+	 */
+	public $machine_check_date;
+
+	/**
+	 * @var string|null	Copy of the number of the certificate of the check of the sprayer
+	 */
+	public $machine_cert_ref;
+
+	/**
+	 * @var string|null	Method of application or distribution (code of llx_dolitrace_c_application_method)
+	 */
+	public $application_method;
 
 	/**
 	 * @var float|string|null
@@ -779,6 +797,8 @@ class DoliTraceTreatment extends CommonObject
 			$sql .= ", operator_license_end = ".(!empty($this->operator_license_end) ? "'".$this->db->idate($this->operator_license_end)."'" : "NULL");
 			$sql .= ", machine_label = ".($this->machine_label !== null ? "'".$this->db->escape($this->machine_label)."'" : "NULL");
 			$sql .= ", machine_check_end = ".(!empty($this->machine_check_end) ? "'".$this->db->idate($this->machine_check_end)."'" : "NULL");
+			$sql .= ", machine_check_date = ".(!empty($this->machine_check_date) ? "'".$this->db->idate($this->machine_check_date)."'" : "NULL");
+			$sql .= ", machine_cert_ref = ".($this->machine_cert_ref !== null && $this->machine_cert_ref !== '' ? "'".$this->db->escape($this->machine_cert_ref)."'" : "NULL");
 			$sql .= " WHERE rowid = ".((int) $this->id)." AND status = ".self::STATUS_DRAFT;
 
 			dol_syslog(get_class($this)."::validate()", LOG_DEBUG);
@@ -932,11 +952,15 @@ class DoliTraceTreatment extends CommonObject
 		}
 		$this->machine_label = null;
 		$this->machine_check_end = null;
+		$this->machine_check_date = null;
+		$this->machine_cert_ref = null;
 		if ($this->fk_machine > 0) {
-			$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, ref, label, date_sprayer_check_end FROM ".$this->db->prefix()."dolifarm_machine WHERE rowid = ".((int) $this->fk_machine));
+			$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, ref, label, date_sprayer_check_end, date_sprayer_check, sprayer_cert_ref FROM ".$this->db->prefix()."dolifarm_machine WHERE rowid = ".((int) $this->fk_machine));
 			if (isset($rows[$this->fk_machine])) {
 				$this->machine_label = trim($rows[$this->fk_machine]->ref.' - '.$rows[$this->fk_machine]->label, ' -');
 				$this->machine_check_end = $this->db->jdate($rows[$this->fk_machine]->date_sprayer_check_end);
+				$this->machine_check_date = $this->db->jdate($rows[$this->fk_machine]->date_sprayer_check);
+				$this->machine_cert_ref = $rows[$this->fk_machine]->sprayer_cert_ref;
 			}
 		}
 
@@ -1026,6 +1050,13 @@ class DoliTraceTreatment extends CommonObject
 		}
 		if (count($this->targets) == 0 || count($this->products) == 0) {
 			$errors[] = $langs->trans('ErrorTreatmentNeedsAreaAndProduct');
+		}
+		if (!empty($this->application_method)) {
+			$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, kind FROM ".$this->db->prefix()."dolitrace_c_application_method WHERE code = '".$this->db->escape($this->application_method)."'");
+			$method = reset($rows);
+			if (!$method || (int) $method->kind != (int) $this->kind) {
+				$errors[] = $langs->trans('ErrorTreatmentApplicationMethodKind');
+			}
 		}
 
 		$cropplans = dolitraceTreatmentCropPlans($this->db, $this);
@@ -1253,6 +1284,12 @@ class DoliTraceTreatment extends CommonObject
 			'targets' => array(),
 			'products' => array(),
 		);
+		// Data added for the AGEA field notebook: in the fingerprint only when filled in, so the fingerprints of the older records do not change
+		foreach (array('machine_check_date' => $date($this->machine_check_date), 'machine_cert_ref' => (string) $this->machine_cert_ref, 'application_method' => (string) $this->application_method) as $key => $value) {
+			if ($value !== '') {
+				$content[$key] = $value;
+			}
+		}
 		foreach ($this->targets as $target) {
 			$content['targets'][] = array(
 				'target_type' => (int) $target->target_type,
@@ -1400,7 +1437,7 @@ class DoliTraceTreatment extends CommonObject
 		$this->db->begin();
 		$new = new self($this->db);
 		foreach (array('entity', 'kind', 'technical_type', 'fk_soc', 'fk_dossier', 'date_start', 'date_end', 'reason', 'fk_operator', 'fk_soc_contractor', 'contractor_mode',
-			'contractor_signed', 'date_contractor_signed', 'delegation_ref', 'fk_machine', 'water_volume', 'weather', 'note_public', 'note_private') as $key) {
+			'contractor_signed', 'date_contractor_signed', 'delegation_ref', 'fk_machine', 'application_method', 'water_volume', 'weather', 'note_public', 'note_private') as $key) {
 			$new->$key = $this->$key;
 		}
 		$new->ref = '(PROV)';

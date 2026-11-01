@@ -214,6 +214,7 @@ CREATE TABLE IF NOT EXISTS llx_dolitrace_c_irrigation_method (
 	rowid			integer AUTO_INCREMENT PRIMARY KEY,
 	code			varchar(16) NOT NULL,
 	label			varchar(64) NOT NULL,
+	agea_value		varchar(128),
 	active			tinyint DEFAULT 1 NOT NULL,
 	position		integer DEFAULT 0,
 	UNIQUE INDEX uk_dolitrace_c_irrigation_method_code (code)
@@ -227,3 +228,44 @@ INSERT IGNORE INTO llx_dolitrace_c_irrigation_method (code, label, active, posit
 ('FURROW', 'Scorrimento / Infiltrazione laterale', 1, 50),
 ('FLOOD', 'Sommersione', 1, 60),
 ('OTHER', 'Altro', 1, 900);
+
+-- Methods of application or distribution of the records (AGEA field notebook: sheet 3 plant protection, 6 organic and 7 mineral fertilization).
+-- kind: 1 plant protection, 2 fertilization; fert_group: ORG organic, MIN mineral; agea_value: item of the AGEA list (no official codes yet)
+CREATE TABLE IF NOT EXISTS llx_dolitrace_c_application_method (
+	rowid			integer AUTO_INCREMENT PRIMARY KEY,
+	code			varchar(32) NOT NULL,
+	label			varchar(128) NOT NULL,
+	kind			smallint DEFAULT 1 NOT NULL,
+	fert_group		varchar(8),
+	agea_value		varchar(128),
+	active			tinyint DEFAULT 1 NOT NULL,
+	position		integer DEFAULT 0,
+	UNIQUE INDEX uk_dolitrace_c_application_method_code (code)
+) ENGINE=innodb;
+
+INSERT IGNORE INTO llx_dolitrace_c_application_method (code, label, kind, fert_group, agea_value, active, position) VALUES
+('PPP_ATOMIZER', 'Atomizzatore', 1, NULL, 'Atomizzatori', 1, 10),
+('PPP_SPRAYER', 'Irroratrice', 1, NULL, 'Irroratrici', 1, 20),
+('PPP_DUSTER', 'Impolveratrice', 1, NULL, 'Impolveratrici', 1, 30),
+('PPP_MICROGRAN', 'Microgranulatore', 1, NULL, 'Microgranulatore', 1, 40),
+('PPP_GREENHOUSE', 'Impianto fisso per serra', 1, NULL, 'Impianti fissi per serra', 1, 50),
+('PPP_HOSE', 'Manichetta', 1, NULL, 'Manichetta', 1, 60),
+('ORG_SPLASH_PLATE', 'Piatto deviatore', 2, 'ORG', 'piatto deviatore', 1, 110),
+('ORG_BOOM', 'Barra di distribuzione', 2, 'ORG', 'barra di distribuzione', 1, 120),
+('ORG_REEL', 'Rotolone a bassa pressione', 2, 'ORG', 'rotolone a bassa pressione', 1, 130),
+('ORG_BAND', 'Rasoterra in banda', 2, 'ORG', 'rasoterra in banda', 1, 140),
+('ORG_BAND_SHOE', 'Rasoterra in banda con deflettore', 2, 'ORG', 'rasoterra in banda con deflettore', 1, 150),
+('ORG_DISC_OPEN', 'Sotto-superficiale a dischi (solco aperto)', 2, 'ORG', 'sotto-superficiale a dischi (solco aperto)', 1, 160),
+('ORG_RIPPER_UMB', 'Sotto-superficiale ripper e ombelicale', 2, 'ORG', 'sotto-superficiale ripper e ombelicale', 1, 170),
+('ORG_RIPPER_CLOSED', 'Sotto-superficiale ripper (solco chiuso)', 2, 'ORG', 'sotto-superficiale ripper (solco chiuso)', 1, 180),
+('ORG_INJ_SELFPROP', 'Sotto-superficiale assolcatore (solco chiuso), operatrice semovente', 2, 'ORG', 'sotto-superficiale assolcatore (solco chiuso) operatrice semovente', 1, 190),
+('ORG_INJ_TRAILED', 'Sotto-superficiale assolcatore (solco chiuso), botte trainata', 2, 'ORG', 'sotto-superficiale assolcatore (solco chiuso) botte trainata', 1, 200),
+('ORG_DEEP_INJ', 'Iniezione profonda', 2, 'ORG', 'iniezione profonda', 1, 210),
+('ORG_FERTIG_PIVOT', 'Fertirrigazione superficiale (ranger o pivot)', 2, 'ORG', 'Fertirrigazione superficiale (ranger o pivot)', 1, 220),
+('ORG_FERTIG_HOSE', 'Fertirrigazione superficiale (manichette)', 2, 'ORG', 'Fertirrigazione superficiale (con manichette)', 1, 230),
+('ORG_FERTIG_SUB', 'Fertirrigazione sotto-superficiale (subirrigazione)', 2, 'ORG', 'Fertirrigazione sotto-superficiale (subirrigazione)', 1, 240),
+('MIN_HOSE', 'In manichetta', 2, 'MIN', 'In manichetta', 1, 310),
+('MIN_RAIN', 'A pioggia', 2, 'MIN', 'a pioggia', 1, 320),
+('MIN_SOIL', 'Al terreno', 2, 'MIN', 'al terreno', 1, 330),
+('MIN_FERTIG', 'Fertirrigazione', 2, 'MIN', 'fertirrigazione', 1, 340),
+('MIN_FOLIAR', 'Fogliare', 2, 'MIN', 'fogliare', 1, 350);

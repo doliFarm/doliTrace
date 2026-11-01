@@ -227,6 +227,7 @@ ErrorTreatmentImportNotFound = %s not found: %s
 ErrorTreatmentImportCropPlanMany = More crop plans in progress for %s on %s: give the EPPO code of the crop
 WarningTreatmentImportOperator = Operator not found (%s): set it on the card
 WarningTreatmentImportMachine = Machine not found (%s): set it on the card
+WarningTreatmentImportApplicationMethod = Method of application not found or not of the kind of the record (%s): set it on the card
 WarningTreatmentImportContractor = Contractor not found (%s): set it on the card
 
 # Register - warnings
@@ -270,3 +271,17 @@ ErrorOperationFertigationRecord = The fertigation record must be a fertilization
 ErrorValueMustBePositive = %s cannot be negative
 CropPlanPcgRef = Area in the PCG
 CropPlanPcgRefHelp = Identifier of the area (appezzamento) in the graphic crop plan (PCG) of the farm dossier on the SIAN, for the field notebook (QDCA)
+
+# AGEA field notebook (circ. 21371/2024, Allegato 3)
+Agea_value = AGEA item
+AgeaValueHelp = Item of the corresponding list in the AGEA field notebook (circ. 21371/2024, Allegato 3). Empty: not exported to AGEA
+Fert_group = AGEA group
+DictionaryApplicationMethod = Methods of application
+ApplicationMethodCodeHelp = Unique code of the method of application or distribution
+ApplicationMethodKindHelp = 1 plant protection, 2 fertilization
+ApplicationMethodFertGroupHelp = For fertilizations: ORG organic, MIN chemical
+TreatmentApplicationMethod = Method of application
+TreatmentApplicationMethodHelp = How the product was applied or distributed (lists of the AGEA field notebook). Choose a method of the same kind as the record
+TreatmentMachineCheckDate = Last sprayer check
+TreatmentMachineCertRef = Sprayer check certificate
+ErrorTreatmentApplicationMethodKind = The method of application is not of the same kind as the record (plant protection or fertilization)

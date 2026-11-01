@@ -89,7 +89,7 @@ class DoliTraceTreatmentImport
 	{
 		$example = array(
 			'record' => '1', 'kind' => 'plant_protection', 'technical_type' => 'surfaces', 'date_start' => '2026-04-10 08:30',
-			'operator_license' => 'PAN-0000', 'machine' => 'MAC-001', 'water_volume' => '500', 'weather' => 'Sereno',
+			'operator_license' => 'PAN-0000', 'machine' => 'MAC-001', 'water_volume' => '500', 'weather' => 'Sereno', 'application_method' => 'PPP_ATOMIZER',
 			'target_type' => 'plot', 'plot_ref' => 'APPEZ-0001', 'crop_eppo' => 'TRZDU', 'bbch' => '31', 'treated_qty' => '1.5', 'treated_unit' => 'HA',
 			'product_type' => 'plant_protection_product', 'reg_number' => '12345', 'adversity_eppo' => 'PLASVI', 'dose' => '2.5', 'dose_unit' => 'KG_HA', 'batch' => 'L2026-01',
 		);
@@ -266,6 +266,14 @@ class DoliTraceTreatmentImport
 		if ($object->water_volume === false) {
 			$result['errors'][] = $langs->transnoentities('ErrorTreatmentImportValue', 'water_volume', $value($head, 'water_volume'));
 			$object->water_volume = null;
+		}
+		if ($value($head, 'application_method') !== '') {
+			$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, code FROM ".$this->db->prefix()."dolitrace_c_application_method WHERE active = 1 AND kind = ".((int) $object->kind)." AND code = '".$this->db->escape($value($head, 'application_method'))."'");
+			if (count($rows) == 1) {
+				$object->application_method = reset($rows)->code;
+			} else {
+				$result['warnings'][] = $langs->transnoentities('WarningTreatmentImportApplicationMethod', $value($head, 'application_method'));
+			}
 		}
 
 		// Operator, machine and contractor: if not found the draft is created without them and the user completes it

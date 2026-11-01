@@ -34,7 +34,7 @@ dol_include_once('/dolifarm/lib/dolifarm_access.lib.php');
 class DoliTraceTreatmentExport
 {
 	const FORMAT = 'dolifarm-register';
-	const FORMAT_VERSION = '1.1';
+	const FORMAT_VERSION = '1.2';
 
 	/**
 	 * @var string[]	Columns of the CSV, in their order
@@ -42,9 +42,9 @@ class DoliTraceTreatmentExport
 	public static $csvColumns = array(
 		'record', 'ref', 'version', 'status', 'kind', 'technical_type', 'farm_cuaa', 'farm_name',
 		'date_start', 'date_end', 'reason', 'operator_name', 'operator_license', 'operator_license_end',
-		'contractor_name', 'contractor_vat', 'machine', 'machine_check_end', 'water_volume', 'weather', 'late',
+		'contractor_name', 'contractor_vat', 'machine', 'machine_check_end', 'machine_check_date', 'machine_cert_ref', 'water_volume', 'weather', 'application_method', 'late',
 		'target_type', 'plot_ref', 'location_ref', 'pcg_ref', 'zone_zvn', 'crop_eppo', 'crop_label', 'bbch', 'building_ref', 'seed_batch', 'treated_qty', 'treated_unit',
-		'product_type', 'product_ref', 'product_label', 'reg_number', 'n_content', 'p2o5_content', 'k2o_content',
+		'product_type', 'product_ref', 'product_label', 'reg_number', 'fert_type', 'fert_group', 'n_content', 'p2o5_content', 'k2o_content',
 		'adversity_eppo', 'adversity_label', 'dose', 'dose_unit', 'dose_unit_label', 'qty_total', 'qty_unit', 'n_applied', 'batch',
 		'content_hash',
 	);
@@ -137,6 +137,32 @@ class DoliTraceTreatmentExport
 	}
 
 	/**
+	 * Row of a dictionary by its code, with cache
+	 *
+	 * @param	string		$table		Table without prefix
+	 * @param	string		$code		Code
+	 * @param	string		$fields		Fields to read
+	 * @return	object|null				Row, null if not found
+	 */
+	private function lookupCode($table, $code, $fields)
+	{
+		if ((string) $code === '') {
+			return null;
+		}
+		$key = 'code:'.$table;
+		if (!array_key_exists($key, $this->cache) || !array_key_exists($code, $this->cache[$key])) {
+			$this->cache[$key][$code] = null;
+			$resql = $this->db->query("SELECT ".$fields." FROM ".$this->db->prefix().$table." WHERE code = '".$this->db->escape($code)."'");
+			if ($resql) {
+				$obj = $this->db->fetch_object($resql);
+				$this->cache[$key][$code] = $obj ? $obj : null;
+				$this->db->free($resql);
+			}
+		}
+		return $this->cache[$key][$code];
+	}
+
+	/**
 	 * Data of a record in the format of the register
 	 *
 	 * @param	DoliTraceTreatment	$record		Record with its products and areas
@@ -149,6 +175,7 @@ class DoliTraceTreatmentExport
 		$farm = $this->lookup('societe', $record->fk_soc, 'nom, idprof4, tva_intra');
 		$contractor = $this->lookup('societe', $record->fk_soc_contractor, 'nom, idprof4, tva_intra');
 		$machine = $this->lookup('dolifarm_machine', $record->fk_machine, 'ref');
+		$method = isset($content['application_method']) ? $this->lookupCode('dolitrace_c_application_method', $content['application_method'], 'label, agea_value') : null;
 		$previous = $this->lookup('dolitrace_treatment', $record->fk_previous, 'ref');
 		$hashcheck = $record->status == DoliTraceTreatment::STATUS_DRAFT ? 0 : $record->checkHash();
 
@@ -184,7 +211,14 @@ class DoliTraceTreatmentExport
 				'ref' => $machine ? $machine->ref : '',
 				'label' => $content['machine_label'],
 				'check_end' => $content['machine_check_end'],
+				'check_date' => isset($content['machine_check_date']) ? $content['machine_check_date'] : '',
+				'cert_ref' => isset($content['machine_cert_ref']) ? $content['machine_cert_ref'] : '',
 			),
+			'application_method' => $method ? array(
+				'code' => $content['application_method'],
+				'label' => (string) $method->label,
+				'agea_value' => (string) $method->agea_value,
+			) : null,
 			'water_volume_l_ha' => $content['water_volume'],
 			'weather' => $content['weather'],
 			'late' => (int) $record->late,
@@ -217,13 +251,17 @@ class DoliTraceTreatmentExport
 		}
 		foreach ($record->products as $i => $product) {
 			$agrodrug = $this->lookup('dolifarm_agrodrug', $product->fk_agrodrug, 'ref');
-			$fertilizer = $this->lookup('dolifarm_fertilizer', $product->fk_fertilizer, 'ref');
+			$fertilizer = $this->lookup('dolifarm_fertilizer', $product->fk_fertilizer, 'ref, fk_fert_type');
+			$ferttype = $fertilizer ? $this->lookupCode('dolifarm_c_fert_type', $fertilizer->fk_fert_type, 'label, fert_group, agea_value') : null;
 			$unit = $this->lookup('dolitrace_c_dose_unit', $product->fk_dose_unit, 'code');
 			$data['products'][] = array(
 				'type' => $product->fk_fertilizer > 0 ? 'fertilizer' : 'plant_protection_product',
 				'ref' => $agrodrug ? $agrodrug->ref : ($fertilizer ? $fertilizer->ref : ''),
 				'label' => $content['products'][$i]['product_label'],
 				'reg_number' => $content['products'][$i]['reg_number'],
+				'fert_type' => $fertilizer ? (string) $fertilizer->fk_fert_type : '',
+				'fert_group' => $ferttype ? (string) $ferttype->fert_group : '',
+				'fert_type_agea' => $ferttype ? (string) $ferttype->agea_value : '',
 				'n_content' => $content['products'][$i]['n_content'],
 				'p2o5_content' => $content['products'][$i]['p2o5_content'],
 				'k2o_content' => $content['products'][$i]['k2o_content'],
@@ -303,7 +341,7 @@ class DoliTraceTreatmentExport
 		$sql .= " o.irrigation_method, o.water_volume, o.irrigated_area, o.fertigation, o.fk_treatment,";
 		$sql .= " cp.ref as cropplan_ref, cp.pcg_ref, cp.fk_soc, p.ref as plot_ref, p.iacs_parcel,";
 		$sql .= " c.eppo_code as crop_eppo, c.label as crop_label, s.nom as farm_name, s.idprof4 as farm_cuaa,";
-		$sql .= " ot.label as type_label, im.label as irrigation_method_label, tr.ref as treatment_ref";
+		$sql .= " ot.label as type_label, ot.agea_value as type_agea, im.label as irrigation_method_label, im.agea_value as irrigation_method_agea, tr.ref as treatment_ref";
 		$sql .= " FROM ".$this->db->prefix()."dolitrace_operation as o";
 		$sql .= " INNER JOIN ".$this->db->prefix()."dolitrace_cropplan as cp ON cp.rowid = o.fk_cropplan";
 		$sql .= " LEFT JOIN ".$this->db->prefix()."dolifarm_plot as p ON p.rowid = cp.fk_plot";
@@ -342,6 +380,7 @@ class DoliTraceTreatmentExport
 				'ref' => (string) $obj->ref,
 				'type' => (string) $obj->fk_operation_type,
 				'type_label' => (string) ($obj->type_label ? $obj->type_label : $obj->fk_operation_type),
+				'type_agea' => (string) $obj->type_agea,
 				'date' => $this->dateIso($this->db->jdate($obj->date_op), true),
 				'label' => (string) $obj->label,
 				'farm' => array('name' => (string) $obj->farm_name, 'cuaa' => (string) $obj->farm_cuaa),
@@ -357,6 +396,7 @@ class DoliTraceTreatmentExport
 				$operation['irrigation'] = array(
 					'method' => (string) $obj->irrigation_method,
 					'method_label' => (string) $obj->irrigation_method_label,
+					'method_agea' => (string) $obj->irrigation_method_agea,
 					'water_volume_m3' => $obj->water_volume !== null ? (float) $obj->water_volume : null,
 					'irrigated_area_ha' => $obj->irrigated_area !== null ? (float) $obj->irrigated_area : null,
 					'fertigation' => (int) $obj->fertigation,
@@ -386,7 +426,9 @@ class DoliTraceTreatmentExport
 			'operator_name' => $data['operator']['name'], 'operator_license' => $data['operator']['license'], 'operator_license_end' => $data['operator']['license_end'],
 			'contractor_name' => $data['contractor'] ? $data['contractor']['name'] : '', 'contractor_vat' => $data['contractor'] ? $data['contractor']['vat'] : '',
 			'machine' => $data['machine']['ref'], 'machine_check_end' => $data['machine']['check_end'],
-			'water_volume' => $data['water_volume_l_ha'], 'weather' => $data['weather'], 'late' => $data['late'],
+			'machine_check_date' => $data['machine']['check_date'], 'machine_cert_ref' => $data['machine']['cert_ref'],
+			'water_volume' => $data['water_volume_l_ha'], 'weather' => $data['weather'],
+			'application_method' => $data['application_method'] ? $data['application_method']['code'] : '', 'late' => $data['late'],
 			'content_hash' => $data['content_hash'],
 		);
 		$targets = count($data['targets']) ? $data['targets'] : array(array());
@@ -403,7 +445,7 @@ class DoliTraceTreatmentExport
 				$line['product_ref'] = isset($product['ref']) ? $product['ref'] : '';
 				$line['product_label'] = isset($product['label']) ? $product['label'] : '';
 				$line['n_applied'] = isset($product['n_applied_kg_ha']) ? $product['n_applied_kg_ha'] : '';
-				foreach (array('reg_number', 'n_content', 'p2o5_content', 'k2o_content', 'adversity_eppo', 'adversity_label', 'dose', 'dose_unit', 'dose_unit_label', 'qty_total', 'qty_unit', 'batch') as $key) {
+				foreach (array('reg_number', 'fert_type', 'fert_group', 'n_content', 'p2o5_content', 'k2o_content', 'adversity_eppo', 'adversity_label', 'dose', 'dose_unit', 'dose_unit_label', 'qty_total', 'qty_unit', 'batch') as $key) {
 					$line[$key] = isset($product[$key]) ? $product[$key] : '';
 				}
 				$ordered = array();

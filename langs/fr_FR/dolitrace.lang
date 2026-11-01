@@ -190,6 +190,7 @@ ErrorTreatmentImportNotFound = %s introuvable : %s
 ErrorTreatmentImportCropPlanMany = Plusieurs plans culturaux en cours pour %s au %s : indiquer le code EPPO de la culture
 WarningTreatmentImportOperator = Opérateur introuvable (%s) : l'indiquer sur la fiche
 WarningTreatmentImportMachine = Machine introuvable (%s) : l'indiquer sur la fiche
+WarningTreatmentImportApplicationMethod = Mode d'application introuvable ou d'un autre type que l'enregistrement (%s) : l'indiquer sur la fiche
 WarningTreatmentImportContractor = Prestataire introuvable (%s) : l'indiquer sur la fiche
 
 # Register - warnings
@@ -233,3 +234,17 @@ ErrorOperationFertigationRecord = L'enregistrement de fertirrigation doit être 
 ErrorValueMustBePositive = %s ne peut pas être négatif
 CropPlanPcgRef = Parcelle dans le PCG
 CropPlanPcgRefHelp = Identifiant de la parcelle (appezzamento) dans le plan cultural graphique (PCG) du dossier de l'exploitation sur le SIAN, pour le cahier de culture (QDCA)
+
+# AGEA field notebook (circ. 21371/2024, Allegato 3)
+Agea_value = Valeur AGEA
+AgeaValueHelp = Valeur de la liste correspondante du cahier de campagne AGEA (circ. 21371/2024, annexe 3). Vide : non exportée vers AGEA
+Fert_group = Groupe AGEA
+DictionaryApplicationMethod = Modes d'application
+ApplicationMethodCodeHelp = Code unique du mode d'application ou d'épandage
+ApplicationMethodKindHelp = 1 protection des plantes, 2 fertilisation
+ApplicationMethodFertGroupHelp = Pour les fertilisations : ORG organique, MIN chimique
+TreatmentApplicationMethod = Mode d'application
+TreatmentApplicationMethodHelp = Comment le produit a été appliqué ou épandu (listes du cahier de campagne AGEA). Choisir un mode du même type que l'enregistrement
+TreatmentMachineCheckDate = Dernier contrôle du pulvérisateur
+TreatmentMachineCertRef = Certificat de contrôle du pulvérisateur
+ErrorTreatmentApplicationMethodKind = Le mode d'application n'est pas du même type que l'enregistrement (protection des plantes ou fertilisation)
