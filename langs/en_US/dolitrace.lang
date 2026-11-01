@@ -361,3 +361,7 @@ TreatmentCuApplied = Copper metal applied (kg/ha)
 TreatmentCuAppliedShort = Cu %s kg/ha
 WarningTreatmentNotOrganic = The product %s is not marked as allowed in organic farming (card of the product), but it is used on areas in conversion or organic: %s
 WarningTreatmentCopper = Plot %s: %s kg/ha of copper metal in the last 7 years, above the limit of %s kg/ha (Reg. EU 2021/1165)
+TreatmentOrganicConfirm = I confirm the use of a product not allowed in organic farming: the plots listed will have to start the conversion period again (Reg. EU 2018/848, annex II part I point 1.7.3)
+ErrorTreatmentOrganicConfirm = The record uses a product not allowed in organic farming on areas in conversion or organic: tick the confirmation to validate it
+TreatmentOrganicRestart = Product not allowed on areas in conversion or organic: the plot starts the conversion again (Reg. EU 2018/848, annex II part I point 1.7.3)
+TreatmentOrganicRestartLink = open the new conversion from the date of the record

@@ -204,6 +204,11 @@ if (empty($reshook)) {
 	if (in_array($action, array('confirm_validate', 'confirm_correct', 'confirm_cancelrecord')) && !$permissiontovalidate) {
 		$action = '';
 	}
+	// Product not allowed on an organic area: the validation must be confirmed explicitly (the plot starts the conversion again)
+	if ($action == 'confirm_validate' && $confirm == 'yes' && count($object->getOrganicBreaches()) && GETPOST('organic_confirm', 'alpha') === '') {
+		setEventMessages($langs->trans('ErrorTreatmentOrganicConfirm'), null, 'errors');
+		$action = '';
+	}
 
 	// Correction: a new draft version of a validated record
 	if ($action == 'confirm_correct' && $confirm == 'yes') {
@@ -561,7 +566,12 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	// Confirmation to validate: the record can no longer be modified
 	if ($action == 'validate') {
 		$text = $langs->trans('ConfirmValidateTreatment').($warningshtml ? '<br><br>'.$warningshtml : '');
-		$formconfirm = $form->formconfirm($_SERVER["PHP_SELF"].'?id='.$object->id, $langs->trans('Validate'), $text, 'confirm_validate', '', 0, 1, count($warnings) ? 350 : 0, 650);
+		// Product not allowed on an organic area: explicit confirmation
+		$formquestion = '';
+		if (count($object->getOrganicBreaches())) {
+			$formquestion = array(array('type' => 'checkbox', 'name' => 'organic_confirm', 'label' => '<b>'.$langs->trans('TreatmentOrganicConfirm').'</b>', 'value' => false));
+		}
+		$formconfirm = $form->formconfirm($_SERVER["PHP_SELF"].'?id='.$object->id, $langs->trans('Validate'), $text, 'confirm_validate', $formquestion, 0, 1, count($warnings) ? 400 : 0, 650);
 	}
 
 	// Confirmation to correct or to cancel a validated record: the reason is required
@@ -934,6 +944,30 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	}
 	if ($warningshtml) {
 		print info_admin($warningshtml, 0, 0, 'warning');
+	}
+	// Validated record with a product not allowed on an organic area: proposal of the new conversion of the plot
+	// (Reg. EU 2018/848, annex II part I point 1.7.3), until the history of the plot has a period from the date of the record
+	if ($object->status == $object::STATUS_VALIDATED && dol_include_once('/dolifarm/lib/dolifarm_bio.lib.php')) {
+		$restart = '';
+		$day = dol_print_date($object->date_start, '%Y-%m-%d', 'tzserver');
+		$done = array();
+		foreach ($object->getOrganicBreaches() as $breach) {
+			if (isset($done[$breach['fk_plot']])) {
+				continue;
+			}
+			$done[$breach['fk_plot']] = 1;
+			$history = dolifarmBioHistory($db, $breach['fk_plot']);
+			$last = (count($history) ? $history[count($history) - 1] : null);
+			if ($last && dol_print_date($last->date_start, '%Y-%m-%d', 'tzserver') >= $day) {
+				continue;
+			}
+			$params = array('id' => $breach['fk_plot'], 'status' => 'CONVERSION', 'reason' => 'RESTART', 'reference' => $object->ref,
+				'date_startday' => (int) dol_print_date($object->date_start, '%d', 'tzserver'), 'date_startmonth' => (int) dol_print_date($object->date_start, '%m', 'tzserver'), 'date_startyear' => (int) dol_print_date($object->date_start, '%Y', 'tzserver'));
+			$restart .= '<br>- '.dol_escape_htmltag($breach['location']).': <a href="'.dolBuildUrl(dol_buildpath('/dolifarm/dolifarmplot_bio.php', 1), $params).'">'.$langs->trans('TreatmentOrganicRestartLink').'</a>';
+		}
+		if ($restart) {
+			print info_admin('<b>'.$langs->trans('TreatmentOrganicRestart').'</b>'.$restart, 0, 0, 'warning');
+		}
 	}
 
 	// Buttons for actions

@@ -372,3 +372,7 @@ TreatmentCuApplied = Rame metallo distribuito (kg/ha)
 TreatmentCuAppliedShort = Cu %s kg/ha
 WarningTreatmentNotOrganic = Il prodotto %s non risulta ammesso in agricoltura biologica (scheda del prodotto), ma è usato su aree in conversione o biologiche: %s
 WarningTreatmentCopper = Appezzamento %s: %s kg/ha di rame metallo negli ultimi 7 anni, oltre il limite di %s kg/ha (Reg. UE 2021/1165)
+TreatmentOrganicConfirm = Confermo l'uso di un prodotto non ammesso in biologico: gli appezzamenti indicati dovranno ricominciare il periodo di conversione (Reg. UE 2018/848, all. II parte I punto 1.7.3)
+ErrorTreatmentOrganicConfirm = La registrazione usa un prodotto non ammesso in biologico su aree in conversione o biologiche: per convalidarla spuntare la conferma
+TreatmentOrganicRestart = Prodotto non ammesso su aree in conversione o biologiche: l'appezzamento ricomincia la conversione (Reg. UE 2018/848, all. II parte I punto 1.7.3)
+TreatmentOrganicRestartLink = aprire la nuova conversione dalla data della registrazione

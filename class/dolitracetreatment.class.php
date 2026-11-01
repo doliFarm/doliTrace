@@ -1550,8 +1550,8 @@ class DoliTraceTreatment extends CommonObject
 	/**
 	 * Warnings of the organic production on the areas of the record
 	 *
-	 * - plant protection product not marked as allowed in organic farming (Reg. EU 2021/1165, annex I) on an area
-	 *   in conversion or organic at the date (Reg. EU 2018/848, annex II part I point 1.10);
+	 * - plant protection product or fertilizer not marked as allowed in organic farming (Reg. EU 2021/1165, annexes I
+	 *   and II) on an area in conversion or organic at the date (see getOrganicBreaches());
 	 * - copper metal over the limit on a plot: kg/ha of the validated records of the last 7 years, this one included
 	 *   (Reg. EU 2021/1165, annex I: 28 kg/ha in 7 years; setup DOLITRACE_CU_LIMIT_7Y, 0 = no check).
 	 *
@@ -1570,27 +1570,13 @@ class DoliTraceTreatment extends CommonObject
 		}
 		$prefix = $this->db->prefix();
 
-		// Areas in conversion or organic at the date
-		$organic = array();
-		foreach ($this->targets as $target) {
-			if ($target->target_type != DoliTraceTreatmentTarget::TYPE_PLOT || !($target->fk_plot > 0)) {
-				continue;
-			}
-			$status = ($this->status != self::STATUS_DRAFT && (string) $target->bio_status !== '' ? (string) $target->bio_status : $this->plotBioStatus((int) $target->fk_plot));
-			if (dolifarmBioIsOrganic($status)) {
-				$organic[] = $target->location_ref.' ('.$this->bioStatusLabel($status).')';
-			}
+		// Products not allowed on areas in conversion or organic at the date
+		$byproduct = array();
+		foreach ($this->getOrganicBreaches() as $breach) {
+			$byproduct[$breach['product']][] = $breach['location'].' ('.$breach['status_label'].')';
 		}
-		if (count($organic)) {
-			foreach ($this->products as $product) {
-				if (!($product->fk_agrodrug > 0)) {
-					continue;
-				}
-				$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, organic_allowed FROM ".$prefix."dolifarm_agrodrug WHERE rowid = ".((int) $product->fk_agrodrug));
-				if (isset($rows[$product->fk_agrodrug]) && empty($rows[$product->fk_agrodrug]->organic_allowed)) {
-					$warnings[] = $langs->transnoentities('WarningTreatmentNotOrganic', $product->product_label, implode(', ', array_unique($organic)));
-				}
-			}
+		foreach ($byproduct as $label => $areas) {
+			$warnings[] = $langs->transnoentities('WarningTreatmentNotOrganic', $label, implode(', ', array_unique($areas)));
 		}
 
 		// Copper over 7 years on each plot
@@ -1623,6 +1609,56 @@ class DoliTraceTreatment extends CommonObject
 			}
 		}
 		return $warnings;
+	}
+
+	/**
+	 * Products not allowed in organic farming used on areas in conversion or organic at the date of the record
+	 *
+	 * Plant protection products: field "Allowed in organic farming" of the product (Reg. EU 2021/1165, annex I).
+	 * Fertilizers: field "Allowed in organic farming" of the fertilizer (Reg. EU 2021/1165, annex II).
+	 * The status of the areas is the copy of the validation, or the history of the plot for drafts.
+	 * Such a use makes the plot start the conversion again (Reg. EU 2018/848, annex II part I point 1.7.3).
+	 *
+	 * @return	array<int,array{fk_plot:int,location:string,status:string,status_label:string,product:string}>
+	 */
+	public function getOrganicBreaches()
+	{
+		$breaches = array();
+		if (empty($this->date_start) || !dol_include_once('/dolifarm/lib/dolifarm_bio.lib.php') || !function_exists('dolifarmBioIsOrganic')) {
+			return $breaches;
+		}
+		$prefix = $this->db->prefix();
+		$areas = array();
+		foreach ($this->targets as $target) {
+			if ($target->target_type != DoliTraceTreatmentTarget::TYPE_PLOT || !($target->fk_plot > 0)) {
+				continue;
+			}
+			$status = ($this->status != self::STATUS_DRAFT && (string) $target->bio_status !== '' ? (string) $target->bio_status : $this->plotBioStatus((int) $target->fk_plot));
+			if (dolifarmBioIsOrganic($status)) {
+				$areas[] = array('fk_plot' => (int) $target->fk_plot, 'location' => (string) $target->location_ref, 'status' => $status, 'status_label' => $this->bioStatusLabel($status));
+			}
+		}
+		if (empty($areas)) {
+			return $breaches;
+		}
+		foreach ($this->products as $product) {
+			$allowed = true;
+			if ($product->fk_agrodrug > 0) {
+				$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, organic_allowed FROM ".$prefix."dolifarm_agrodrug WHERE rowid = ".((int) $product->fk_agrodrug));
+				$allowed = (isset($rows[$product->fk_agrodrug]) && !empty($rows[$product->fk_agrodrug]->organic_allowed));
+			} elseif ($product->fk_fertilizer > 0) {
+				$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, organic FROM ".$prefix."dolifarm_fertilizer WHERE rowid = ".((int) $product->fk_fertilizer));
+				$allowed = (isset($rows[$product->fk_fertilizer]) && !empty($rows[$product->fk_fertilizer]->organic));
+			}
+			if ($allowed) {
+				continue;
+			}
+			foreach ($areas as $area) {
+				$area['product'] = (string) $product->product_label;
+				$breaches[] = $area;
+			}
+		}
+		return $breaches;
 	}
 
 	/**
