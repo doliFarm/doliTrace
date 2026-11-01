@@ -88,6 +88,11 @@ class DoliTraceOperation extends CommonObject
 	const TYPE_IRRIGATION = 'IRRIGATION';
 
 	/**
+	 * @var string[]	Types of the sowing and planting: the reproductive material has an organic status (Reg. EU 2018/848, annex II part I point 1.8)
+	 */
+	public static $seedingTypes = array('PLANTING', 'SOWING_DIRECT', 'TRANSPLANTING', 'OVERSEEDING', 'PLANTATION');
+
+	/**
 	 *  'type' field format:
 	 *  	'integer', 'integer:ObjectClass:PathToClass[:AddCreateButtonOrNot[:Filter[:Sortfield]]]',
 	 *  	'select' (list of values are in 'options'. for integer list of values are in 'arrayofkeyval'),
@@ -165,6 +170,10 @@ class DoliTraceOperation extends CommonObject
 		"depth_cm" => array("type" => "decimal(5,2)", "label" => "Depthcm", "enabled" => "1", 'position' => 70, 'notnull' => 0, "visible" => "-1",),
 		"fk_product" => array("type" => "integer:Product:product/class/product.class.php:1", "label" => "Fkproduct", "picto" => "product", "enabled" => "1", 'position' => 75, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx", "csslist" => "tdoverflowmax150",),
 		"batch_input" => array("type" => "varchar(128)", "label" => "Batchinput", "enabled" => "1", 'position' => 80, 'notnull' => 0, "visible" => "-1",),
+		// Organic production: sowing and planting (copied from the product when empty)
+		"seed_status" => array("type" => "varchar(16)", "label" => "OperationSeedStatus", "enabled" => "1", 'position' => 81, 'notnull' => 0, "visible" => "-1", "arrayofkeyval" => array('BIO' => 'SeedStatusBio', 'INCONV' => 'SeedStatusInConversion', 'NONBIO' => 'SeedStatusNonBio'), "help" => "OperationSeedStatusHelp",),
+		"bdsb_ref" => array("type" => "varchar(64)", "label" => "OperationBdsbRef", "enabled" => "1", 'position' => 82, 'notnull' => 0, "visible" => "-1", "help" => "OperationBdsbRefHelp",),
+		"bdsb_date" => array("type" => "date", "label" => "OperationBdsbDate", "enabled" => "1", 'position' => 83, 'notnull' => 0, "visible" => "-1",),
 		"qty_used" => array("type" => "decimal(24,8)", "label" => "Qtyused", "enabled" => "1", 'position' => 85, 'notnull' => 0, "visible" => "-1",),
 		"water_vol_ha" => array("type" => "decimal(24,8)", "label" => "Watervolha", "enabled" => "1", 'position' => 88, 'notnull' => 0, "visible" => "-1",),
 		"irrigation_method" => array("type" => "sellist:dolitrace_c_irrigation_method:label:code::active=1", "label" => "IrrigationMethod", "enabled" => "1", 'position' => 89, 'notnull' => 0, "visible" => "-1", "help" => "IrrigationOnlyHelp", "css" => "maxwidth300",),
@@ -207,6 +216,21 @@ class DoliTraceOperation extends CommonObject
 	public $depth_cm;
 	public $fk_product;
 	public $batch_input;
+
+	/**
+	 * @var string|null		Organic status of the reproductive material: BIO, INCONV or NONBIO
+	 */
+	public $seed_status;
+
+	/**
+	 * @var string|null		Number of the derogation of the BDSB (banca dati sementi biologiche) for non organic material
+	 */
+	public $bdsb_ref;
+
+	/**
+	 * @var int|string|null	Date of the derogation
+	 */
+	public $bdsb_date;
 	public $qty_used;
 	public $water_vol_ha;
 	public $entity;
@@ -650,6 +674,21 @@ class DoliTraceOperation extends CommonObject
 		if ($this->fk_pheno_stage === '') {
 			$this->fk_pheno_stage = null;
 		}
+		// Organic status of the reproductive material: only on sowing and planting, copied from the product when empty
+		if (!in_array((string) $this->fk_operation_type, self::$seedingTypes)) {
+			$this->seed_status = null;
+			$this->bdsb_ref = null;
+			$this->bdsb_date = null;
+		} else {
+			if (!in_array((string) $this->seed_status, array('BIO', 'INCONV', 'NONBIO'))) {
+				$this->seed_status = $this->productSeedStatus();
+			}
+			// The derogation is for non organic material only
+			if ($this->seed_status != 'NONBIO') {
+				$this->bdsb_ref = null;
+				$this->bdsb_date = null;
+			}
+		}
 		$isirrigation = ($this->fk_operation_type == self::TYPE_IRRIGATION);
 		if (!$isirrigation) {
 			// Irrigation data left by a change of type are not kept
@@ -680,6 +719,66 @@ class DoliTraceOperation extends CommonObject
 			}
 		}
 		return 1;
+	}
+
+	/**
+	 * Organic status of the reproductive material from the product (extrafield of doliFarm)
+	 *
+	 * @return	string|null		BIO, INCONV, NONBIO, null when not set
+	 */
+	private function productSeedStatus()
+	{
+		if (!($this->fk_product > 0)) {
+			return null;
+		}
+		$sql = "SELECT dolifarm_seed_status FROM ".$this->db->prefix()."product_extrafields WHERE fk_object = ".((int) $this->fk_product);
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			// The extrafield is created by the activation of doliFarm: not there yet on older installations
+			return null;
+		}
+		$obj = $this->db->fetch_object($resql);
+		$this->db->free($resql);
+		return ($obj && in_array((string) $obj->dolifarm_seed_status, array('BIO', 'INCONV', 'NONBIO')) ? (string) $obj->dolifarm_seed_status : null);
+	}
+
+	/**
+	 * Warnings of the organic production on a sowing or planting (they do not block the saving)
+	 *
+	 * On a plot in conversion or organic at the date of the operation (Reg. EU 2018/848, annex II part I point 1.8;
+	 * DM 15130/2017): the status of the material must be given, and non organic material needs a derogation of the BDSB.
+	 *
+	 * @return	string[]	Warnings, translated
+	 */
+	public function getOrganicWarnings()
+	{
+		global $langs;
+
+		$warnings = array();
+		if (!in_array((string) $this->fk_operation_type, self::$seedingTypes) || empty($this->fk_cropplan) || empty($this->date_op)
+			|| !dol_include_once('/dolifarm/lib/dolifarm_bio.lib.php') || !function_exists('dolifarmBioStatusAt')) {
+			return $warnings;
+		}
+		$langs->loadLangs(array('dolitrace@dolitrace', 'dolifarm@dolifarm'));
+		$sql = "SELECT cp.fk_plot, p.ref FROM ".$this->db->prefix()."dolitrace_cropplan as cp";
+		$sql .= " INNER JOIN ".$this->db->prefix()."dolifarm_plot as p ON p.rowid = cp.fk_plot";
+		$sql .= " WHERE cp.rowid = ".((int) $this->fk_cropplan);
+		$resql = $this->db->query($sql);
+		$plot = $resql ? $this->db->fetch_object($resql) : null;
+		if (!$plot) {
+			return $warnings;
+		}
+		$date = (is_numeric($this->date_op) ? (int) $this->date_op : dol_stringtotime($this->date_op));
+		$status = dolifarmBioStatusAt($this->db, (int) $plot->fk_plot, $date);
+		if (!dolifarmBioIsOrganic($status)) {
+			return $warnings;
+		}
+		if ((string) $this->seed_status === '') {
+			$warnings[] = $langs->transnoentities('WarningOperationSeedStatusMissing', $plot->ref);
+		} elseif ($this->seed_status == 'NONBIO' && trim((string) $this->bdsb_ref) === '') {
+			$warnings[] = $langs->transnoentities('WarningOperationSeedNoDerogation', $plot->ref);
+		}
+		return $warnings;
 	}
 
 	/**

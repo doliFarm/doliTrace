@@ -389,6 +389,12 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
     print '<div class="clearboth"></div>';
 
+    // Organic production: status of the reproductive material and derogation on organic plots
+    $organicwarnings = $object->getOrganicWarnings();
+    if (count($organicwarnings)) {
+        print info_admin(implode('<br>', array_map('dol_escape_htmltag', $organicwarnings)), 0, 0, 'warning');
+    }
+
     print dol_get_fiche_end();
 
 

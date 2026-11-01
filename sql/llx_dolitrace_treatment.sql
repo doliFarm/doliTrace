@@ -41,6 +41,8 @@ CREATE TABLE IF NOT EXISTS llx_dolitrace_treatment(
 	machine_check_date		date,								-- copy
 	machine_cert_ref		varchar(64),						-- copy
 	application_method		varchar(32),
+	justification_type		varchar(32),						-- organic: llx_dolitrace_c_justification
+	justification_ref		varchar(255),						-- organic: reference of the document of the need
 	water_volume			double(24,8),						-- l/ha
 	weather					varchar(255),
 	version					integer DEFAULT 1 NOT NULL,

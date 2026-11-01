@@ -171,6 +171,8 @@ class DoliTraceTreatment extends CommonObject
 		'water_volume' => array('type' => 'double(24,8)', 'label' => 'TreatmentWaterVolume', 'enabled' => 1, 'position' => 65, 'notnull' => 0, 'visible' => -1, 'css' => 'maxwidth100', 'help' => 'TreatmentWaterVolumeHelp'),
 		'weather' => array('type' => 'varchar(255)', 'label' => 'TreatmentWeather', 'enabled' => 1, 'position' => 66, 'notnull' => 0, 'visible' => -1, 'css' => 'minwidth300'),
 		'application_method' => array('type' => 'sellist:dolitrace_c_application_method:label:code::active=1', 'label' => 'TreatmentApplicationMethod', 'enabled' => 1, 'position' => 67, 'notnull' => 0, 'visible' => -1, 'css' => 'maxwidth500 widthcentpercentminusxx', 'help' => 'TreatmentApplicationMethodHelp'),
+		'justification_type' => array('type' => 'sellist:dolitrace_c_justification:label:code::active=1', 'label' => 'TreatmentJustificationType', 'enabled' => 1, 'position' => 68, 'notnull' => 0, 'visible' => -1, 'css' => 'maxwidth300', 'help' => 'TreatmentJustificationTypeHelp'),
+		'justification_ref' => array('type' => 'varchar(255)', 'label' => 'TreatmentJustificationRef', 'enabled' => 1, 'position' => 69, 'notnull' => 0, 'visible' => -1, 'css' => 'minwidth300', 'help' => 'TreatmentJustificationRefHelp'),
 		'version' => array('type' => 'integer', 'label' => 'TreatmentVersion', 'enabled' => 1, 'position' => 80, 'notnull' => 1, 'visible' => 5, 'default' => '1', 'noteditable' => 1, 'csslist' => 'right'),
 		'fk_previous' => array('type' => 'integer:DoliTraceTreatment:dolitrace/class/dolitracetreatment.class.php', 'label' => 'TreatmentPrevious', 'enabled' => 1, 'position' => 81, 'notnull' => 0, 'visible' => -5, 'noteditable' => 1),
 		'late' => array('type' => 'boolean', 'label' => 'TreatmentLate', 'enabled' => 1, 'position' => 82, 'notnull' => 0, 'visible' => -5, 'noteditable' => 1, 'help' => 'TreatmentLateHelp'),
@@ -299,6 +301,16 @@ class DoliTraceTreatment extends CommonObject
 	 * @var string|null	Method of application or distribution (code of llx_dolitrace_c_application_method)
 	 */
 	public $application_method;
+
+	/**
+	 * @var string|null	Organic production: type of the document justifying the need of the plant protection (code of llx_dolitrace_c_justification)
+	 */
+	public $justification_type;
+
+	/**
+	 * @var string|null	Organic production: reference of the document (report, bulletin, model, trap catches); the file goes in the tab Documents
+	 */
+	public $justification_ref;
 
 	/**
 	 * @var float|string|null
@@ -1570,6 +1582,12 @@ class DoliTraceTreatment extends CommonObject
 		}
 		$prefix = $this->db->prefix();
 
+		// Plant protection on areas in conversion or organic: the need must be justified (Reg. EU 2018/848, annex II part I
+		// point 1.10.2; DM 229771/2022 art. 4 c. 8)
+		if ($this->kind == self::KIND_PLANTPROTECTION && (string) $this->justification_type === '' && count($this->getOrganicAreas())) {
+			$warnings[] = $langs->transnoentities('WarningTreatmentNoJustification');
+		}
+
 		// Products not allowed on areas in conversion or organic at the date
 		$byproduct = array();
 		foreach ($this->getOrganicBreaches() as $breach) {
@@ -1612,6 +1630,31 @@ class DoliTraceTreatment extends CommonObject
 	}
 
 	/**
+	 * Areas of the record in conversion or organic at its date
+	 *
+	 * The status is the copy of the validation, or the history of the plot for drafts.
+	 *
+	 * @return	array<int,array{fk_plot:int,location:string,status:string,status_label:string}>
+	 */
+	public function getOrganicAreas()
+	{
+		$areas = array();
+		if (empty($this->date_start) || !dol_include_once('/dolifarm/lib/dolifarm_bio.lib.php') || !function_exists('dolifarmBioIsOrganic')) {
+			return $areas;
+		}
+		foreach ($this->targets as $target) {
+			if ($target->target_type != DoliTraceTreatmentTarget::TYPE_PLOT || !($target->fk_plot > 0)) {
+				continue;
+			}
+			$status = ($this->status != self::STATUS_DRAFT && (string) $target->bio_status !== '' ? (string) $target->bio_status : $this->plotBioStatus((int) $target->fk_plot));
+			if (dolifarmBioIsOrganic($status)) {
+				$areas[] = array('fk_plot' => (int) $target->fk_plot, 'location' => (string) $target->location_ref, 'status' => $status, 'status_label' => $this->bioStatusLabel($status));
+			}
+		}
+		return $areas;
+	}
+
+	/**
 	 * Products not allowed in organic farming used on areas in conversion or organic at the date of the record
 	 *
 	 * Plant protection products: field "Allowed in organic farming" of the product (Reg. EU 2021/1165, annex I).
@@ -1628,16 +1671,7 @@ class DoliTraceTreatment extends CommonObject
 			return $breaches;
 		}
 		$prefix = $this->db->prefix();
-		$areas = array();
-		foreach ($this->targets as $target) {
-			if ($target->target_type != DoliTraceTreatmentTarget::TYPE_PLOT || !($target->fk_plot > 0)) {
-				continue;
-			}
-			$status = ($this->status != self::STATUS_DRAFT && (string) $target->bio_status !== '' ? (string) $target->bio_status : $this->plotBioStatus((int) $target->fk_plot));
-			if (dolifarmBioIsOrganic($status)) {
-				$areas[] = array('fk_plot' => (int) $target->fk_plot, 'location' => (string) $target->location_ref, 'status' => $status, 'status_label' => $this->bioStatusLabel($status));
-			}
-		}
+		$areas = $this->getOrganicAreas();
 		if (empty($areas)) {
 			return $breaches;
 		}
@@ -1722,7 +1756,7 @@ class DoliTraceTreatment extends CommonObject
 			'products' => array(),
 		);
 		// Data added for the AGEA field notebook: in the fingerprint only when filled in, so the fingerprints of the older records do not change
-		foreach (array('machine_check_date' => $date($this->machine_check_date), 'machine_cert_ref' => (string) $this->machine_cert_ref, 'application_method' => (string) $this->application_method) as $key => $value) {
+		foreach (array('machine_check_date' => $date($this->machine_check_date), 'machine_cert_ref' => (string) $this->machine_cert_ref, 'application_method' => (string) $this->application_method, 'justification_type' => (string) $this->justification_type, 'justification_ref' => (string) $this->justification_ref) as $key => $value) {
 			if ($value !== '') {
 				$content[$key] = $value;
 			}
@@ -1887,7 +1921,7 @@ class DoliTraceTreatment extends CommonObject
 		$this->db->begin();
 		$new = new self($this->db);
 		foreach (array('entity', 'kind', 'technical_type', 'fk_soc', 'fk_dossier', 'date_start', 'date_end', 'reason', 'fk_operator', 'fk_soc_contractor', 'contractor_mode',
-			'contractor_signed', 'date_contractor_signed', 'delegation_ref', 'fk_machine', 'application_method', 'water_volume', 'weather', 'note_public', 'note_private') as $key) {
+			'contractor_signed', 'date_contractor_signed', 'delegation_ref', 'fk_machine', 'application_method', 'justification_type', 'justification_ref', 'water_volume', 'weather', 'note_public', 'note_private') as $key) {
 			$new->$key = $this->$key;
 		}
 		$new->ref = '(PROV)';

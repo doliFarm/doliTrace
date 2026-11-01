@@ -34,7 +34,7 @@ dol_include_once('/dolifarm/lib/dolifarm_access.lib.php');
 class DoliTraceTreatmentExport
 {
 	const FORMAT = 'dolifarm-register';
-	const FORMAT_VERSION = '1.3';
+	const FORMAT_VERSION = '1.4';
 
 	/**
 	 * @var string[]	Columns of the CSV, in their order
@@ -42,10 +42,10 @@ class DoliTraceTreatmentExport
 	public static $csvColumns = array(
 		'record', 'ref', 'version', 'status', 'kind', 'technical_type', 'farm_cuaa', 'farm_name',
 		'date_start', 'date_end', 'reason', 'operator_name', 'operator_license', 'operator_license_end',
-		'contractor_name', 'contractor_vat', 'machine', 'machine_check_end', 'machine_check_date', 'machine_cert_ref', 'water_volume', 'weather', 'application_method', 'late',
-		'target_type', 'plot_ref', 'location_ref', 'pcg_ref', 'zone_zvn', 'crop_eppo', 'crop_label', 'bbch', 'building_ref', 'seed_batch', 'treated_qty', 'treated_unit',
+		'contractor_name', 'contractor_vat', 'machine', 'machine_check_end', 'machine_check_date', 'machine_cert_ref', 'water_volume', 'weather', 'application_method', 'justification_type', 'justification_ref', 'late',
+		'target_type', 'plot_ref', 'location_ref', 'pcg_ref', 'zone_zvn', 'bio_status', 'crop_eppo', 'crop_label', 'bbch', 'building_ref', 'seed_batch', 'treated_qty', 'treated_unit',
 		'product_type', 'product_ref', 'product_label', 'reg_number', 'fert_type', 'fert_group', 'n_content', 'p2o5_content', 'k2o_content', 'cu_content', 'efficiency', 'dry_matter', 'density',
-		'adversity_eppo', 'adversity_label', 'dose', 'dose_unit', 'dose_unit_label', 'qty_total', 'qty_unit', 'qty_agea', 'qty_agea_unit', 'qty_agea_basis', 'n_applied', 'batch',
+		'adversity_eppo', 'adversity_label', 'dose', 'dose_unit', 'dose_unit_label', 'qty_total', 'qty_unit', 'qty_agea', 'qty_agea_unit', 'qty_agea_basis', 'n_applied', 'cu_applied', 'batch',
 		'content_hash',
 	);
 
@@ -238,6 +238,8 @@ class DoliTraceTreatmentExport
 		$machine = $this->lookup('dolifarm_machine', $record->fk_machine, 'ref');
 		$operator = $this->lookup('dolifarm_operator', $record->fk_operator, 'ref');
 		$method = isset($content['application_method']) ? $this->lookupCode('dolitrace_c_application_method', $content['application_method'], 'label, agea_value') : null;
+		// Organic production (format 1.4): document justifying the need of the plant protection
+		$justification = isset($content['justification_type']) ? $this->lookupCode('dolitrace_c_justification', $content['justification_type'], 'label') : null;
 		$previous = $this->lookup('dolitrace_treatment', $record->fk_previous, 'ref');
 		$hashcheck = $record->status == DoliTraceTreatment::STATUS_DRAFT ? 0 : $record->checkHash();
 
@@ -282,6 +284,11 @@ class DoliTraceTreatmentExport
 				'label' => (string) $method->label,
 				'agea_value' => (string) $method->agea_value,
 			) : null,
+			'justification' => (isset($content['justification_type']) || isset($content['justification_ref'])) ? array(
+				'type' => isset($content['justification_type']) ? $content['justification_type'] : '',
+				'label' => $justification ? (string) $justification->label : '',
+				'ref' => isset($content['justification_ref']) ? $content['justification_ref'] : '',
+			) : null,
 			'water_volume_l_ha' => $content['water_volume'],
 			'weather' => $content['weather'],
 			'late' => (int) $record->late,
@@ -303,6 +310,8 @@ class DoliTraceTreatmentExport
 				// Area of the graphic crop plan of the SIAN, from the crop plan (not part of the content of the record)
 				'pcg_ref' => $cropplan ? (string) $cropplan->pcg_ref : '',
 				'zone_zvn' => $content['targets'][$i]['zone_zvn'],
+				// Organic status of the plot at the date (code of dolifarm_c_biostatus), copied at the validation (format 1.4)
+				'bio_status' => isset($content['targets'][$i]['bio_status']) ? $content['targets'][$i]['bio_status'] : '',
 				'crop_eppo' => $content['targets'][$i]['crop_eppo'],
 				'crop_label' => $content['targets'][$i]['crop_label'],
 				'bbch' => $content['targets'][$i]['bbch'],
@@ -350,6 +359,7 @@ class DoliTraceTreatmentExport
 				'qty_total' => $content['products'][$i]['qty_total'],
 				'qty_unit' => $content['products'][$i]['qty_unit'],
 				'n_applied_kg_ha' => $content['products'][$i]['n_applied'],
+				'cu_applied_kg_ha' => isset($content['products'][$i]['cu_applied']) ? $content['products'][$i]['cu_applied'] : '',
 				'batch' => $content['products'][$i]['batch'],
 			);
 			// Quantity in the units of the AGEA lists: kg or l for each ha, m², m³, kg of seed or seed
@@ -684,7 +694,7 @@ class DoliTraceTreatmentExport
 	public function getOperations(User $user, $socid, $datefrom, $dateto)
 	{
 		$sql = "SELECT o.rowid, o.ref, o.date_op, o.date_op_end, o.fk_operation_type, o.label, o.fk_pheno_stage, o.status,";
-		$sql .= " o.irrigation_method, o.water_volume, o.irrigated_area, o.fertigation, o.fk_treatment,";
+		$sql .= " o.irrigation_method, o.water_volume, o.irrigated_area, o.fertigation, o.fk_treatment, o.seed_status, o.bdsb_ref, o.bdsb_date,";
 		$sql .= " cp.ref as cropplan_ref, cp.pcg_ref, cp.fk_soc, p.ref as plot_ref, p.iacs_parcel,";
 		$sql .= " c.eppo_code as crop_eppo, c.label as crop_label, s.nom as farm_name, s.idprof4 as farm_cuaa,";
 		$sql .= " ot.label as type_label, ot.agea_value as type_agea, im.label as irrigation_method_label, im.agea_value as irrigation_method_agea, tr.ref as treatment_ref";
@@ -751,6 +761,14 @@ class DoliTraceTreatmentExport
 					'fertigation_record_ref' => (string) $obj->treatment_ref,
 				);
 			}
+			// Organic production (format 1.4): reproductive material of the sowing and planting
+			if (in_array((string) $obj->fk_operation_type, DoliTraceOperation::$seedingTypes)) {
+				$operation['seed'] = array(
+					'status' => (string) $obj->seed_status,
+					'bdsb_ref' => (string) $obj->bdsb_ref,
+					'bdsb_date' => $this->dateIso($this->db->jdate($obj->bdsb_date), false),
+				);
+			}
 			$operations[] = $operation;
 		}
 		$this->db->free($resql);
@@ -777,6 +795,7 @@ class DoliTraceTreatmentExport
 			'machine_check_date' => $data['machine']['check_date'], 'machine_cert_ref' => $data['machine']['cert_ref'],
 			'water_volume' => $data['water_volume_l_ha'], 'weather' => $data['weather'],
 			'application_method' => $data['application_method'] ? $data['application_method']['code'] : '', 'late' => $data['late'],
+			'justification_type' => $data['justification'] ? $data['justification']['type'] : '', 'justification_ref' => $data['justification'] ? $data['justification']['ref'] : '',
 			'content_hash' => $data['content_hash'],
 		);
 		$targets = count($data['targets']) ? $data['targets'] : array(array());
@@ -785,7 +804,7 @@ class DoliTraceTreatmentExport
 		foreach ($targets as $target) {
 			foreach ($products as $product) {
 				$line = $head;
-				foreach (array('plot_ref', 'location_ref', 'pcg_ref', 'zone_zvn', 'crop_eppo', 'crop_label', 'bbch', 'building_ref', 'seed_batch', 'treated_qty', 'treated_unit') as $key) {
+				foreach (array('plot_ref', 'location_ref', 'pcg_ref', 'zone_zvn', 'bio_status', 'crop_eppo', 'crop_label', 'bbch', 'building_ref', 'seed_batch', 'treated_qty', 'treated_unit') as $key) {
 					$line[$key] = isset($target[$key]) ? $target[$key] : '';
 				}
 				$line['target_type'] = isset($target['type']) ? $target['type'] : '';
@@ -793,6 +812,7 @@ class DoliTraceTreatmentExport
 				$line['product_ref'] = isset($product['ref']) ? $product['ref'] : '';
 				$line['product_label'] = isset($product['label']) ? $product['label'] : '';
 				$line['n_applied'] = isset($product['n_applied_kg_ha']) ? $product['n_applied_kg_ha'] : '';
+				$line['cu_applied'] = isset($product['cu_applied_kg_ha']) ? $product['cu_applied_kg_ha'] : '';
 				foreach (array('reg_number', 'fert_type', 'fert_group', 'n_content', 'p2o5_content', 'k2o_content', 'cu_content', 'efficiency', 'dry_matter', 'density', 'adversity_eppo', 'adversity_label', 'dose', 'dose_unit', 'dose_unit_label', 'qty_total', 'qty_unit', 'qty_agea', 'qty_agea_unit', 'qty_agea_basis', 'batch') as $key) {
 					$line[$key] = isset($product[$key]) ? $product[$key] : '';
 				}
@@ -919,6 +939,12 @@ class DoliTraceTreatmentExport
 						if (!empty($target)) {
 							if ($target['type'] == 'plot') {
 								$area = $target['crop_label'].($target['crop_eppo'] ? ' ('.$target['crop_eppo'].')' : '').' - '.$target['location_ref'].($target['bbch'] !== '' ? ' - BBCH '.$target['bbch'] : '');
+								// Organic status of the plot at the date
+								if (preg_match('/^BIO_CONV_([0-9])$/', $target['bio_status'], $reg)) {
+									$area .= ' - '.$outputlangs->transnoentities('TreatmentBioConvShort', $reg[1]);
+								} elseif (in_array($target['bio_status'], array('BIO_FULL', 'BIODYNAMIC'))) {
+									$area .= ' - '.$outputlangs->transnoentities($target['bio_status'] == 'BIODYNAMIC' ? 'TreatmentBiodynamicShort' : 'TreatmentBioShort');
+								}
 							} elseif ($target['type'] == 'building') {
 								$area = $target['location_ref'];
 							} else {
@@ -930,8 +956,9 @@ class DoliTraceTreatmentExport
 							dol_print_date($record->date_start, 'dayhour', 'tzuser', $outputlangs),
 							$area,
 							!empty($target) ? $number($target['treated_qty']).' '.($unitlabels[$target['treated_unit']] ?? $target['treated_unit']) : '',
-							!empty($product) ? $product['label'].($product['reg_number'] ? ' - '.$product['reg_number'] : '').($product['batch'] ? ' - '.$outputlangs->transnoentities('Batch').' '.$product['batch'] : '') : '',
-							!empty($product) ? ($product['adversity_label'] ? $product['adversity_label'].' ('.$product['adversity_eppo'].')' : ($product['n_content'] !== '' ? 'N-P-K '.$number((float) $product['n_content']).'-'.$number((float) $product['p2o5_content']).'-'.$number((float) $product['k2o_content']) : '')) : '',
+							!empty($product) ? $product['label'].($product['reg_number'] ? ' - '.$product['reg_number'] : '').($product['batch'] ? ' - '.$outputlangs->transnoentities('Batch').' '.$product['batch'] : '').($product['cu_applied_kg_ha'] !== '' ? ' - '.$outputlangs->transnoentities('TreatmentCuAppliedShort', $number($product['cu_applied_kg_ha'])) : '') : '',
+							(!empty($product) ? ($product['adversity_label'] ? $product['adversity_label'].' ('.$product['adversity_eppo'].')' : ($product['n_content'] !== '' ? 'N-P-K '.$number((float) $product['n_content']).'-'.$number((float) $product['p2o5_content']).'-'.$number((float) $product['k2o_content']) : '')) : '')
+								.($data['justification'] ? ' - '.$outputlangs->transnoentities('TreatmentJustificationShort').': '.trim($data['justification']['label'].' '.$data['justification']['ref']) : ''),
 							!empty($product) ? $number($product['dose']).' '.$product['dose_unit_label'] : '',
 							!empty($product) && $product['qty_total'] !== '' ? $number($product['qty_total']).' '.$product['qty_unit'] : '',
 							$data['operator']['name'].($data['operator']['license'] ? ' - '.$data['operator']['license'] : '').($data['contractor'] ? ' / '.$data['contractor']['name'] : ''),

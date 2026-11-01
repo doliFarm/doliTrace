@@ -32,6 +32,9 @@ CREATE TABLE IF NOT EXISTS llx_dolitrace_operation(
 	depth_cm decimal(5,2), 
 	fk_product integer, 
 	batch_input varchar(128), 
+	seed_status varchar(16),		-- organic: reproductive material BIO, INCONV or NONBIO
+	bdsb_ref varchar(64),			-- organic: number of the derogation of the BDSB for non organic material
+	bdsb_date date,					-- organic: date of the derogation
 	qty_used decimal(24,8), 
 	water_vol_ha decimal(24,8),
 	irrigation_method varchar(16),						-- llx_dolitrace_c_irrigation_method.code

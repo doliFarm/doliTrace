@@ -275,6 +275,18 @@ class DoliTraceTreatmentImport
 				$result['warnings'][] = $langs->transnoentities('WarningTreatmentImportApplicationMethod', $value($head, 'application_method'));
 			}
 		}
+		// Organic production: document justifying the need of the plant protection
+		if ($value($head, 'justification_type') !== '') {
+			$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, code FROM ".$this->db->prefix()."dolitrace_c_justification WHERE active = 1 AND code = '".$this->db->escape($value($head, 'justification_type'))."'");
+			if (count($rows) == 1) {
+				$object->justification_type = reset($rows)->code;
+			} else {
+				$result['warnings'][] = $langs->transnoentities('WarningTreatmentImportJustification', $value($head, 'justification_type'));
+			}
+		}
+		if ($value($head, 'justification_ref') !== '') {
+			$object->justification_ref = dol_trunc($value($head, 'justification_ref'), 255, 'right', 'UTF-8', 1);
+		}
 
 		// Operator, machine and contractor: if not found the draft is created without them and the user completes it
 		if ($value($head, 'operator_license') !== '' || $value($head, 'operator_name') !== '') {

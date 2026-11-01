@@ -274,3 +274,22 @@ INSERT IGNORE INTO llx_dolitrace_c_application_method (code, label, kind, fert_g
 INSERT IGNORE INTO llx_dolitrace_c_dose_unit (code, label, kind, technical_type, basis, qty_unit, factor, active, position) VALUES
 ('G_KSEED', 'g/1000 semi', 1, 3, 'KSEED', 'kg', 0.001, 1, 220),
 ('ML_KSEED', 'ml/1000 semi', 1, 3, 'KSEED', 'l', 0.001, 1, 230);
+
+-- Organic production: type of the document justifying the need of a plant protection product
+-- (Reg. EU 2018/848, annex II part I point 1.10.2; DM 229771/2022 art. 4 c. 8)
+CREATE TABLE IF NOT EXISTS llx_dolitrace_c_justification (
+	rowid			integer AUTO_INCREMENT PRIMARY KEY,
+	code			varchar(32) NOT NULL,
+	label			varchar(128) NOT NULL,
+	active			tinyint DEFAULT 1 NOT NULL,
+	position		integer DEFAULT 0,
+	UNIQUE INDEX uk_dolitrace_c_justification_code (code)
+) ENGINE=innodb;
+
+INSERT IGNORE INTO llx_dolitrace_c_justification (code, label, active, position) VALUES
+('AGRONOMIC_REPORT', 'Relazione tecnico agronomica', 1, 10),
+('PHYTO_REPORT', 'Relazione fitopatologica', 1, 20),
+('BULLETIN', 'Bollettino fitosanitario', 1, 30),
+('FORECAST_MODEL', 'Modello previsionale', 1, 40),
+('TRAP_CATCHES', 'Catture in trappola', 1, 50),
+('OTHER', 'Altro', 1, 900);

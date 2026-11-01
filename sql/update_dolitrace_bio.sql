@@ -21,3 +21,12 @@ ALTER TABLE llx_dolitrace_treatment_target ADD COLUMN bio_status varchar(16);
 
 -- Products: kg of copper metal per hectare (limit of 28 kg/ha over 7 years, Reg. EU 2021/1165)
 ALTER TABLE llx_dolitrace_treatment_product ADD COLUMN cu_applied double(24,8);
+
+-- Records of plant protection: type and reference of the document justifying the need (DM 229771/2022 art. 4 c. 8)
+ALTER TABLE llx_dolitrace_treatment ADD COLUMN justification_type varchar(32);
+ALTER TABLE llx_dolitrace_treatment ADD COLUMN justification_ref varchar(255);
+
+-- Sowing and planting: organic status of the reproductive material and derogation of the BDSB (Reg. EU 2018/848, annex II part I point 1.8.5; DM 15130/2017)
+ALTER TABLE llx_dolitrace_operation ADD COLUMN seed_status varchar(16);
+ALTER TABLE llx_dolitrace_operation ADD COLUMN bdsb_ref varchar(64);
+ALTER TABLE llx_dolitrace_operation ADD COLUMN bdsb_date date;
