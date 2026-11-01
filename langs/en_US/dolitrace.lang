@@ -164,6 +164,7 @@ TreatmentIntegrity = Integrity
 TreatmentIntegrityHelp = SHA-256 fingerprint of the content computed at validation: if the data is changed outside the application, the fingerprint no longer matches
 TreatmentIntegrityOk = Content intact
 TreatmentIntegrityKo = The content does not match the validated one
+TreatmentIntegrityNone = Record validated without fingerprint: the content cannot be checked
 TreatmentReplacedBy = Replaced by
 TreatmentCorrectionInProgress = Correction in progress
 ErrorTreatmentDateFuture = The start date is in the future

@@ -229,6 +229,7 @@ TreatmentIntegrity = Integrità
 TreatmentIntegrityHelp = Impronta SHA-256 del contenuto calcolata alla validazione: se i dati vengono modificati fuori dall'applicazione, l'impronta non corrisponde più
 TreatmentIntegrityOk = Contenuto integro
 TreatmentIntegrityKo = Il contenuto non corrisponde a quello validato
+TreatmentIntegrityNone = Registrazione validata senza impronta: il contenuto non è verificabile
 TreatmentReplacedBy = Sostituita da
 TreatmentCorrectionInProgress = Correzione in corso
 ErrorTreatmentDateFuture = La data di inizio è nel futuro

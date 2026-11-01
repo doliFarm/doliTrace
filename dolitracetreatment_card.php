@@ -676,10 +676,13 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
 	// Integrity of a validated record and its correction
 	$correctionid = $object->getCorrectionId();
-	$check = ($object->status != $object::STATUS_DRAFT ? $object->checkHash() : -1);
-	if ($check >= 0) {
+	$check = ($object->status != $object::STATUS_DRAFT ? $object->checkHash() : -2);
+	if ($check >= -1) {
 		print '<tr><td>'.$form->textwithpicto($langs->trans('TreatmentIntegrity'), $langs->trans('TreatmentIntegrityHelp')).'</td><td>';
-		if ($check > 0) {
+		if ($check == -1) {
+			// Validated without fingerprint: the content cannot be checked
+			print img_picto('', 'fa-exclamation-triangle', 'class="pictofixedwidth" style="color: #bc9526"').'<span class="warning">'.$langs->trans('TreatmentIntegrityNone').'</span>';
+		} elseif ($check > 0) {
 			print img_picto('', 'fa-check-circle', 'class="pictofixedwidth" style="color: #28a745"').$langs->trans('TreatmentIntegrityOk');
 		} elseif ($check == 0) {
 			print img_picto('', 'fa-exclamation-triangle', 'class="pictofixedwidth error"').'<span class="error">'.$langs->trans('TreatmentIntegrityKo').'</span>';
