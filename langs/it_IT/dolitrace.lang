@@ -397,4 +397,4 @@ WarningOperationSeedStatusMissing = Semina o impianto sull'appezzamento %s in co
 WarningOperationSeedNoDerogation = Materiale non biologico sull'appezzamento %s in conversione o biologico senza deroga della BDSB
 WarningTreatmentRevoked = %s: prodotto revocato dal %s nella banca dati del Ministero della Salute (verificare nel decreto i termini per lo smaltimento delle scorte)
 WarningTreatmentSuspended = %s: autorizzazione sospesa nella banca dati del Ministero della Salute
-WarningTreatmentOrganicVerify = %s: uso in biologico da verificare (%s). Dopo il controllo, confermarlo nella scheda dell'agrofarmaco
+WarningTreatmentOrganicVerify = %s: uso in biologico da verificare (%s). Dopo il controllo, confermarlo nella scheda del prodotto

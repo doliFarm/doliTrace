@@ -1615,10 +1615,13 @@ class DoliTraceTreatment extends CommonObject
 		// Products that need a check by hand (conditions of annex I, uses of the label not recorded, not in the catalogue)
 		if (count($this->getOrganicAreas())) {
 			foreach ($this->products as $product) {
-				if (!($product->fk_agrodrug > 0)) {
+				if ($product->fk_agrodrug > 0) {
+					$check = $this->organicCheck((int) $product->fk_agrodrug);
+				} elseif ($product->fk_fertilizer > 0) {
+					$check = $this->organicCheck((int) $product->fk_fertilizer, true);
+				} else {
 					continue;
 				}
-				$check = $this->organicCheck((int) $product->fk_agrodrug);
 				if ($check !== null && $check['result'] == 'verify') {
 					$warnings[] = $langs->transnoentities('WarningTreatmentOrganicVerify', $product->product_label, implode('; ', $check['reasons']));
 				}
@@ -1711,8 +1714,14 @@ class DoliTraceTreatment extends CommonObject
 				$allowed = ($check === null || $check['result'] != 'no');
 				$reasons = ($check === null ? array() : $check['reasons']);
 			} elseif ($product->fk_fertilizer > 0) {
-				$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, organic FROM ".$prefix."dolifarm_fertilizer WHERE rowid = ".((int) $product->fk_fertilizer));
-				$allowed = (isset($rows[$product->fk_fertilizer]) && !empty($rows[$product->fk_fertilizer]->organic));
+				$check = $this->organicCheck((int) $product->fk_fertilizer, true);
+				if ($check === null) {
+					$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, organic FROM ".$prefix."dolifarm_fertilizer WHERE rowid = ".((int) $product->fk_fertilizer));
+					$allowed = (isset($rows[$product->fk_fertilizer]) && !empty($rows[$product->fk_fertilizer]->organic));
+				} else {
+					$allowed = ($check['result'] != 'no');
+					$reasons = $check['reasons'];
+				}
 			}
 			if ($allowed) {
 				continue;
@@ -1730,17 +1739,18 @@ class DoliTraceTreatment extends CommonObject
 	 * Check of an agrodrug for organic production at the date of the record (substances of annex I, authorisation,
 	 * uses of the label), done by doliFarm
 	 *
-	 * @param	int		$agrodrugid		Id of the agrodrug
+	 * @param	int		$agrodrugid		Id of the agrodrug, or of the fertilizer
+	 * @param	bool	$fertilizer		The id is of a fertilizer
 	 * @return	array{result:string,reasons:string[]}|null		Null when doliFarm has no check (older version)
 	 */
-	private function organicCheck($agrodrugid)
+	private function organicCheck($agrodrugid, $fertilizer = false)
 	{
-		if (!dol_include_once('/dolifarm/lib/dolifarm_organic.lib.php') || !function_exists('dolifarmOrganicAgroDrugCheck')) {
+		if (!dol_include_once('/dolifarm/lib/dolifarm_organic.lib.php') || !function_exists($fertilizer ? 'dolifarmOrganicFertilizerCheck' : 'dolifarmOrganicAgroDrugCheck')) {
 			return null;
 		}
-		$key = $agrodrugid.'_'.dol_print_date($this->date_start, '%Y%m%d', 'tzserver');
+		$key = ($fertilizer ? 'F' : 'A').$agrodrugid.'_'.dol_print_date($this->date_start, '%Y%m%d', 'tzserver');
 		if (!isset($this->organicChecks[$key])) {
-			$this->organicChecks[$key] = dolifarmOrganicAgroDrugCheck($this->db, $agrodrugid, $this->date_start);
+			$this->organicChecks[$key] = ($fertilizer ? dolifarmOrganicFertilizerCheck($this->db, $agrodrugid) : dolifarmOrganicAgroDrugCheck($this->db, $agrodrugid, $this->date_start));
 		}
 		return $this->organicChecks[$key];
 	}
