@@ -260,22 +260,24 @@ class modDolitrace extends DolibarrModules
 		// Register of the treatments and fertilizations: adversities (EPPO codes) and units of dose
 		$this->dictionaries = array(
 			'langs' => 'dolitrace@dolitrace',
-			'tabname' => array('dolitrace_c_adversity', 'dolitrace_c_dose_unit'),
-			'tablib' => array('DictionaryAdversity', 'DictionaryDoseUnit'),
+			'tabname' => array('dolitrace_c_adversity', 'dolitrace_c_dose_unit', 'dolitrace_c_irrigation_method'),
+			'tablib' => array('DictionaryAdversity', 'DictionaryDoseUnit', 'DictionaryIrrigationMethod'),
 			'tabsql' => array(
 				'SELECT rowid, code, label, category, active, position FROM '.MAIN_DB_PREFIX.'dolitrace_c_adversity',
 				'SELECT rowid, code, label, kind, technical_type, basis, qty_unit, factor, active, position FROM '.MAIN_DB_PREFIX.'dolitrace_c_dose_unit',
+				'SELECT rowid, code, label, active, position FROM '.MAIN_DB_PREFIX.'dolitrace_c_irrigation_method',
 			),
-			'tabsqlsort' => array('position ASC, label ASC', 'position ASC, code ASC'),
-			'tabfield' => array('code,label,category,position', 'code,label,kind,technical_type,basis,qty_unit,factor,position'),
-			'tabfieldvalue' => array('code,label,category,position', 'code,label,kind,technical_type,basis,qty_unit,factor,position'),
-			'tabfieldinsert' => array('code,label,category,position', 'code,label,kind,technical_type,basis,qty_unit,factor,position'),
-			'tabrowid' => array('rowid', 'rowid'),
-			'tabcond' => array(isModEnabled('dolitrace'), isModEnabled('dolitrace')),
+			'tabsqlsort' => array('position ASC, label ASC', 'position ASC, code ASC', 'position ASC, label ASC'),
+			'tabfield' => array('code,label,category,position', 'code,label,kind,technical_type,basis,qty_unit,factor,position', 'code,label,position'),
+			'tabfieldvalue' => array('code,label,category,position', 'code,label,kind,technical_type,basis,qty_unit,factor,position', 'code,label,position'),
+			'tabfieldinsert' => array('code,label,category,position', 'code,label,kind,technical_type,basis,qty_unit,factor,position', 'code,label,position'),
+			'tabrowid' => array('rowid', 'rowid', 'rowid'),
+			'tabcond' => array(isModEnabled('dolitrace'), isModEnabled('dolitrace'), isModEnabled('dolitrace')),
 			'tabhelp' => array(
 				array('code' => $langs->trans('AdversityCodeHelp'), 'category' => $langs->trans('AdversityCategoryHelp')),
 				array('code' => $langs->trans('DoseUnitCodeHelp'), 'kind' => $langs->trans('DoseUnitKindHelp'), 'technical_type' => $langs->trans('DoseUnitTechnicalTypeHelp'),
 					'basis' => $langs->trans('DoseUnitBasisHelp'), 'qty_unit' => $langs->trans('DoseUnitQtyUnitHelp'), 'factor' => $langs->trans('DoseUnitFactorHelp')),
+				array('code' => $langs->trans('IrrigationMethodCodeHelp')),
 			),
 		);
 		/* END MODULEBUILDER DICTIONARIES */

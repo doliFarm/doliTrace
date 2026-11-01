@@ -250,3 +250,23 @@ HarvestUnit = Unit
 HarvestBatch = Lot
 HarvestConfirmValidate = Validate the harvest? The harvested product is put in the production warehouse.
 HarvestConfirmSetDraft = Set the harvest back to draft? The harvested product is taken out of the production warehouse.
+
+# Crop events and irrigations (sections of the field notebook)
+DictionaryIrrigationMethod = Irrigation methods
+IrrigationMethodCodeHelp = Code of the irrigation method, in upper case
+OperationBbch = BBCH stage
+OperationBbchHelp = Phenological stage of the crop on the BBCH scale (for example 65 = full flowering)
+IrrigationMethod = Irrigation method
+IrrigationOnlyHelp = Only for operations of type Irrigation
+IrrigationWaterVolume = Water volume (m³)
+IrrigationWaterVolumeHelp = Total volume of water distributed, in cubic metres (only for Irrigation)
+IrrigatedArea = Irrigated area (ha)
+IrrigatedAreaHelp = Hectares reached by the irrigation; if empty, the area of the plot (only for Irrigation)
+Fertigation = Fertigation
+FertigationHelp = Fertilizers distributed with the water: record the fertilization in the register and link it here
+FertigationRecord = Fertilization record
+FertigationRecordHelp = Record of the fertilization register distributed with this irrigation
+ErrorOperationFertigationRecord = The fertigation record must be a fertilization of the same farm as the crop plan
+ErrorValueMustBePositive = %s cannot be negative
+CropPlanPcgRef = Area in the PCG
+CropPlanPcgRefHelp = Identifier of the area (appezzamento) in the graphic crop plan (PCG) of the farm dossier on the SIAN, for the field notebook (QDCA)

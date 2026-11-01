@@ -73,7 +73,7 @@ class DoliTraceOperation extends CommonObject
 	 * @var int<0,1>|string		Does this object support multicompany module ?
 	 * 							0=No test on entity, 1=Test with field entity in local table, 'field@table'=Test entity into the field@table (example 'fk_soc@societe')
 	 */
-	public $ismultientitymanaged = 0;
+	public $ismultientitymanaged = 1;
 
 	/**
      * @var array|null  Cache dei tipi operazione per evitare query multiple
@@ -83,6 +83,9 @@ class DoliTraceOperation extends CommonObject
 	const STATUS_DRAFT = 0;
 	const STATUS_VALIDATED = 1;
 	const STATUS_CANCELED = 9;
+
+	// Type of the irrigations (register of the irrigations)
+	const TYPE_IRRIGATION = 'IRRIGATION';
 
 	/**
 	 *  'type' field format:
@@ -135,6 +138,7 @@ class DoliTraceOperation extends CommonObject
 	public $fields = array(
 		"rowid" => array("type" => "int", "label" => "TechnicalID", "enabled" => "1", 'position' => 10, 'notnull' => 1, "visible" => "0",),
 		"ref" => array("type" => "varchar(128)", "label" => "Ref", "enabled" => "1", 'position' => 15, 'notnull' => 0, "visible" => "5", "csslist" => "tdoverflowmax150", "showoncombobox" => "1",),
+		"entity" => array("type" => "integer", "label" => "Entity", "enabled" => "1", 'position' => 20, 'notnull' => 1, "visible" => "0", "default" => "1", "index" => 1,),
 		"fk_cropplan" => array("type" => "integer:DoliTraceCropplan:dolitrace/class/dolitracecropplan.class.php","label" => "CropPlan","enabled" => "1","position" => 25,"notnull" => 1,"visible" => "1","index" => 1,"css" => "minwidth300", ),
 		"date_op" => array("type" => "datetime", "label" => "Dateop", "enabled" => "1", 'position' => 30, 'notnull' => 1, "visible" => "-1",),
 		//"fk_operation_type" => array("type" => "varchar(32)", "label" => "Fkoperationtype", "enabled" => "1", 'position' => 35, 'notnull' => 1, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
@@ -153,7 +157,7 @@ class DoliTraceOperation extends CommonObject
 		
 		"label" => array("type" => "varchar(255)", "label" => "Label", "enabled" => "1", 'position' => 40, 'notnull' => 0, "visible" => "1", "alwayseditable" => "1", "css" => "minwidth300", "cssview" => "wordbreak", "csslist" => "tdoverflowmax150",),
 		"weather_cond" => array("type" => "varchar(128)", "label" => "Weathercond", "enabled" => "1", 'position' => 45, 'notnull' => 0, "visible" => "-1",),
-		"fk_pheno_stage" => array("type" => "varchar(64)", "label" => "Fkphenostage", "enabled" => "1", 'position' => 50, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
+		"fk_pheno_stage" => array("type" => "varchar(64)", "label" => "OperationBbch", "help" => "OperationBbchHelp", "enabled" => "1", 'position' => 50, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
 		"fk_adversity" => array("type" => "varchar(64)", "label" => "Fkadversity", "enabled" => "1", 'position' => 55, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
 		"fk_machine" => array("type" => "int", "label" => "Fkmachine", "enabled" => "1", 'position' => 60, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
 		"duration_min" => array("type" => "int", "label" => "Durationmin", "enabled" => "1", 'position' => 65, 'notnull' => 0, "visible" => "-1",),
@@ -162,6 +166,11 @@ class DoliTraceOperation extends CommonObject
 		"batch_input" => array("type" => "varchar(128)", "label" => "Batchinput", "enabled" => "1", 'position' => 80, 'notnull' => 0, "visible" => "-1",),
 		"qty_used" => array("type" => "decimal(24,8)", "label" => "Qtyused", "enabled" => "1", 'position' => 85, 'notnull' => 0, "visible" => "-1",),
 		"water_vol_ha" => array("type" => "decimal(24,8)", "label" => "Watervolha", "enabled" => "1", 'position' => 90, 'notnull' => 0, "visible" => "-1",),
+		"irrigation_method" => array("type" => "sellist:dolitrace_c_irrigation_method:label:code::active=1", "label" => "IrrigationMethod", "enabled" => "1", 'position' => 91, 'notnull' => 0, "visible" => "-1", "help" => "IrrigationOnlyHelp", "css" => "maxwidth300",),
+		"water_volume" => array("type" => "double(24,8)", "label" => "IrrigationWaterVolume", "enabled" => "1", 'position' => 92, 'notnull' => 0, "visible" => "-1", "help" => "IrrigationWaterVolumeHelp", "isameasure" => 1,),
+		"irrigated_area" => array("type" => "double(24,8)", "label" => "IrrigatedArea", "enabled" => "1", 'position' => 93, 'notnull' => 0, "visible" => "-1", "help" => "IrrigatedAreaHelp", "isameasure" => 1,),
+		"fertigation" => array("type" => "boolean", "label" => "Fertigation", "enabled" => "1", 'position' => 94, 'notnull' => 0, "visible" => "-1", "default" => "0", "help" => "FertigationHelp",),
+		"fk_treatment" => array("type" => "integer:DoliTraceTreatment:dolitrace/class/dolitracetreatment.class.php:0:(t.kind:=:2)", "label" => "FertigationRecord", "enabled" => "1", 'position' => 96, 'notnull' => 0, "visible" => "-1", "help" => "FertigationRecordHelp", "css" => "maxwidth300",),
 		"cost_material" => array("type" => "decimal(24,8)", "label" => "Costmaterial", "enabled" => "1", 'position' => 95, 'notnull' => 0, "visible" => "-1",),
 		"cost_manpower" => array("type" => "decimal(24,8)", "label" => "Costmanpower", "enabled" => "1", 'position' => 100, 'notnull' => 0, "visible" => "-1",),
 		"cost_energy" => array("type" => "decimal(24,8)", "label" => "Costenergy", "enabled" => "1", 'position' => 105, 'notnull' => 0, "visible" => "-1",),
@@ -194,6 +203,12 @@ class DoliTraceOperation extends CommonObject
 	public $batch_input;
 	public $qty_used;
 	public $water_vol_ha;
+	public $entity;
+	public $irrigation_method;
+	public $water_volume;
+	public $irrigated_area;
+	public $fertigation;
+	public $fk_treatment;
 	public $cost_material;
 	public $cost_manpower;
 	public $cost_energy;
@@ -266,7 +281,7 @@ class DoliTraceOperation extends CommonObject
 		// Drop-down lists only with the farms the user can see (doliFarm >= 1.3.1)
 		dol_include_once('/dolifarm/lib/dolifarm_access.lib.php');
 		if (function_exists('dolifarmRestrictLinkFields')) {
-			dolifarmRestrictLinkFields($this, array('fk_cropplan'));
+			dolifarmRestrictLinkFields($this, array('fk_cropplan', 'fk_treatment'));
 		}
 
 		if (!getDolGlobalInt('MAIN_SHOW_TECHNICAL_ID') && isset($this->fields['rowid']) && !empty($this->fields['ref'])) {
@@ -347,6 +362,15 @@ class DoliTraceOperation extends CommonObject
 	 */
 	public function create(User $user, $notrigger = 0)
 	{
+		global $conf;
+
+		// createCommon() does not fill the entity
+		if (empty($this->entity)) {
+			$this->entity = $conf->entity;
+		}
+		if ($this->checkData() < 0) {
+			return -1;
+		}
 		$result = $this->createCommon($user, $notrigger);
 
 		// uncomment lines below if you want to validate object after creation
@@ -581,7 +605,54 @@ class DoliTraceOperation extends CommonObject
 	 */
 	public function update(User $user, $notrigger = 0)
 	{
+		if ($this->checkData() < 0) {
+			return -1;
+		}
 		return $this->updateCommon($user, $notrigger);
+	}
+
+	/**
+	 * Check the data of the register of the crop events and of the irrigations before saving
+	 *
+	 * Irrigation data only on irrigations; the fertigation is linked to a fertilization record of the same farm.
+	 *
+	 * @return	int		Return integer <0 if KO, >0 if OK
+	 */
+	public function checkData()
+	{
+		global $langs;
+
+		$langs->load('dolitrace@dolitrace');
+		$isirrigation = ($this->fk_operation_type == self::TYPE_IRRIGATION);
+		if (!$isirrigation) {
+			// Irrigation data left by a change of type are not kept
+			$this->irrigation_method = null;
+			$this->water_volume = null;
+			$this->irrigated_area = null;
+			$this->fertigation = 0;
+			$this->fk_treatment = null;
+			return 1;
+		}
+		foreach (array('water_volume', 'irrigated_area') as $key) {
+			if ($this->$key !== null && $this->$key !== '' && (float) $this->$key < 0) {
+				$this->error = $langs->trans('ErrorValueMustBePositive', $langs->transnoentitiesnoconv($this->fields[$key]['label']));
+				return -1;
+			}
+		}
+		if (empty($this->fertigation)) {
+			$this->fk_treatment = null;
+		} elseif (!empty($this->fk_treatment)) {
+			$sql = "SELECT t.kind, t.fk_soc, cp.fk_soc as cropplan_soc FROM ".$this->db->prefix()."dolitrace_treatment as t";
+			$sql .= " LEFT JOIN ".$this->db->prefix()."dolitrace_cropplan as cp ON cp.rowid = ".((int) $this->fk_cropplan);
+			$sql .= " WHERE t.rowid = ".((int) $this->fk_treatment);
+			$resql = $this->db->query($sql);
+			$obj = $resql ? $this->db->fetch_object($resql) : null;
+			if (!$obj || (int) $obj->kind != 2 || (int) $obj->fk_soc != (int) $obj->cropplan_soc) {
+				$this->error = $langs->trans('ErrorOperationFertigationRecord');
+				return -1;
+			}
+		}
+		return 1;
 	}
 
 	/**

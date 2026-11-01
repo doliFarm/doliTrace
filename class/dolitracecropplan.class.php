@@ -141,7 +141,8 @@ class DoliTraceCropplan extends CommonObject
         "fk_soc" => array("type" => "integer:Societe:societe/class/societe.class.php:1", "label" => "ThirdParty", "picto" => "company", "enabled" => "1", 'position' => 30, 'notnull' => 1, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx", "csslist" => "tdoverflowmax150",),
         "fk_dossier" => array("type" => "integer:DoliFarmFarmDossier:dolifarm/class/dolifarmfarmdossier.class.php:1", "label" => "FarmDossier", "enabled" => "1", "position" => 32, "notnull" => 1, "visible" => "1", "index" => 1,),
         "fk_plot" => array("type" => "integer:DoliFarmPlot:custom/dolifarm/class/dolifarmplot.class.php:1", "label" => "Fkplot", "enabled" => "1", 'position' => 35, 'notnull' => 1, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
-        
+        "pcg_ref" => array("type" => "varchar(64)", "label" => "CropPlanPcgRef", "enabled" => "1", 'position' => 36, 'notnull' => 0, "visible" => "-1", "alwayseditable" => "1", "help" => "CropPlanPcgRefHelp", "css" => "maxwidth200",),
+
         // Link to Crop (DoliTrace) - Note: Assuming you will create this class
         "fk_output_product" => array("type" => "integer:Product:product/class/product.class.php","label" => "ProductOut","picto" => "product","enabled" => "1","position" => 38,"notnull" => 0,"visible" => "-2","index" => 1,),
         "fk_crop" => array("type" => "sellist:dolifarm_crops:label:rowid::status=1","label" => "Crop","enabled" => "1","position" => 40,"notnull" => 1,"visible" => "-1", "css" => "minwidth300",),        
@@ -176,6 +177,7 @@ class DoliTraceCropplan extends CommonObject
     public $fk_soc;
     public $fk_dossier;
     public $fk_plot;
+    public $pcg_ref;
     public $fk_crop;
     public $fk_project;
     public $fk_output_product;

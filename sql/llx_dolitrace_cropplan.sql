@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS llx_dolitrace_cropplan (
     fk_project      INTEGER,
     fk_dossier      INTEGER DEFAULT NULL,
     batch_output VARCHAR(128) DEFAULT NULL,
+    pcg_ref         VARCHAR(64) DEFAULT NULL,           -- identifier of the area in the graphic crop plan (PCG) of the SIAN
     -- Dati
     season          INTEGER NOT NULL,
     date_start      DATE,

@@ -112,7 +112,16 @@ if ($action == 'export' && in_array($format, array('json', 'csv', 'pdf'))) {
 		);
 		$filename = 'registro_trattamenti'.($socid > 0 ? '_'.$socid : '').'_'.$filters['date_from'].'_'.$filters['date_to'].'.'.$format;
 		if ($format == 'json') {
-			$content = $export->toJson($records, $filters);
+			// Crop events and irrigations of the field notebook, for the users who can read the crop operations
+			$operations = array();
+			if ($user->hasRight('dolitrace', 'dolitraceoperation', 'read')) {
+				$operations = $export->getOperations($user, $socid, $datefrom, $dateto);
+				if (!is_array($operations)) {
+					dol_syslog('Export of the crop operations: '.$export->error, LOG_ERR);
+					$operations = array();
+				}
+			}
+			$content = $export->toJson($records, $filters, $operations);
 			$mime = 'application/json';
 		} elseif ($format == 'csv') {
 			$content = $export->toCsv($records);

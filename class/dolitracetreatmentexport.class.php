@@ -25,6 +25,7 @@
  */
 
 dol_include_once('/dolitrace/class/dolitracetreatment.class.php');
+dol_include_once('/dolitrace/class/dolitraceoperation.class.php');
 dol_include_once('/dolifarm/lib/dolifarm_access.lib.php');
 
 /**
@@ -33,7 +34,7 @@ dol_include_once('/dolifarm/lib/dolifarm_access.lib.php');
 class DoliTraceTreatmentExport
 {
 	const FORMAT = 'dolifarm-register';
-	const FORMAT_VERSION = '1.0';
+	const FORMAT_VERSION = '1.1';
 
 	/**
 	 * @var string[]	Columns of the CSV, in their order
@@ -42,7 +43,7 @@ class DoliTraceTreatmentExport
 		'record', 'ref', 'version', 'status', 'kind', 'technical_type', 'farm_cuaa', 'farm_name',
 		'date_start', 'date_end', 'reason', 'operator_name', 'operator_license', 'operator_license_end',
 		'contractor_name', 'contractor_vat', 'machine', 'machine_check_end', 'water_volume', 'weather', 'late',
-		'target_type', 'plot_ref', 'location_ref', 'zone_zvn', 'crop_eppo', 'crop_label', 'bbch', 'building_ref', 'seed_batch', 'treated_qty', 'treated_unit',
+		'target_type', 'plot_ref', 'location_ref', 'pcg_ref', 'zone_zvn', 'crop_eppo', 'crop_label', 'bbch', 'building_ref', 'seed_batch', 'treated_qty', 'treated_unit',
 		'product_type', 'product_ref', 'product_label', 'reg_number', 'n_content', 'p2o5_content', 'k2o_content',
 		'adversity_eppo', 'adversity_label', 'dose', 'dose_unit', 'dose_unit_label', 'qty_total', 'qty_unit', 'n_applied', 'batch',
 		'content_hash',
@@ -197,10 +198,13 @@ class DoliTraceTreatmentExport
 		foreach ($record->targets as $i => $target) {
 			$plot = $this->lookup('dolifarm_plot', $target->fk_plot, 'ref');
 			$building = $this->lookup('dolifarm_building', $target->fk_building, 'ref');
+			$cropplan = $this->lookup('dolitrace_cropplan', $target->fk_cropplan, 'pcg_ref');
 			$data['targets'][] = array(
 				'type' => array(1 => 'plot', 2 => 'building', 3 => 'seeds')[(int) $target->target_type] ?? (string) $target->target_type,
 				'plot_ref' => $plot ? $plot->ref : '',
 				'location_ref' => $content['targets'][$i]['location_ref'],
+				// Area of the graphic crop plan of the SIAN, from the crop plan (not part of the content of the record)
+				'pcg_ref' => $cropplan ? (string) $cropplan->pcg_ref : '',
 				'zone_zvn' => $content['targets'][$i]['zone_zvn'],
 				'crop_eppo' => $content['targets'][$i]['crop_eppo'],
 				'crop_label' => $content['targets'][$i]['crop_label'],
@@ -256,7 +260,7 @@ class DoliTraceTreatmentExport
 	 * @param	array<string,string>	$filters	Filters of the export (farm, period)
 	 * @return	string							JSON
 	 */
-	public function toJson($records, $filters)
+	public function toJson($records, $filters, $operations = array())
 	{
 		$data = array(
 			'format' => self::FORMAT,
@@ -265,11 +269,104 @@ class DoliTraceTreatmentExport
 			'regulation' => 'Reg. (EU) 2023/564',
 			'filters' => $filters,
 			'records' => array(),
+			'crop_events' => array(),
+			'irrigations' => array(),
 		);
 		foreach ($records as $record) {
 			$data['records'][] = $this->getRecordData($record);
 		}
+		foreach ($operations as $operation) {
+			if ($operation['type'] == DoliTraceOperation::TYPE_IRRIGATION) {
+				$data['irrigations'][] = $operation;
+			} else {
+				$data['crop_events'][] = $operation;
+			}
+		}
 		return json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+	}
+
+	/**
+	 * Crop events and irrigations of the period (crop operations of doliTrace), for the sections of the field notebook
+	 * that are not treatments or fertilizations
+	 *
+	 * Fertilizations and plant protection treatments are in the register: the operations of these types are left out.
+	 *
+	 * @param	User		$user		User
+	 * @param	int			$socid		Farm, 0 for all the farms of the user
+	 * @param	int|string	$datefrom	First day (timestamp), '' for no limit
+	 * @param	int|string	$dateto		Last day (timestamp), '' for no limit
+	 * @return	array<int,array<string,mixed>>|int	Operations, <0 if KO
+	 */
+	public function getOperations(User $user, $socid, $datefrom, $dateto)
+	{
+		$sql = "SELECT o.rowid, o.ref, o.date_op, o.fk_operation_type, o.label, o.fk_pheno_stage, o.status,";
+		$sql .= " o.irrigation_method, o.water_volume, o.irrigated_area, o.fertigation, o.fk_treatment,";
+		$sql .= " cp.ref as cropplan_ref, cp.pcg_ref, cp.fk_soc, p.ref as plot_ref, p.iacs_parcel,";
+		$sql .= " c.eppo_code as crop_eppo, c.label as crop_label, s.nom as farm_name, s.idprof4 as farm_cuaa,";
+		$sql .= " ot.label as type_label, im.label as irrigation_method_label, tr.ref as treatment_ref";
+		$sql .= " FROM ".$this->db->prefix()."dolitrace_operation as o";
+		$sql .= " INNER JOIN ".$this->db->prefix()."dolitrace_cropplan as cp ON cp.rowid = o.fk_cropplan";
+		$sql .= " LEFT JOIN ".$this->db->prefix()."dolifarm_plot as p ON p.rowid = cp.fk_plot";
+		$sql .= " LEFT JOIN ".$this->db->prefix()."dolifarm_crops as c ON c.rowid = cp.fk_crop";
+		$sql .= " LEFT JOIN ".$this->db->prefix()."societe as s ON s.rowid = cp.fk_soc";
+		$sql .= " LEFT JOIN ".$this->db->prefix()."dolifarm_c_operation_type as ot ON ot.code = o.fk_operation_type";
+		$sql .= " LEFT JOIN ".$this->db->prefix()."dolitrace_c_irrigation_method as im ON im.code = o.irrigation_method";
+		$sql .= " LEFT JOIN ".$this->db->prefix()."dolitrace_treatment as tr ON tr.rowid = o.fk_treatment";
+		$sql .= " WHERE o.entity IN (".getEntity('dolitraceoperation').")";
+		$sql .= " AND (o.status IS NULL OR o.status <> ".((int) DoliTraceOperation::STATUS_CANCELED).")";
+		$sql .= " AND o.fk_operation_type NOT IN ('TT_Fertiliser', 'TT_Pesticide')";
+		if ($socid > 0) {
+			$sql .= " AND cp.fk_soc = ".((int) $socid);
+		}
+		if ($datefrom !== '' && $datefrom !== null) {
+			$sql .= " AND o.date_op >= '".$this->db->idate((int) $datefrom)."'";
+		}
+		if ($dateto !== '' && $dateto !== null) {
+			$sql .= " AND o.date_op <= '".$this->db->idate((int) $dateto)."'";
+		}
+		$sql .= dolifarmSqlSocFilter($user, 'cp.fk_soc');
+		$sql .= " ORDER BY cp.fk_soc, o.date_op, o.rowid";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+		global $langs;
+
+		// The labels of the crops of doliFarm are translation keys
+		$langs->load('dolifarm@dolifarm');
+		$operations = array();
+		while ($obj = $this->db->fetch_object($resql)) {
+			$operation = array(
+				'id' => (int) $obj->rowid,
+				'ref' => (string) $obj->ref,
+				'type' => (string) $obj->fk_operation_type,
+				'type_label' => (string) ($obj->type_label ? $obj->type_label : $obj->fk_operation_type),
+				'date' => $this->dateIso($this->db->jdate($obj->date_op), true),
+				'label' => (string) $obj->label,
+				'farm' => array('name' => (string) $obj->farm_name, 'cuaa' => (string) $obj->farm_cuaa),
+				'cropplan_ref' => (string) $obj->cropplan_ref,
+				'pcg_ref' => (string) $obj->pcg_ref,
+				'plot_ref' => (string) $obj->plot_ref,
+				'location_ref' => (string) $obj->iacs_parcel,
+				'crop_eppo' => (string) $obj->crop_eppo,
+				'crop_label' => $langs->transnoentitiesnoconv((string) $obj->crop_label),
+				'bbch' => (string) $obj->fk_pheno_stage,
+			);
+			if ($obj->fk_operation_type == DoliTraceOperation::TYPE_IRRIGATION) {
+				$operation['irrigation'] = array(
+					'method' => (string) $obj->irrigation_method,
+					'method_label' => (string) $obj->irrigation_method_label,
+					'water_volume_m3' => $obj->water_volume !== null ? (float) $obj->water_volume : null,
+					'irrigated_area_ha' => $obj->irrigated_area !== null ? (float) $obj->irrigated_area : null,
+					'fertigation' => (int) $obj->fertigation,
+					'fertigation_record_ref' => (string) $obj->treatment_ref,
+				);
+			}
+			$operations[] = $operation;
+		}
+		$this->db->free($resql);
+		return $operations;
 	}
 
 	/**
@@ -298,7 +395,7 @@ class DoliTraceTreatmentExport
 		foreach ($targets as $target) {
 			foreach ($products as $product) {
 				$line = $head;
-				foreach (array('plot_ref', 'location_ref', 'zone_zvn', 'crop_eppo', 'crop_label', 'bbch', 'building_ref', 'seed_batch', 'treated_qty', 'treated_unit') as $key) {
+				foreach (array('plot_ref', 'location_ref', 'pcg_ref', 'zone_zvn', 'crop_eppo', 'crop_label', 'bbch', 'building_ref', 'seed_batch', 'treated_qty', 'treated_unit') as $key) {
 					$line[$key] = isset($target[$key]) ? $target[$key] : '';
 				}
 				$line['target_type'] = isset($target['type']) ? $target['type'] : '';

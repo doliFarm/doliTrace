@@ -213,3 +213,23 @@ HarvestUnit = Unité
 HarvestBatch = Lot
 HarvestConfirmValidate = Valider la récolte ? Le produit récolté entre dans l'entrepôt de production.
 HarvestConfirmSetDraft = Remettre la récolte en brouillon ? Le produit récolté sort de l'entrepôt de production.
+
+# Événements culturaux et irrigations (sections du cahier de culture)
+DictionaryIrrigationMethod = Méthodes d'irrigation
+IrrigationMethodCodeHelp = Code de la méthode d'irrigation, en majuscules
+OperationBbch = Stade BBCH
+OperationBbchHelp = Stade phénologique de la culture sur l'échelle BBCH (par exemple 65 = pleine floraison)
+IrrigationMethod = Méthode d'irrigation
+IrrigationOnlyHelp = Seulement pour les opérations de type Irrigation
+IrrigationWaterVolume = Volume d'eau (m³)
+IrrigationWaterVolumeHelp = Volume total d'eau distribué, en mètres cubes (seulement pour l'irrigation)
+IrrigatedArea = Surface irriguée (ha)
+IrrigatedAreaHelp = Hectares atteints par l'irrigation ; si vide, la surface de la parcelle (seulement pour l'irrigation)
+Fertigation = Fertirrigation
+FertigationHelp = Fertilisants distribués avec l'eau : enregistrer la fertilisation dans le registre et la lier ici
+FertigationRecord = Enregistrement de fertilisation
+FertigationRecordHelp = Enregistrement du registre des fertilisations distribué avec cette irrigation
+ErrorOperationFertigationRecord = L'enregistrement de fertirrigation doit être une fertilisation de la même exploitation que le plan cultural
+ErrorValueMustBePositive = %s ne peut pas être négatif
+CropPlanPcgRef = Parcelle dans le PCG
+CropPlanPcgRefHelp = Identifiant de la parcelle (appezzamento) dans le plan cultural graphique (PCG) du dossier de l'exploitation sur le SIAN, pour le cahier de culture (QDCA)

@@ -208,3 +208,22 @@ INSERT IGNORE INTO llx_dolitrace_c_dose_unit (code, label, kind, technical_type,
 ('ML_KGSEED', 'ml/kg di seme', 1, 3, 'KG', 'l', 0.001, 1, 190),
 ('G_QSEED', 'g/q di seme', 1, 3, 'KG', 'kg', 0.00001, 1, 200),
 ('ML_QSEED', 'ml/q di seme', 1, 3, 'KG', 'l', 0.00001, 1, 210);
+
+-- Irrigation methods (register of the irrigations, section "registro irrigazioni" of the AGEA QDCA)
+CREATE TABLE IF NOT EXISTS llx_dolitrace_c_irrigation_method (
+	rowid			integer AUTO_INCREMENT PRIMARY KEY,
+	code			varchar(16) NOT NULL,
+	label			varchar(64) NOT NULL,
+	active			tinyint DEFAULT 1 NOT NULL,
+	position		integer DEFAULT 0,
+	UNIQUE INDEX uk_dolitrace_c_irrigation_method_code (code)
+) ENGINE=innodb;
+
+INSERT IGNORE INTO llx_dolitrace_c_irrigation_method (code, label, active, position) VALUES
+('SPRINKLER', 'Aspersione', 1, 10),
+('DRIP', 'Goccia', 1, 20),
+('MICRO', 'Microirrigazione / Spruzzo', 1, 30),
+('SUBSURFACE', 'Subirrigazione', 1, 40),
+('FURROW', 'Scorrimento / Infiltrazione laterale', 1, 50),
+('FLOOD', 'Sommersione', 1, 60),
+('OTHER', 'Altro', 1, 900);

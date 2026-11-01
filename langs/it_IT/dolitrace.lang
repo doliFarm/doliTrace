@@ -305,3 +305,23 @@ WarningTreatmentAuthExpired = Autorizzazione del prodotto %s scaduta il %s: veri
 WarningTreatmentDoseAboveMax = Dose effettiva di %s (quantità totale / superficie trattata) pari a %s, oltre la dose massima del prodotto (%s)
 WarningTreatmentHarvestInSafety = Raccolta %s del %s entro l'intervallo di sicurezza (raccolta consentita dal %s)
 WarningTreatmentZvnNitrogen = Superficie %s in zona vulnerabile: %s kg N/ha di origine zootecnica nell'anno %s, oltre il limite di %s kg N/ha
+
+# Eventi colturali e irrigazioni (sezioni del quaderno di campagna)
+DictionaryIrrigationMethod = Metodi di irrigazione
+IrrigationMethodCodeHelp = Codice del metodo di irrigazione, in maiuscolo
+OperationBbch = Fase BBCH
+OperationBbchHelp = Fase fenologica della coltura nella scala BBCH (per esempio 65 = piena fioritura)
+IrrigationMethod = Metodo di irrigazione
+IrrigationOnlyHelp = Solo per le operazioni di tipo Irrigazione
+IrrigationWaterVolume = Volume d'acqua (m³)
+IrrigationWaterVolumeHelp = Volume totale d'acqua distribuito, in metri cubi (solo per l'irrigazione)
+IrrigatedArea = Superficie irrigata (ha)
+IrrigatedAreaHelp = Ettari raggiunti dall'irrigazione; se vuoto, la superficie dell'appezzamento (solo per l'irrigazione)
+Fertigation = Fertirrigazione
+FertigationHelp = Fertilizzanti distribuiti con l'acqua: registrare la fertilizzazione nel registro e collegarla qui
+FertigationRecord = Registrazione di fertilizzazione
+FertigationRecordHelp = Registrazione del registro delle fertilizzazioni distribuita con questa irrigazione
+ErrorOperationFertigationRecord = La registrazione della fertirrigazione deve essere una fertilizzazione della stessa azienda del piano colturale
+ErrorValueMustBePositive = %s non può essere negativo
+CropPlanPcgRef = Appezzamento PCG
+CropPlanPcgRefHelp = Identificativo dell'appezzamento nel Piano Colturale Grafico (PCG) del fascicolo aziendale sul SIAN, per il quaderno di campagna (QDCA)

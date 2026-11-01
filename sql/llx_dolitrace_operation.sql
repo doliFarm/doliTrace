@@ -17,8 +17,9 @@
 CREATE TABLE IF NOT EXISTS llx_dolitrace_operation(
 	-- BEGIN MODULEBUILDER FIELDS
 	rowid int AUTO_INCREMENT PRIMARY KEY NOT NULL, 
-	ref varchar(128), 
-	fk_cropplan int NOT NULL, 
+	ref varchar(128),
+	entity integer DEFAULT 1 NOT NULL,
+	fk_cropplan int NOT NULL,
 	date_op datetime NOT NULL, 
 	fk_operation_type varchar(32) NOT NULL, 
 	label varchar(255), 
@@ -31,7 +32,12 @@ CREATE TABLE IF NOT EXISTS llx_dolitrace_operation(
 	fk_product integer, 
 	batch_input varchar(128), 
 	qty_used decimal(24,8), 
-	water_vol_ha decimal(24,8), 
+	water_vol_ha decimal(24,8),
+	irrigation_method varchar(16),						-- llx_dolitrace_c_irrigation_method.code
+	water_volume double(24,8),							-- m3 of water of the irrigation
+	irrigated_area double(24,8),						-- ha
+	fertigation smallint DEFAULT 0,
+	fk_treatment integer,								-- fertilization record of the fertigation
 	cost_material decimal(24,8), 
 	cost_manpower decimal(24,8), 
 	cost_energy decimal(24,8), 
