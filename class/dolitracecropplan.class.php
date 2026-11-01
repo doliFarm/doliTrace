@@ -251,6 +251,11 @@ class DoliTraceCropplan extends CommonObject
 
 		dol_include_once('/dolifarm/lib/dolifarm_icons.lib.php');
 		$this->picto = dolifarm_get_fa_icon('cropplan');
+		// Drop-down lists only with the farms the user can see (doliFarm >= 1.3.1)
+		dol_include_once('/dolifarm/lib/dolifarm_access.lib.php');
+		if (function_exists('dolifarmRestrictLinkFields')) {
+			dolifarmRestrictLinkFields($this, array('fk_dossier', 'fk_plot'));
+		}
 
         if (!getDolGlobalInt('MAIN_SHOW_TECHNICAL_ID') && isset($this->fields['rowid']) && !empty($this->fields['ref'])) {
             $this->fields['rowid']['visible'] = 0;

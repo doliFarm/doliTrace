@@ -337,7 +337,10 @@ if ($action == 'create') {
     // -------------------------------------------------------------------------
     // [MOD] 2. PLOT: Configurazione Dinamica prima del Template
     // -------------------------------------------------------------------------
-    if ($object->fk_soc > 0) {
+    // The farm can come from the URL: plots only of a farm the user can see
+    if ($object->fk_soc > 0 && !dolifarmUserCanSeeSoc($user, (int) $object->fk_soc)) {
+        $object->fields['fk_plot']['type'] = "integer:DoliFarmPlot:dolifarm/class/dolifarmplot.class.php:1:(rowid:=:-1)";
+    } elseif ($object->fk_soc > 0) {
         // Sovrascriviamo definizione (=) per evitare errori di sintassi
         $filter_plot_dynamic = "(fk_soc:=:" . ((int)$object->fk_soc) . ") AND (status:=:1)";
         $object->fields['fk_plot']['type'] = "integer:DoliFarmPlot:dolifarm/class/dolifarmplot.class.php:1:" . $filter_plot_dynamic;
@@ -410,7 +413,7 @@ if (($id || $ref) && $action == 'edit') {
     // -------------------------------------------------------------------------
     // [MOD] 2. PLOT: Configurazione Dinamica
     // -------------------------------------------------------------------------
-    if ($object->fk_soc > 0) {
+    if ($object->fk_soc > 0 && dolifarmUserCanSeeSoc($user, (int) $object->fk_soc)) {
         $filter_plot_dynamic = "(fk_soc:=:" . ((int)$object->fk_soc) . ") AND (status:=:1)";
         $object->fields['fk_plot']['type'] = "integer:DoliFarmPlot:dolifarm/class/dolifarmplot.class.php:1:" . $filter_plot_dynamic;
     } else {
