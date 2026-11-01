@@ -269,3 +269,8 @@ INSERT IGNORE INTO llx_dolitrace_c_application_method (code, label, kind, fert_g
 ('MIN_SOIL', 'Al terreno', 2, 'MIN', 'al terreno', 1, 330),
 ('MIN_FERTIG', 'Fertirrigazione', 2, 'MIN', 'fertirrigazione', 1, 340),
 ('MIN_FOLIAR', 'Fogliare', 2, 'MIN', 'fogliare', 1, 350);
+
+-- Seeds counted by number (AGEA field notebook, sheet 5): treated quantity in thousands of seeds
+INSERT IGNORE INTO llx_dolitrace_c_dose_unit (code, label, kind, technical_type, basis, qty_unit, factor, active, position) VALUES
+('G_KSEED', 'g/1000 semi', 1, 3, 'KSEED', 'kg', 0.001, 1, 220),
+('ML_KSEED', 'ml/1000 semi', 1, 3, 'KSEED', 'l', 0.001, 1, 230);

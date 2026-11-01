@@ -261,6 +261,7 @@ function dolitraceTreatmentQtyInBasis($object, $basis)
 		'M3' => array('M3' => 1),
 		'KG' => array('KG' => 1, 'T' => 1000),
 		'T' => array('T' => 1, 'KG' => 0.001),
+		'KSEED' => array('KSEED' => 1),
 	);
 	if (empty($conversions[$basis])) {
 		return null;

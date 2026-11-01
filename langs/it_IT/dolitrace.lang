@@ -190,6 +190,7 @@ TreatmentFromPlot = da appezzamento
 TreatmentTreatedQtyBuildingHelp = m² o m³ trattati; se vuoto, la superficie coperta o il volume del fabbricato
 TreatmentFromBuilding = da fabbricato
 TreatmentSeedBatch = Lotto di sementi
+TreatmentThousandSeeds = migliaia di semi
 TreatmentProducts = Prodotti fitosanitari
 TreatmentFertilizers = Fertilizzanti
 TreatmentAgroDrug = Prodotto fitosanitario

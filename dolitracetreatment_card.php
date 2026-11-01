@@ -290,7 +290,7 @@ if (empty($reshook)) {
 				$error++;
 				setEventMessages($langs->trans('ErrorFieldRequired', $langs->transnoentitiesnoconv('TreatmentSeedBatch')), null, 'errors');
 			}
-			$target->treated_unit = (GETPOST('treated_unit', 'aZ09') == 'T' ? 'T' : 'KG');
+			$target->treated_unit = (in_array(GETPOST('treated_unit', 'aZ09'), array('T', 'KSEED')) ? GETPOST('treated_unit', 'aZ09') : 'KG');
 		}
 		if (!$error && !($target->treated_qty > 0)) {
 			$error++;
@@ -745,7 +745,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	if (count($cropplanrefs)) {
 		$cropplanrefs = dolitraceTreatmentFetchRows($db, "SELECT rowid, ref FROM ".$db->prefix()."dolitrace_cropplan WHERE rowid IN (".$db->sanitize(implode(',', $cropplanrefs)).")");
 	}
-	$unitlabels = array('HA' => 'ha', 'M2' => 'm²', 'M3' => 'm³', 'KG' => 'kg', 'T' => 't');
+	$unitlabels = array('HA' => 'ha', 'M2' => 'm²', 'M3' => 'm³', 'KG' => 'kg', 'T' => 't', 'KSEED' => $langs->trans('TreatmentThousandSeeds'));
 	foreach ($object->targets as $target) {
 		print '<tr class="oddeven">';
 		if ($target->target_type == DoliTraceTreatmentTarget::TYPE_PLOT) {
@@ -802,7 +802,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 				$units = array('M2' => 'm²', 'M3' => 'm³');
 			} else {
 				print '<input type="text" name="seed_batch" class="minwidth200" value="'.dol_escape_htmltag(GETPOST('seed_batch', 'alphanohtml')).'">';
-				$units = array('KG' => 'kg', 'T' => 't');
+				$units = array('KG' => 'kg', 'T' => 't', 'KSEED' => $langs->trans('TreatmentThousandSeeds'));
 			}
 			print '</td>';
 			$placeholder = ($targettype == DoliTraceTreatmentTarget::TYPE_BUILDING ? ' title="'.dol_escape_htmltag($langs->trans('TreatmentTreatedQtyBuildingHelp')).'" placeholder="'.dol_escape_htmltag($langs->trans('TreatmentFromBuilding')).'"' : '');

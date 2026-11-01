@@ -125,6 +125,7 @@ TreatmentFromPlot = from plot
 TreatmentTreatedQtyBuildingHelp = Treated m² or m³; if empty, the covered surface or the volume of the building
 TreatmentFromBuilding = from building
 TreatmentSeedBatch = Seed lot
+TreatmentThousandSeeds = thousand seeds
 TreatmentProducts = Plant protection products
 TreatmentFertilizers = Fertilizers
 TreatmentAgroDrug = Plant protection product

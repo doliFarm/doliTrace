@@ -88,6 +88,7 @@ TreatmentFromPlot = de la parcelle
 TreatmentTreatedQtyBuildingHelp = m² ou m³ traités ; si vide, la surface couverte ou le volume du bâtiment
 TreatmentFromBuilding = du bâtiment
 TreatmentSeedBatch = Lot de semences
+TreatmentThousandSeeds = milliers de graines
 TreatmentProducts = Produits phytosanitaires
 TreatmentFertilizers = Fertilisants
 TreatmentAgroDrug = Produit phytosanitaire
