@@ -574,13 +574,8 @@ class DoliTraceTreatmentImport
 			$product->fk_product = ($found->fk_product > 0 ? (int) $found->fk_product : null);
 			$product->product_label = $found->label;
 			$product->reg_number = $found->reg_number;
-			$adversity = null;
-			foreach (dolitraceTreatmentAdversities($this->db) as $row) {
-				if (strtoupper((string) $row->code) == strtoupper($data['adversity_eppo'])) {
-					$adversity = $row;
-					break;
-				}
-			}
+			// Any pest code of the EPPO database: added to the dictionary when missing
+			$adversity = dolitraceTreatmentAdversityByCode($this->db, $data['adversity_eppo']);
 			if (!$adversity) {
 				$result['errors'][] = $prefix.$langs->transnoentities('ErrorTreatmentImportNotFound', $langs->transnoentitiesnoconv('TreatmentAdversity'), $data['adversity_eppo']);
 				return null;

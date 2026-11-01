@@ -324,8 +324,14 @@ if (empty($reshook)) {
 		if ($object->kind == $object::KIND_PLANTPROTECTION) {
 			$agrodrugs = dolitraceTreatmentAgroDrugs($db);
 			$agrodrug = isset($agrodrugs[GETPOSTINT('fk_agrodrug')]) ? $agrodrugs[GETPOSTINT('fk_agrodrug')] : null;
-			$adversities = dolitraceTreatmentAdversities($db);
-			$adversity = isset($adversities[GETPOSTINT('fk_adversity')]) ? $adversities[GETPOSTINT('fk_adversity')] : null;
+			$adversityerror = '';
+			if (GETPOST('adversity_eppo', 'alphanohtml') !== '') {
+				// Search on the whole EPPO database: the code is added to the dictionary when missing
+				$adversity = dolitraceTreatmentAdversityByCode($db, GETPOST('adversity_eppo', 'alphanohtml'), $adversityerror);
+			} else {
+				$adversities = dolitraceTreatmentAdversities($db);
+				$adversity = isset($adversities[GETPOSTINT('fk_adversity')]) ? $adversities[GETPOSTINT('fk_adversity')] : null;
+			}
 			if (!$agrodrug) {
 				$error++;
 				setEventMessages($langs->trans('ErrorFieldRequired', $langs->transnoentitiesnoconv('TreatmentAgroDrug')), null, 'errors');
@@ -337,7 +343,7 @@ if (empty($reshook)) {
 			}
 			if (!$adversity) {
 				$error++;
-				setEventMessages($langs->trans('ErrorFieldRequired', $langs->transnoentitiesnoconv('TreatmentAdversity')), null, 'errors');
+				setEventMessages($adversityerror !== '' ? $adversityerror : $langs->trans('ErrorFieldRequired', $langs->transnoentitiesnoconv('TreatmentAdversity')), null, 'errors');
 			} else {
 				$product->fk_adversity = (int) $adversity->rowid;
 				$product->adversity_code = $adversity->code;
@@ -913,11 +919,16 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 				$options[$agrodrug->rowid] = $agrodrug->label.($agrodrug->reg_number ? ' ('.$agrodrug->reg_number.')' : '');
 			}
 			print '<td colspan="2">'.$form->selectarray('fk_agrodrug', $options, GETPOSTINT('fk_agrodrug'), 1, 0, 0, '', 0, 0, 0, '', 'minwidth200 maxwidth300', 1).'</td>';
-			$options = array();
-			foreach (dolitraceTreatmentAdversities($db) as $adversity) {
-				$options[$adversity->rowid] = $adversity->label.' ('.$adversity->code.')';
+			if (dol_include_once('/dolifarm/lib/dolifarm_eppo.lib.php') && function_exists('dolifarmEppoSelect') && dolifarmEppoDataAvailable() && !empty($conf->use_javascript_ajax)) {
+				// Whole EPPO database (pests, diseases, weeds), not only the dictionary
+				print '<td>'.dolifarmEppoSelect($db, 'adversity_eppo', GETPOST('adversity_eppo', 'alphanohtml'), 'pest', 'minwidth200 maxwidth300').'</td>';
+			} else {
+				$options = array();
+				foreach (dolitraceTreatmentAdversities($db) as $adversity) {
+					$options[$adversity->rowid] = $adversity->label.' ('.$adversity->code.')';
+				}
+				print '<td>'.$form->selectarray('fk_adversity', $options, GETPOSTINT('fk_adversity'), 1, 0, 0, '', 0, 0, 0, '', 'minwidth200 maxwidth300', 1).'</td>';
 			}
-			print '<td>'.$form->selectarray('fk_adversity', $options, GETPOSTINT('fk_adversity'), 1, 0, 0, '', 0, 0, 0, '', 'minwidth200 maxwidth300', 1).'</td>';
 		} else {
 			foreach (dolitraceTreatmentFertilizers($db) as $fertilizer) {
 				$options[$fertilizer->rowid] = $fertilizer->label;
