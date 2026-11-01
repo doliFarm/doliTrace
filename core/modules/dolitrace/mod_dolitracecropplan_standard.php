@@ -1,5 +1,5 @@
 <?php
-/* Copyright (C) 2026       SuperAdmin */
+/* Copyright (C) 2026       Luigi Grillo - doliFarm.com	<info@dolifarm.com> */
 
 /**
  * \file    htdocs/custom/dolitrace/core/modules/dolitrace/mod_dolitracecropplan_standard.php

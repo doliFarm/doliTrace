@@ -40,6 +40,7 @@ $listOfModuleContent = [
 	'css',
 	'COPYING',
 	'LICENSE',
+	'COPYING-GPL-3.0',
 	'core',
 	'img',
 	'js',
