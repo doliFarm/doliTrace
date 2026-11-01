@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS llx_dolitrace_treatment_product(
 	cu_content			double(24,8),						-- copy (%)
 	efficiency			double(24,8),						-- copy (0-1)
 	dry_matter			double(24,8),						-- copy (%)
+	density				double(24,8),						-- copy (kg/l), 1 for the livestock effluents without density
 	fk_adversity		integer,							-- llx_dolitrace_c_adversity
 	adversity_code		varchar(10),						-- copy of the EPPO code
 	adversity_label		varchar(255),						-- copy

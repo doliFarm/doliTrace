@@ -44,7 +44,7 @@ class DoliTraceTreatmentExport
 		'date_start', 'date_end', 'reason', 'operator_name', 'operator_license', 'operator_license_end',
 		'contractor_name', 'contractor_vat', 'machine', 'machine_check_end', 'machine_check_date', 'machine_cert_ref', 'water_volume', 'weather', 'application_method', 'late',
 		'target_type', 'plot_ref', 'location_ref', 'pcg_ref', 'zone_zvn', 'crop_eppo', 'crop_label', 'bbch', 'building_ref', 'seed_batch', 'treated_qty', 'treated_unit',
-		'product_type', 'product_ref', 'product_label', 'reg_number', 'fert_type', 'fert_group', 'n_content', 'p2o5_content', 'k2o_content', 'cu_content', 'efficiency', 'dry_matter',
+		'product_type', 'product_ref', 'product_label', 'reg_number', 'fert_type', 'fert_group', 'n_content', 'p2o5_content', 'k2o_content', 'cu_content', 'efficiency', 'dry_matter', 'density',
 		'adversity_eppo', 'adversity_label', 'dose', 'dose_unit', 'dose_unit_label', 'qty_total', 'qty_unit', 'qty_agea', 'qty_agea_unit', 'qty_agea_basis', 'n_applied', 'batch',
 		'content_hash',
 	);
@@ -341,6 +341,7 @@ class DoliTraceTreatmentExport
 				'cu_content' => isset($content['products'][$i]['cu_content']) ? $content['products'][$i]['cu_content'] : '',
 				'efficiency' => isset($content['products'][$i]['efficiency']) ? $content['products'][$i]['efficiency'] : '',
 				'dry_matter' => isset($content['products'][$i]['dry_matter']) ? $content['products'][$i]['dry_matter'] : '',
+				'density' => isset($content['products'][$i]['density']) ? $content['products'][$i]['density'] : '',
 				'adversity_eppo' => $content['products'][$i]['adversity_code'],
 				'adversity_label' => $content['products'][$i]['adversity_label'],
 				'dose' => $content['products'][$i]['dose'],
@@ -792,7 +793,7 @@ class DoliTraceTreatmentExport
 				$line['product_ref'] = isset($product['ref']) ? $product['ref'] : '';
 				$line['product_label'] = isset($product['label']) ? $product['label'] : '';
 				$line['n_applied'] = isset($product['n_applied_kg_ha']) ? $product['n_applied_kg_ha'] : '';
-				foreach (array('reg_number', 'fert_type', 'fert_group', 'n_content', 'p2o5_content', 'k2o_content', 'cu_content', 'efficiency', 'dry_matter', 'adversity_eppo', 'adversity_label', 'dose', 'dose_unit', 'dose_unit_label', 'qty_total', 'qty_unit', 'qty_agea', 'qty_agea_unit', 'qty_agea_basis', 'batch') as $key) {
+				foreach (array('reg_number', 'fert_type', 'fert_group', 'n_content', 'p2o5_content', 'k2o_content', 'cu_content', 'efficiency', 'dry_matter', 'density', 'adversity_eppo', 'adversity_label', 'dose', 'dose_unit', 'dose_unit_label', 'qty_total', 'qty_unit', 'qty_agea', 'qty_agea_unit', 'qty_agea_basis', 'batch') as $key) {
 					$line[$key] = isset($product[$key]) ? $product[$key] : '';
 				}
 				$ordered = array();

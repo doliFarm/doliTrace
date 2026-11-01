@@ -908,8 +908,14 @@ class DoliTraceTreatment extends CommonObject
 				$basisqty = $unit ? dolitraceTreatmentQtyInBasis($this, $unit->basis) : null;
 				$qty = ($basisqty !== null && $product->dose > 0) ? price2num($product->dose * $basisqty * $unit->factor, 'MS') : null;
 			}
-			if ($product->n_content > 0 && $qty > 0 && $hectares > 0 && in_array($product->qty_unit, array('kg', 't'))) {
-				$kg = $qty * ($product->qty_unit == 't' ? 1000 : 1);
+			// Mass of the product: liquids (l, m³) by their density
+			$kgfactors = array('kg' => 1, 't' => 1000);
+			if ($product->density > 0) {
+				$kgfactors['l'] = (float) $product->density;
+				$kgfactors['m3'] = 1000 * (float) $product->density;
+			}
+			if ($product->n_content > 0 && $qty > 0 && $hectares > 0 && isset($kgfactors[$product->qty_unit])) {
+				$kg = $qty * $kgfactors[$product->qty_unit];
 				$n_applied = price2num($kg * $product->n_content / 100 / $hectares, 'MS');
 			}
 			if ((string) $qty === (string) $product->qty_total && (string) $n_applied === (string) $product->n_applied) {
@@ -974,7 +980,7 @@ class DoliTraceTreatment extends CommonObject
 				}
 			}
 			if ($product->fk_fertilizer > 0) {
-				$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, label, registration_number, fk_product, n_content, p2o5_content, k2o_content, cu_content, efficiency, dry_matter FROM ".$this->db->prefix()."dolifarm_fertilizer WHERE rowid = ".((int) $product->fk_fertilizer));
+				$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, label, registration_number, fk_product, fk_fert_type, n_content, p2o5_content, k2o_content, cu_content, efficiency, dry_matter, density FROM ".$this->db->prefix()."dolifarm_fertilizer WHERE rowid = ".((int) $product->fk_fertilizer));
 				if (isset($rows[$product->fk_fertilizer])) {
 					$fertilizer = $rows[$product->fk_fertilizer];
 					$product->product_label = $fertilizer->label;
@@ -986,6 +992,8 @@ class DoliTraceTreatment extends CommonObject
 					$product->cu_content = $fertilizer->cu_content;
 					$product->efficiency = $fertilizer->efficiency;
 					$product->dry_matter = $fertilizer->dry_matter;
+					// Liquid livestock effluents without density: 1 kg/l, as the tables that give their nitrogen in kg/m³
+					$product->density = ($fertilizer->density > 0 ? $fertilizer->density : (in_array($fertilizer->fk_fert_type, self::$livestockFertTypes) ? 1 : null));
 				}
 			}
 			if ($product->fk_adversity > 0) {
@@ -1186,6 +1194,10 @@ class DoliTraceTreatment extends CommonObject
 				}
 				$safetydays = max($safetydays, (int) $agrodrug->safety_days_default);
 			}
+			// Liquid fertilizer with nitrogen but no density: the nitrogen applied is not computed
+			if ($product->fk_fertilizer > 0 && $product->n_content > 0 && in_array($product->qty_unit, array('l', 'm3')) && !($product->density > 0)) {
+				$warnings[] = $langs->transnoentities('WarningTreatmentNoDensity', $product->product_label);
+			}
 			if ($product->fk_fertilizer > 0 && $product->n_applied > 0) {
 				$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, fk_fert_type FROM ".$this->db->prefix()."dolifarm_fertilizer WHERE rowid = ".((int) $product->fk_fertilizer));
 				if (isset($rows[$product->fk_fertilizer]) && in_array($rows[$product->fk_fertilizer]->fk_fert_type, self::$livestockFertTypes)) {
@@ -1329,7 +1341,7 @@ class DoliTraceTreatment extends CommonObject
 				'batch' => (string) $product->batch,
 			);
 			// Data added for the AGEA field notebook: only when filled in, so the fingerprints of the older records do not change
-			foreach (array('cu_content', 'efficiency', 'dry_matter') as $key) {
+			foreach (array('cu_content', 'efficiency', 'dry_matter', 'density') as $key) {
 				if ($num($product->$key) !== '') {
 					$line[$key] = $num($product->$key);
 				}
@@ -2477,6 +2489,7 @@ class DoliTraceTreatmentProduct extends DoliTraceTreatmentRow
 		'cu_content' => array('type' => 'double(24,8)', 'label' => 'TreatmentCuContent', 'enabled' => 1, 'position' => 18, 'notnull' => 0, 'visible' => 0),
 		'efficiency' => array('type' => 'double(24,8)', 'label' => 'TreatmentEfficiency', 'enabled' => 1, 'position' => 18, 'notnull' => 0, 'visible' => 0),
 		'dry_matter' => array('type' => 'double(24,8)', 'label' => 'TreatmentDryMatter', 'enabled' => 1, 'position' => 18, 'notnull' => 0, 'visible' => 0),
+		'density' => array('type' => 'double(24,8)', 'label' => 'TreatmentDensity', 'enabled' => 1, 'position' => 19, 'notnull' => 0, 'visible' => 0),
 		'fk_adversity' => array('type' => 'integer', 'label' => 'TreatmentAdversity', 'enabled' => 1, 'position' => 20, 'notnull' => 0, 'visible' => 1),
 		'adversity_code' => array('type' => 'varchar(10)', 'label' => 'TreatmentAdversityCode', 'enabled' => 1, 'position' => 21, 'notnull' => 0, 'visible' => 1),
 		'adversity_label' => array('type' => 'varchar(255)', 'label' => 'TreatmentAdversity', 'enabled' => 1, 'position' => 22, 'notnull' => 0, 'visible' => 1),
@@ -2548,6 +2561,11 @@ class DoliTraceTreatmentProduct extends DoliTraceTreatmentRow
 	 * @var float|string|null
 	 */
 	public $dry_matter;
+
+	/**
+	 * @var float|string|null	Copy of the density of the fertilizer (kg/l)
+	 */
+	public $density;
 
 	/**
 	 * @var ?int

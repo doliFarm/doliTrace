@@ -21,3 +21,6 @@ ALTER TABLE llx_dolitrace_operation ADD COLUMN date_op_end datetime;
 ALTER TABLE llx_dolitrace_treatment_product ADD COLUMN cu_content double(24,8);
 ALTER TABLE llx_dolitrace_treatment_product ADD COLUMN efficiency double(24,8);
 ALTER TABLE llx_dolitrace_treatment_product ADD COLUMN dry_matter double(24,8);
+
+-- Density of the liquid fertilizers, for the nitrogen applied with quantities in l or m3
+ALTER TABLE llx_dolitrace_treatment_product ADD COLUMN density double(24,8);
