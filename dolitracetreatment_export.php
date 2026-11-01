@@ -121,7 +121,16 @@ if ($action == 'export' && in_array($format, array('json', 'csv', 'pdf'))) {
 					$operations = array();
 				}
 			}
-			$content = $export->toJson($records, $filters, $operations);
+			// Storage sites with the stock of the products at the start and at the end of the period
+			$storage = array();
+			if (isModEnabled('stock') && $user->hasRight('stock', 'lire')) {
+				$storage = $export->getStorage($user, $socid, $datefrom, $dateto);
+				if (!is_array($storage)) {
+					dol_syslog('Export of the storage sites: '.$export->error, LOG_ERR);
+					$storage = array();
+				}
+			}
+			$content = $export->toJson($records, $filters, $operations, $storage);
 			$mime = 'application/json';
 		} elseif ($format == 'csv') {
 			$content = $export->toCsv($records);

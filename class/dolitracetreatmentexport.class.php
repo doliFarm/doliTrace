@@ -320,7 +320,7 @@ class DoliTraceTreatmentExport
 	 * @param	array<string,string>	$filters	Filters of the export (farm, period)
 	 * @return	string							JSON
 	 */
-	public function toJson($records, $filters, $operations = array())
+	public function toJson($records, $filters, $operations = array(), $storage = array())
 	{
 		$data = array(
 			'format' => self::FORMAT,
@@ -331,6 +331,7 @@ class DoliTraceTreatmentExport
 			'records' => array(),
 			'crop_events' => array(),
 			'irrigations' => array(),
+			'storage' => $storage,
 		);
 		foreach ($records as $record) {
 			$data['records'][] = $this->getRecordData($record);
@@ -343,6 +344,165 @@ class DoliTraceTreatmentExport
 			}
 		}
 		return json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+	}
+
+	/**
+	 * Storage sites of the plant protection products and fertilizers (AGEA field notebook, sheet 9): warehouse of the
+	 * technical inputs of the farm dossiers, with the cadastral data of the building that keeps it, and the stock of each
+	 * product at the start and at the end of the period, computed from the current stock and the movements (read only)
+	 *
+	 * @param	User		$user		User
+	 * @param	int			$socid		Farm, 0 for all the farms of the user
+	 * @param	int|string	$datefrom	First day (timestamp), '' for no limit
+	 * @param	int|string	$dateto		Last day (timestamp), '' for today
+	 * @return	array<int,array<string,mixed>>|int	Storage sites, <0 if KO
+	 */
+	public function getStorage(User $user, $socid, $datefrom, $dateto)
+	{
+		if (!isModEnabled('stock')) {
+			return array();
+		}
+		$prefix = $this->db->prefix();
+		$sql = "SELECT DISTINCT e.rowid, e.ref, e.lieu, e.address, e.zip, e.town, d.fk_soc, s.nom as farm_name, s.idprof4 as farm_cuaa";
+		$sql .= " FROM ".$prefix."dolifarm_farmdossier as d";
+		$sql .= " INNER JOIN ".$prefix."entrepot as e ON e.rowid = d.fk_warehouse_inputs";
+		$sql .= " LEFT JOIN ".$prefix."societe as s ON s.rowid = d.fk_soc";
+		$sql .= " WHERE d.entity IN (".getEntity('dolifarmfarmdossier').")";
+		if ($socid > 0) {
+			$sql .= " AND d.fk_soc = ".((int) $socid);
+		}
+		$sql .= dolifarmSqlSocFilter($user, 'd.fk_soc');
+		$sql .= " ORDER BY d.fk_soc, e.ref";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+		$sites = array();
+		while ($obj = $this->db->fetch_object($resql)) {
+			if (isset($sites[$obj->rowid])) {
+				continue;
+			}
+			$sites[$obj->rowid] = $obj;
+		}
+		$this->db->free($resql);
+
+		// Products of the register: plant protection products and fertilizers linked to a product of the stock
+		$products = array();
+		$sql = "SELECT 'plant_protection_product' as type, a.ref, a.label, a.reg_number, a.fk_product FROM ".$prefix."dolifarm_agrodrug as a";
+		$sql .= " WHERE a.fk_product > 0 AND a.entity IN (".getEntity('dolifarmagrodrug').")";
+		$sql .= " UNION ALL SELECT 'fertilizer' as type, f.ref, f.label, f.registration_number as reg_number, f.fk_product FROM ".$prefix."dolifarm_fertilizer as f";
+		$sql .= " WHERE f.fk_product > 0 AND f.entity IN (".getEntity('dolifarmfertilizer').")";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+		while ($obj = $this->db->fetch_object($resql)) {
+			if (!isset($products[$obj->fk_product])) {
+				$products[$obj->fk_product] = $obj;
+			}
+		}
+		$this->db->free($resql);
+
+		// Units of the products: quantities in kg, litres or units as in the AGEA list
+		$units = array(
+			'T' => array('kg', 1000), 'KG' => array('kg', 1), 'G' => array('kg', 0.001), 'MG' => array('kg', 0.000001),
+			'M3' => array('l', 1000), 'DM3' => array('l', 1), 'L' => array('l', 1), 'CM3' => array('l', 0.001),
+			'P' => array('unit', 1), 'SET' => array('unit', 1),
+		);
+		$productunits = array();
+		if (count($products)) {
+			$sql = "SELECT p.rowid, u.code FROM ".$prefix."product as p LEFT JOIN ".$prefix."c_units as u ON u.rowid = p.fk_unit";
+			$sql .= " WHERE p.rowid IN (".$this->db->sanitize(implode(',', array_map('intval', array_keys($products)))).")";
+			$resql = $this->db->query($sql);
+			if ($resql) {
+				while ($obj = $this->db->fetch_object($resql)) {
+					$productunits[$obj->rowid] = (string) $obj->code;
+				}
+				$this->db->free($resql);
+			}
+		}
+
+		$start = ($datefrom !== '' && $datefrom !== null) ? (int) $datefrom : null;
+		$end = ($dateto !== '' && $dateto !== null) ? (int) $dateto : dol_now();
+		$storage = array();
+		foreach ($sites as $site) {
+			$building = null;
+			$sql = "SELECT ref, cadastral_comune, cadastral_section, cadastral_sheet, cadastral_parcel, cadastral_sub FROM ".$prefix."dolifarm_building";
+			$sql .= " WHERE fk_warehouse = ".((int) $site->rowid)." AND entity IN (".getEntity('dolifarmbuilding').") ORDER BY rowid";
+			$resql = $this->db->query($sql);
+			if ($resql) {
+				$building = $this->db->fetch_object($resql);
+				$this->db->free($resql);
+			}
+
+			// Stock now and movements after the start and after the end of the period
+			$stock = array();
+			$sql = "SELECT fk_product, reel FROM ".$prefix."product_stock WHERE fk_entrepot = ".((int) $site->rowid);
+			$resql = $this->db->query($sql);
+			if ($resql) {
+				while ($obj = $this->db->fetch_object($resql)) {
+					$stock[$obj->fk_product] = array('now' => (float) $obj->reel, 'after_start' => 0.0, 'after_end' => 0.0);
+				}
+				$this->db->free($resql);
+			}
+			$sql = "SELECT fk_product,";
+			$sql .= " SUM(CASE WHEN ".($start !== null ? "datem >= '".$this->db->idate($start)."'" : "1 = 0")." THEN value ELSE 0 END) as after_start,";
+			$sql .= " SUM(CASE WHEN datem > '".$this->db->idate($end)."' THEN value ELSE 0 END) as after_end";
+			$sql .= " FROM ".$prefix."stock_mouvement WHERE fk_entrepot = ".((int) $site->rowid)." GROUP BY fk_product";
+			$resql = $this->db->query($sql);
+			if ($resql) {
+				while ($obj = $this->db->fetch_object($resql)) {
+					if (!isset($stock[$obj->fk_product])) {
+						$stock[$obj->fk_product] = array('now' => 0.0, 'after_start' => 0.0, 'after_end' => 0.0);
+					}
+					$stock[$obj->fk_product]['after_start'] = (float) $obj->after_start;
+					$stock[$obj->fk_product]['after_end'] = (float) $obj->after_end;
+				}
+				$this->db->free($resql);
+			}
+
+			$lines = array();
+			foreach ($stock as $fk_product => $values) {
+				if (!isset($products[$fk_product])) {
+					continue;
+				}
+				$product = $products[$fk_product];
+				$code = isset($productunits[$fk_product]) ? $productunits[$fk_product] : '';
+				$unit = isset($units[$code]) ? $units[$code] : array('', 1);
+				$qtystart = ($start !== null ? $values['now'] - $values['after_start'] : null);
+				$qtyend = $values['now'] - $values['after_end'];
+				$lines[] = array(
+					'type' => $product->type,
+					'ref' => (string) $product->ref,
+					'label' => (string) $product->label,
+					'reg_number' => (string) $product->reg_number,
+					'date_start' => $start !== null ? dol_print_date($start, '%Y-%m-%d') : '',
+					'qty_start' => $qtystart !== null ? (float) price2num($qtystart * $unit[1], 'MS') : null,
+					'date_end' => dol_print_date($end, '%Y-%m-%d'),
+					'qty_end' => (float) price2num($qtyend * $unit[1], 'MS'),
+					'unit' => $unit[0],
+					'stock_unit' => $code,
+				);
+			}
+			$storage[] = array(
+				'warehouse_ref' => (string) $site->ref,
+				'warehouse_label' => (string) $site->lieu,
+				'farm' => array('name' => (string) $site->farm_name, 'cuaa' => (string) $site->farm_cuaa),
+				'address' => (string) $site->address,
+				'zip' => (string) $site->zip,
+				'town' => (string) $site->town,
+				'building_ref' => $building ? (string) $building->ref : '',
+				'cadastral_comune' => $building ? (string) $building->cadastral_comune : '',
+				'cadastral_section' => $building ? (string) $building->cadastral_section : '',
+				'cadastral_sheet' => $building ? (string) $building->cadastral_sheet : '',
+				'cadastral_parcel' => $building ? (string) $building->cadastral_parcel : '',
+				'cadastral_sub' => $building ? (string) $building->cadastral_sub : '',
+				'products' => $lines,
+			);
+		}
+		return $storage;
 	}
 
 	/**
