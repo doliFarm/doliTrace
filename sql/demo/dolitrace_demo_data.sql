@@ -65,23 +65,11 @@ VALUES (@id_plan, '2026-05-10 09:00:00', 'SCOUTING', 'Ispezione visiva Fusariosi
 -- 6. Inserimento Harvest
 SET @ref_harvest = 'HARV-2026-001';
 
-INSERT IGNORE INTO llx_dolitrace_harvest 
+-- No unique key on the ref: insert only when the harvest is not there (the file can be imported twice)
+INSERT INTO llx_dolitrace_harvest
 (ref, uuid, label, fk_cropplan, date_harvest, fk_product_out, qty_harvested, qty_unit, batch_number, cost_energy, cost_manpower, status)
-VALUES 
-(
-    @ref_harvest, 
-    UUID(), 
-    'Trebbiatura Lotto A', 
-    @id_plan, 
-    '2026-06-28', 
-    NULL, 
-    3850.00, 
-    'kg', 
-    'BATCH-26-WHEAT-A', 
-    400.00, 
-    100.00, 
-    1
-);
+SELECT @ref_harvest, UUID(), 'Trebbiatura Lotto A', @id_plan, '2026-06-28', NULL, 3850.00, 'kg', 'BATCH-26-WHEAT-A', 400.00, 100.00, 1
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM (SELECT rowid FROM llx_dolitrace_harvest WHERE ref = @ref_harvest) as existing);
 
 -- 7. Update finali
 UPDATE llx_dolitrace_cropplan 
