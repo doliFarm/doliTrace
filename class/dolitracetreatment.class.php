@@ -1394,11 +1394,17 @@ class DoliTraceTreatment extends CommonObject
 			}
 		}
 		$adversity = strtoupper(trim((string) $product->adversity_code));
+		// A use for a group of the EPPO taxonomy (Citrus, Bacteria...) covers the species of the group
+		$hastaxonomy = dol_include_once('/dolifarm/lib/dolifarm_eppo.lib.php') && function_exists('dolifarmEppoCovers');
+		$covers = function ($usecode, $code) use ($hastaxonomy) {
+			$usecode = strtoupper((string) $usecode);
+			return $usecode === $code || ($hastaxonomy && dolifarmEppoCovers($this->db, $usecode, $code));
+		};
 		$days = 0;
 		foreach ($crops as $code => $croplabel) {
 			$oncrop = array();
 			foreach ($uses as $use) {
-				if (strtoupper((string) $use->crop_eppo) === $code) {
+				if ($covers($use->crop_eppo, $code)) {
 					$oncrop[] = $use;
 				}
 			}
@@ -1408,7 +1414,7 @@ class DoliTraceTreatment extends CommonObject
 			}
 			$matching = array();
 			foreach ($oncrop as $use) {
-				if ($adversity === '' || (string) $use->adversity_code === '' || strtoupper((string) $use->adversity_code) === $adversity) {
+				if ($adversity === '' || (string) $use->adversity_code === '' || $covers($use->adversity_code, $adversity)) {
 					$matching[] = $use;
 				}
 			}
@@ -1535,8 +1541,15 @@ class DoliTraceTreatment extends CommonObject
 			// Maximum of applications of the label, this record included
 			foreach ($agrodrugs as $agrodrug) {
 				$count = 1 + (isset($usedproducts[(int) $agrodrug->rowid]) ? count($usedproducts[(int) $agrodrug->rowid]) : 0);
-				$key = (int) $agrodrug->rowid.'_'.$cropeppo[$cropplanid];
-				$max = (isset($cropmax[$key]) ? $cropmax[$key] : (int) $agrodrug->max_applications);
+				// Use of the crop, else of the nearest group of the EPPO taxonomy that has one, else the card of the product
+				$max = (int) $agrodrug->max_applications;
+				$codes = (dol_include_once('/dolifarm/lib/dolifarm_eppo.lib.php') && function_exists('dolifarmEppoAncestors') ? dolifarmEppoAncestors($this->db, $cropeppo[$cropplanid]) : array($cropeppo[$cropplanid]));
+				foreach ($codes as $code) {
+					if (isset($cropmax[(int) $agrodrug->rowid.'_'.$code])) {
+						$max = $cropmax[(int) $agrodrug->rowid.'_'.$code];
+						break;
+					}
+				}
 				if ($max > 0 && $count > $max) {
 					$warnings[] = $langs->transnoentities('WarningTreatmentMaxApplications', $agrodrug->label, $location, $count, $max);
 				}
