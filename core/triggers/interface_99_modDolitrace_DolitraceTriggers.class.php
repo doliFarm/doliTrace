@@ -516,13 +516,24 @@ class InterfaceDolitraceTriggers extends DolibarrTriggers
 				return 0;
 			}
 
-			// Production warehouse saved at the activation of the module
+			// Warehouse of the harvested products of the farm dossier of the crop plan,
+			// otherwise the production warehouse saved at the activation of the module
 			$warehouse_id = 0;
-			$sql = "SELECT rowid FROM ".$this->db->prefix()."entrepot";
-			$sql .= " WHERE rowid = ".getDolGlobalInt('DOLITRACE_WAREHOUSE_PROD')." AND entity IN (".getEntity('stock').")";
-			$resql = $this->db->query($sql);
-			if ($resql && ($obj = $this->db->fetch_object($resql))) {
-				$warehouse_id = (int) $obj->rowid;
+			if ($object->fk_cropplan > 0) {
+				dol_include_once('/dolifarm/lib/dolifarm_warehouse.lib.php');
+				$sql = "SELECT fk_soc FROM ".$this->db->prefix()."dolitrace_cropplan WHERE rowid = ".((int) $object->fk_cropplan);
+				$resql = $this->db->query($sql);
+				if ($resql && ($obj = $this->db->fetch_object($resql)) && $obj->fk_soc > 0 && function_exists('dolifarmGetFarmWarehouse')) {
+					$warehouse_id = dolifarmGetFarmWarehouse($this->db, (int) $obj->fk_soc, 'products');
+				}
+			}
+			if (!$warehouse_id) {
+				$sql = "SELECT rowid FROM ".$this->db->prefix()."entrepot";
+				$sql .= " WHERE rowid = ".getDolGlobalInt('DOLITRACE_WAREHOUSE_PROD')." AND entity IN (".getEntity('stock').")";
+				$resql = $this->db->query($sql);
+				if ($resql && ($obj = $this->db->fetch_object($resql))) {
+					$warehouse_id = (int) $obj->rowid;
+				}
 			}
 			if (!$warehouse_id) {
 				$this->error = $langs->trans('ErrorDolitraceNoProductionWarehouse');
