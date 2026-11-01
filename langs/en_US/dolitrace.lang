@@ -344,3 +344,6 @@ Qtyused = Quantity
 Watervolha = Qty/ha
 Fkuseroperator = Operator
 Lastmaindoc = Last document
+WarningTreatmentUseCrop = %s: the crop %s is not among the authorised uses of the product
+WarningTreatmentUseAdversity = %s: the pest %s is not among the authorised uses of the product on %s
+WarningTreatmentUseDose = %s on %s: the dose %s is outside the range of the label (%s)

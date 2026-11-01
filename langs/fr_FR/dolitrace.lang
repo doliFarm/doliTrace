@@ -320,3 +320,6 @@ Qtyused = Quantité
 Watervolha = Qté/ha
 Fkuseroperator = Opérateur
 Lastmaindoc = Dernier document
+WarningTreatmentUseCrop = %s : la culture %s ne figure pas parmi les usages autorisés du produit
+WarningTreatmentUseAdversity = %s : le ravageur ou la maladie %s ne figure pas parmi les usages autorisés du produit sur %s
+WarningTreatmentUseDose = %s sur %s : la dose %s est en dehors de l'intervalle de l'étiquette (%s)

@@ -1192,7 +1192,9 @@ class DoliTraceTreatment extends CommonObject
 						$warnings[] = $langs->transnoentities('WarningTreatmentDoseAboveMax', $product->product_label, price(price2num($doseha, 'MS')).' '.$unit.'/ha', price(price2num($agrodrug->max_dose_ha, 'MS')).' '.$unit.'/ha');
 					}
 				}
-				$safetydays = max($safetydays, (int) $agrodrug->safety_days_default);
+				// Authorised uses of the label: crop, pest, dose and pre-harvest interval of the crop
+				$usedays = $this->getUseWarnings($product, $warnings);
+				$safetydays = max($safetydays, $usedays > 0 ? $usedays : (int) $agrodrug->safety_days_default);
 			}
 			// Liquid fertilizer with nitrogen but no density: the nitrogen applied is not computed
 			if ($product->fk_fertilizer > 0 && $product->n_content > 0 && in_array($product->qty_unit, array('l', 'm3')) && !($product->density > 0)) {
@@ -1260,10 +1262,111 @@ class DoliTraceTreatment extends CommonObject
 	}
 
 	/**
+	 * Warnings on the authorised uses (impieghi) of a plant protection product, typed on its card in doliFarm
+	 *
+	 * Without uses on the card nothing is checked. Otherwise, for each crop (EPPO code) of the areas of the record:
+	 * - the crop must have a use;
+	 * - the pest of the line, when given, must have a use on the crop (a use without pest covers every pest);
+	 * - the dose of the line must be inside the range of one of these uses. The doses are compared only when the units
+	 *   have the same basis and the same unit of quantity (for example g/hl and kg/hl).
+	 *
+	 * @param	DoliTraceTreatmentProduct	$product	Line of the product
+	 * @param	string[]					$warnings	Warnings, completed
+	 * @return	int									Longest pre-harvest interval of the uses that apply, 0 when none is given
+	 */
+	public function getUseWarnings($product, &$warnings)
+	{
+		global $langs;
+
+		if (!($product->fk_agrodrug > 0) || !dol_include_once('/dolifarm/class/dolifarmagrodruguse.class.php')) {
+			return 0;
+		}
+		$langs->loadLangs(array('dolitrace@dolitrace', 'dolifarm@dolifarm'));
+		$uses = DoliFarmAgroDrugUse::fetchAllForAgroDrug($this->db, (int) $product->fk_agrodrug);
+		if (empty($uses)) {
+			return 0;
+		}
+		$crops = array();
+		foreach ($this->targets as $target) {
+			$code = strtoupper(trim((string) $target->crop_eppo));
+			if ($code !== '' && !isset($crops[$code])) {
+				$crops[$code] = ((string) $target->crop_label !== '' ? (string) $target->crop_label : $code);
+			}
+		}
+		if (empty($crops)) {
+			return 0;
+		}
+
+		// Units of the doses: the one of the line and those of the uses
+		$units = array();
+		$lineunit = null;
+		foreach (dolitraceTreatmentFetchRows($this->db, "SELECT rowid, code, label, basis, qty_unit, factor FROM ".$this->db->prefix()."dolitrace_c_dose_unit") as $unit) {
+			$units[(string) $unit->code] = $unit;
+			if ((int) $unit->rowid == (int) $product->fk_dose_unit) {
+				$lineunit = $unit;
+			}
+		}
+		$adversity = strtoupper(trim((string) $product->adversity_code));
+		$days = 0;
+		foreach ($crops as $code => $croplabel) {
+			$oncrop = array();
+			foreach ($uses as $use) {
+				if (strtoupper((string) $use->crop_eppo) === $code) {
+					$oncrop[] = $use;
+				}
+			}
+			if (empty($oncrop)) {
+				$warnings[] = $langs->transnoentities('WarningTreatmentUseCrop', $product->product_label, $croplabel);
+				continue;
+			}
+			$matching = array();
+			foreach ($oncrop as $use) {
+				if ($adversity === '' || (string) $use->adversity_code === '' || strtoupper((string) $use->adversity_code) === $adversity) {
+					$matching[] = $use;
+				}
+			}
+			if (empty($matching)) {
+				$warnings[] = $langs->transnoentities('WarningTreatmentUseAdversity', $product->product_label, $adversity, $croplabel);
+				continue;
+			}
+			foreach ($matching as $use) {
+				$days = max($days, (int) $use->safety_days);
+			}
+
+			// Dose: inside the range of at least one use, among those with a comparable unit
+			if (!($product->dose > 0) || empty($lineunit)) {
+				continue;
+			}
+			$dose = (float) $product->dose * (float) $lineunit->factor;
+			$compared = false;
+			$inside = false;
+			$ranges = array();
+			foreach ($matching as $use) {
+				$useunit = isset($units[(string) $use->dose_unit]) ? $units[(string) $use->dose_unit] : null;
+				if (($use->dose_min === null && $use->dose_max === null) || !$useunit || $useunit->basis != $lineunit->basis || $useunit->qty_unit != $lineunit->qty_unit) {
+					continue;
+				}
+				$compared = true;
+				$min = ($use->dose_min !== null ? (float) $use->dose_min * (float) $useunit->factor : null);
+				$max = ($use->dose_max !== null ? (float) $use->dose_max * (float) $useunit->factor : null);
+				if (($min === null || $dose >= $min * 0.9999) && ($max === null || $dose <= $max * 1.0001)) {
+					$inside = true;
+					break;
+				}
+				$ranges[] = ($use->dose_min !== null ? price(price2num($use->dose_min, 'MS')) : '').' - '.($use->dose_max !== null ? price(price2num($use->dose_max, 'MS')) : '').' '.$useunit->label;
+			}
+			if ($compared && !$inside) {
+				$warnings[] = $langs->transnoentities('WarningTreatmentUseDose', $product->product_label, $croplabel, price(price2num($product->dose, 'MS')).' '.$lineunit->label, implode('; ', array_unique($ranges)));
+			}
+		}
+		return $days;
+	}
+
+	/**
 	 * Warnings of resistance management on each crop plan of the record, compared with the other validated records
 	 * of plant protection on the same crop plan
 	 *
-	 * - more applications of a product than the maximum of its label (field of the plant protection product);
+	 * - more applications of a product than the maximum of its label (authorised use of the crop, otherwise field of the product);
 	 * - the same group of the mode of action (FRAC, IRAC, HRAC) in more applications in a row than the setup allows
 	 *   (DOLITRACE_MOA_MAX_CONSECUTIVE, default 2, 0 = no check). Multi-site fungicides and groups not classified are left out.
 	 *
@@ -1284,9 +1387,11 @@ class DoliTraceTreatment extends CommonObject
 			}
 		}
 		$cropplans = array();
+		$cropeppo = array();
 		foreach ($this->targets as $target) {
 			if ($target->fk_cropplan > 0 && !isset($cropplans[(int) $target->fk_cropplan])) {
 				$cropplans[(int) $target->fk_cropplan] = (string) $target->location_ref;
+				$cropeppo[(int) $target->fk_cropplan] = strtoupper(trim((string) $target->crop_eppo));
 			}
 		}
 		if (empty($agrodrugids) || empty($cropplans) || empty($this->date_start)) {
@@ -1304,6 +1409,18 @@ class DoliTraceTreatment extends CommonObject
 			}
 		}
 		$maxconsecutive = getDolGlobalInt('DOLITRACE_MOA_MAX_CONSECUTIVE', 2);
+		// Maximum of applications on each crop from the authorised uses of the label (the largest of the uses of the crop)
+		$cropmax = array();
+		if (dol_include_once('/dolifarm/class/dolifarmagrodruguse.class.php')) {
+			foreach ($agrodrugs as $agrodrug) {
+				foreach (DoliFarmAgroDrugUse::fetchAllForAgroDrug($this->db, (int) $agrodrug->rowid) as $use) {
+					if ($use->max_applications > 0) {
+						$key = (int) $agrodrug->rowid.'_'.strtoupper((string) $use->crop_eppo);
+						$cropmax[$key] = max(isset($cropmax[$key]) ? $cropmax[$key] : 0, (int) $use->max_applications);
+					}
+				}
+			}
+		}
 
 		foreach ($cropplans as $cropplanid => $location) {
 			// Other validated records of plant protection on the crop plan (the version replaced by this draft left out)
@@ -1331,8 +1448,10 @@ class DoliTraceTreatment extends CommonObject
 			// Maximum of applications of the label, this record included
 			foreach ($agrodrugs as $agrodrug) {
 				$count = 1 + (isset($usedproducts[(int) $agrodrug->rowid]) ? count($usedproducts[(int) $agrodrug->rowid]) : 0);
-				if ($agrodrug->max_applications > 0 && $count > (int) $agrodrug->max_applications) {
-					$warnings[] = $langs->transnoentities('WarningTreatmentMaxApplications', $agrodrug->label, $location, $count, (int) $agrodrug->max_applications);
+				$key = (int) $agrodrug->rowid.'_'.$cropeppo[$cropplanid];
+				$max = (isset($cropmax[$key]) ? $cropmax[$key] : (int) $agrodrug->max_applications);
+				if ($max > 0 && $count > $max) {
+					$warnings[] = $langs->transnoentities('WarningTreatmentMaxApplications', $agrodrug->label, $location, $count, $max);
 				}
 			}
 

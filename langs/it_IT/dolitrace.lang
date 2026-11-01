@@ -355,3 +355,6 @@ TreatmentApplicationMethodHelp = Come è stato applicato o distribuito il prodot
 TreatmentMachineCheckDate = Ultimo controllo irroratrice
 TreatmentMachineCertRef = Certificato controllo irroratrice
 ErrorTreatmentApplicationMethodKind = La modalità di applicazione non è dello stesso tipo della registrazione (difesa o fertilizzazione)
+WarningTreatmentUseCrop = %s: la coltura %s non è tra gli impieghi autorizzati del prodotto
+WarningTreatmentUseAdversity = %s: l'avversità %s non è tra gli impieghi autorizzati del prodotto su %s
+WarningTreatmentUseDose = %s su %s: la dose %s è fuori dall'intervallo dell'etichetta (%s)
