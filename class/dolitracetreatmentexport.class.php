@@ -374,15 +374,30 @@ class DoliTraceTreatmentExport
 		if (empty($byfarm)) {
 			$byfarm[0] = array();
 		}
-		$period = trim(($filters['date_from'] ?? '').' - '.($filters['date_to'] ?? ''), ' -');
+		// The PDF is read by people: dates and numbers in the format of the language, units in lower case
+		$day = function ($iso) use ($outputlangs) {
+			$parts = explode('-', (string) $iso);
+			return count($parts) == 3 ? dol_print_date(dol_mktime(12, 0, 0, (int) $parts[1], (int) $parts[2], (int) $parts[0]), 'day', false, $outputlangs) : '';
+		};
+		$number = function ($value) use ($outputlangs) {
+			return ($value === '' || $value === null) ? '' : price((float) $value, 0, $outputlangs, 0, 0, -1);
+		};
+		$unitlabels = array('HA' => 'ha', 'M2' => 'm²', 'M3' => 'm³', 'KG' => 'kg', 'T' => 't');
+		$period = trim($day($filters['date_from'] ?? '').' - '.$day($filters['date_to'] ?? ''), ' -');
 
 		foreach ($byfarm as $records) {
 			$pdf->AddPage();
 			$first = count($records) ? $this->getRecordData($records[0]) : null;
+			$farm = $first ? $first['farm'] : null;
+			if (!$farm && !empty($filters['farm_id']) && (int) $filters['farm_id'] > 0) {
+				// No record in the period: the header still says which farm
+				$soc = $this->lookup('societe', (int) $filters['farm_id'], 'nom, idprof4');
+				$farm = $soc ? array('name' => $soc->nom, 'cuaa' => (string) $soc->idprof4) : null;
+			}
 			$html = '<h3>'.dol_escape_htmltag($outputlangs->transnoentities('TreatmentRegister')).'</h3>';
 			$html .= '<p>';
-			if ($first) {
-				$html .= '<b>'.dol_escape_htmltag($first['farm']['name']).'</b>'.($first['farm']['cuaa'] ? ' - CUAA '.dol_escape_htmltag($first['farm']['cuaa']) : '').'<br>';
+			if ($farm) {
+				$html .= '<b>'.dol_escape_htmltag($farm['name']).'</b>'.($farm['cuaa'] ? ' - CUAA '.dol_escape_htmltag($farm['cuaa']) : '').'<br>';
 			}
 			$html .= ($period ? dol_escape_htmltag($outputlangs->transnoentities('Period').': '.$period).' - ' : '');
 			$html .= dol_escape_htmltag($outputlangs->transnoentities('TreatmentPdfGenerated', dol_print_date(dol_now(), 'dayhour', 'tzuser', $outputlangs))).'</p>';
@@ -425,13 +440,13 @@ class DoliTraceTreatmentExport
 						}
 						$cells = array(
 							$data['ref'].($data['version'] > 1 ? ' (v'.$data['version'].')' : ''),
-							$data['date_start'],
+							dol_print_date($record->date_start, 'dayhour', 'tzuser', $outputlangs),
 							$area,
-							!empty($target) ? $target['treated_qty'].' '.$target['treated_unit'] : '',
+							!empty($target) ? $number($target['treated_qty']).' '.($unitlabels[$target['treated_unit']] ?? $target['treated_unit']) : '',
 							!empty($product) ? $product['label'].($product['reg_number'] ? ' - '.$product['reg_number'] : '').($product['batch'] ? ' - '.$outputlangs->transnoentities('Batch').' '.$product['batch'] : '') : '',
-							!empty($product) ? ($product['adversity_label'] ? $product['adversity_label'].' ('.$product['adversity_eppo'].')' : ($product['n_content'] !== '' ? 'N-P-K '.$product['n_content'].'-'.$product['p2o5_content'].'-'.$product['k2o_content'] : '')) : '',
-							!empty($product) ? $product['dose'].' '.$product['dose_unit_label'] : '',
-							!empty($product) && $product['qty_total'] !== '' ? $product['qty_total'].' '.$product['qty_unit'] : '',
+							!empty($product) ? ($product['adversity_label'] ? $product['adversity_label'].' ('.$product['adversity_eppo'].')' : ($product['n_content'] !== '' ? 'N-P-K '.$number((float) $product['n_content']).'-'.$number((float) $product['p2o5_content']).'-'.$number((float) $product['k2o_content']) : '')) : '',
+							!empty($product) ? $number($product['dose']).' '.$product['dose_unit_label'] : '',
+							!empty($product) && $product['qty_total'] !== '' ? $number($product['qty_total']).' '.$product['qty_unit'] : '',
 							$data['operator']['name'].($data['operator']['license'] ? ' - '.$data['operator']['license'] : '').($data['contractor'] ? ' / '.$data['contractor']['name'] : ''),
 							$statuslabel,
 						);

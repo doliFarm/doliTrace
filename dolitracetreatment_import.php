@@ -175,7 +175,7 @@ if (count($import->results)) {
 		print '<td>'.((int) $result['line']).'</td>';
 		print '<td class="nowraponall">';
 		if (!$ok) {
-			print dolGetBadge($langs->trans('Error'), '', 'danger');
+			print dolGetBadge($langs->trans('TreatmentImportRejected'), '', 'danger');
 		} elseif ($checked) {
 			print dolGetBadge($langs->trans('TreatmentImportReady'), '', 'info');
 		} else {

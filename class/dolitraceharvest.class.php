@@ -134,15 +134,15 @@ class DoliTraceHarvest extends CommonObject
         "uuid" => array("type" => "varchar(36)", "label" => "Uuid", "enabled" => "1", 'position' => 20, 'notnull' => 0, "visible" => "-1",),
         "label" => array("type" => "varchar(255)", "label" => "Label", "enabled" => "1", 'position' => 25, 'notnull' => 0, "visible" => "1", "alwayseditable" => "1", "css" => "minwidth300", "cssview" => "wordbreak", "csslist" => "tdoverflowmax150",),
         
-        "fk_cropplan" => array("type" => "integer:DoliTraceCropplan:custom/dolitrace/class/dolitracecropplan.class.php", "label" => "Fkcropplan", "enabled" => "1", 'position' => 30, 'notnull' => 1, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
+        "fk_cropplan" => array("type" => "integer:DoliTraceCropplan:custom/dolitrace/class/dolitracecropplan.class.php", "label" => "HarvestCropPlan", "enabled" => "1", 'position' => 30, 'notnull' => 1, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
         
-        "date_harvest" => array("type" => "date", "label" => "Dateharvest", "enabled" => "1", 'position' => 35, 'notnull' => 1, "visible" => "-1",),
+        "date_harvest" => array("type" => "date", "label" => "HarvestDate", "enabled" => "1", 'position' => 35, 'notnull' => 1, "visible" => "-1",),
         
-        "fk_product_out" => array("type" => "integer:Product:product/class/product.class.php:1", "label" => "Fkproductout", "picto" => "product", "enabled" => "1", 'position' => 40, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx", "csslist" => "tdoverflowmax150",),
+        "fk_product_out" => array("type" => "integer:Product:product/class/product.class.php:1", "label" => "HarvestProduct", "picto" => "product", "enabled" => "1", 'position' => 40, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx", "csslist" => "tdoverflowmax150",),
         
-        "qty_harvested" => array("type" => "double(24,8)", "label" => "Qtyharvested", "enabled" => "1", 'position' => 45, 'notnull' => 0, "visible" => "-1",),
-        "qty_unit" => array("type" => "varchar(30)", "label" => "Qtyunit", "enabled" => "1", 'position' => 50, 'notnull' => 0, "visible" => "-1",),
-        "batch_number" => array("type" => "varchar(128)", "label" => "Batchnumber", "enabled" => "1", 'position' => 55, 'notnull' => 0, "visible" => "-1",),
+        "qty_harvested" => array("type" => "double(24,8)", "label" => "HarvestQty", "enabled" => "1", 'position' => 45, 'notnull' => 0, "visible" => "-1",),
+        "qty_unit" => array("type" => "varchar(30)", "label" => "HarvestUnit", "enabled" => "1", 'position' => 50, 'notnull' => 0, "visible" => "-1",),
+        "batch_number" => array("type" => "varchar(128)", "label" => "HarvestBatch", "enabled" => "1", 'position' => 55, 'notnull' => 0, "visible" => "-1",),
         
         "cost_material" => array("type" => "double(24,8)", "label" => "Costmaterial", "enabled" => "1", 'position' => 60, 'notnull' => 0, "visible" => "-1",),
         "cost_manpower" => array("type" => "double(24,8)", "label" => "Costmanpower", "enabled" => "1", 'position' => 65, 'notnull' => 0, "visible" => "-1",),

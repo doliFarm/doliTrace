@@ -66,6 +66,11 @@ class DoliTraceTreatmentImport
 	public $import_key = '';
 
 	/**
+	 * @var array<string,string>	Areas of the records created in this run (kind, start and area => record of the file)
+	 */
+	private $imported = array();
+
+	/**
 	 * Constructor
 	 *
 	 * @param	DoliDB	$db		Database handler
@@ -168,6 +173,7 @@ class DoliTraceTreatmentImport
 
 		$langs->loadLangs(array('dolitrace@dolitrace', 'dolifarm@dolifarm'));
 		$this->results = array();
+		$this->imported = array();
 		$this->import_key = dol_print_date(dol_now(), '%Y%m%d%H%M%S');
 		$farm = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, nom, idprof4 FROM ".$this->db->prefix()."societe WHERE rowid = ".((int) $socid)." AND entity IN (".getEntity('societe').")");
 		if (!isset($farm[$socid])) {
@@ -262,16 +268,6 @@ class DoliTraceTreatmentImport
 			$object->water_volume = null;
 		}
 
-		// Same farm, kind and start: the record is already in the register (the file was already imported)
-		$sql = "SELECT rowid, ref FROM ".$this->db->prefix()."dolitrace_treatment";
-		$sql .= " WHERE entity IN (".getEntity('dolitracetreatment').") AND fk_soc = ".((int) $object->fk_soc)." AND kind = ".((int) $object->kind);
-		$sql .= " AND date_start = '".$this->db->idate($object->date_start)."' AND status IN (0, 1)";
-		$existing = dolitraceTreatmentFetchRows($this->db, $sql);
-		if (count($existing)) {
-			$result['errors'][] = $langs->transnoentities('ErrorTreatmentImportExists', reset($existing)->ref);
-			return null;
-		}
-
 		// Operator, machine and contractor: if not found the draft is created without them and the user completes it
 		if ($value($head, 'operator_license') !== '' || $value($head, 'operator_name') !== '') {
 			$sql = "SELECT rowid, label FROM ".$this->db->prefix()."dolifarm_operator WHERE entity IN (".getEntity('dolifarmoperator').") AND fk_soc = ".((int) $object->fk_soc);
@@ -354,6 +350,10 @@ class DoliTraceTreatmentImport
 		if (count($result['errors'])) {
 			return null;
 		}
+		$areakeys = $this->checkDuplicate($object, $targetrows, $result);
+		if (count($result['errors'])) {
+			return null;
+		}
 
 		$object->import_key = $this->import_key;
 		if ($object->create($user) < 0) {
@@ -372,7 +372,59 @@ class DoliTraceTreatmentImport
 			$result['errors'][] = $object->error ? $object->error : implode(', ', $object->errors);
 			return null;
 		}
+		foreach ($areakeys as $areakey) {
+			$this->imported[$areakey] = $result['record'];
+		}
 		return $object;
+	}
+
+	/**
+	 * Check that the record is not already in the register or twice in the file: same farm, kind and start on a same area
+	 *
+	 * Records with the same start on other areas are different treatments (e.g. a date without time).
+	 *
+	 * @param	DoliTraceTreatment			$object		Record to create
+	 * @param	DoliTraceTreatmentTarget[]	$targetrows	Areas of the record
+	 * @param	array<string,mixed>			$result		Result, errors are added
+	 * @return	string[]							Keys of the areas, to find the duplicates in the rest of the file
+	 */
+	private function checkDuplicate($object, $targetrows, &$result)
+	{
+		global $langs;
+
+		$areakeys = array();
+		$where = array();
+		foreach ($targetrows as $target) {
+			if (!empty($target->fk_cropplan)) {
+				$area = 'cropplan:'.((int) $target->fk_cropplan);
+				$where[] = "tt.fk_cropplan = ".((int) $target->fk_cropplan);
+			} elseif (!empty($target->fk_building)) {
+				$area = 'building:'.((int) $target->fk_building);
+				$where[] = "tt.fk_building = ".((int) $target->fk_building);
+			} else {
+				$area = 'seeds:'.$target->seed_batch;
+				$where[] = "tt.seed_batch = '".$this->db->escape($target->seed_batch)."'";
+			}
+			$areakey = ((int) $object->kind).'|'.((int) $object->date_start).'|'.$area;
+			if (isset($this->imported[$areakey])) {
+				$result['errors'][] = $langs->transnoentities('ErrorTreatmentImportDuplicate', $this->imported[$areakey]);
+				return array();
+			}
+			$areakeys[] = $areakey;
+		}
+
+		// Records created before this run (those of this run are found above, also in a check)
+		$sql = "SELECT DISTINCT t.rowid, t.ref FROM ".$this->db->prefix()."dolitrace_treatment as t";
+		$sql .= " INNER JOIN ".$this->db->prefix()."dolitrace_treatment_target as tt ON tt.fk_treatment = t.rowid";
+		$sql .= " WHERE t.entity IN (".getEntity('dolitracetreatment').") AND t.fk_soc = ".((int) $object->fk_soc)." AND t.kind = ".((int) $object->kind);
+		$sql .= " AND t.date_start = '".$this->db->idate($object->date_start)."' AND t.status IN (0, 1)";
+		$sql .= " AND (t.import_key IS NULL OR t.import_key <> '".$this->db->escape($this->import_key)."')";
+		$sql .= " AND (".implode(' OR ', $where).")";
+		$existing = dolitraceTreatmentFetchRows($this->db, $sql);
+		if (count($existing)) {
+			$result['errors'][] = $langs->transnoentities('ErrorTreatmentImportExists', reset($existing)->ref);
+		}
+		return $areakeys;
 	}
 
 	/**

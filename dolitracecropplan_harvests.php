@@ -37,6 +37,7 @@ require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 dol_include_once('/dolitrace/class/dolitracecropplan.class.php');
 dol_include_once('/dolitrace/class/dolitraceharvest.class.php');
 dol_include_once('/dolitrace/lib/dolitrace_cropplan.lib.php');
+dol_include_once('/dolitrace/lib/dolitrace_access.lib.php');
 
 // Langs
 $langs->loadLangs(array("dolitrace@dolitrace", "products", "other"));
@@ -63,6 +64,7 @@ $permissiontoread = $user->hasRight('dolitrace', 'dolitraceharvest', 'read');
 $permissiontowrite = $user->hasRight('dolitrace', 'dolitraceharvest', 'write');
 
 if (!$permissiontoread) accessforbidden();
+dolitraceCheckAccess($user, $object);
 
 
 /*

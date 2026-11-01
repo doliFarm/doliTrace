@@ -38,6 +38,7 @@ dol_include_once('/dolitrace/class/dolitracecropplan.class.php');
 // Assumiamo che la classe per le operazioni si chiami DoliTraceOperation
 dol_include_once('/dolitrace/class/dolitraceoperation.class.php'); 
 dol_include_once('/dolitrace/lib/dolitrace_cropplan.lib.php');
+dol_include_once('/dolitrace/lib/dolitrace_access.lib.php');
 
 // Langs
 $langs->loadLangs(array("dolitrace@dolitrace", "products", "other", "dict"));
@@ -64,6 +65,7 @@ $permissiontoread = $user->hasRight('dolitrace', 'dolitraceoperation', 'read');
 $permissiontowrite = $user->hasRight('dolitrace', 'dolitraceoperation', 'write');
 
 if (!$permissiontoread) accessforbidden();
+dolitraceCheckAccess($user, $object);
 
 
 /*

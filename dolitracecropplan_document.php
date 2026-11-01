@@ -92,6 +92,7 @@ include_once DOL_DOCUMENT_ROOT.'/core/lib/images.lib.php';
 include_once DOL_DOCUMENT_ROOT.'/core/class/html.formfile.class.php';
 dol_include_once('/dolitrace/class/dolitracecropplan.class.php');
 dol_include_once('/dolitrace/lib/dolitrace_cropplan.lib.php');
+dol_include_once('/dolitrace/lib/dolitrace_access.lib.php');
 
 // Load translation files required by the page
 $langs->loadLangs(array("dolitrace@dolitrace", "companies", "other", "mails"));
@@ -160,6 +161,7 @@ if (!isModEnabled("dolitrace")) {
 if (!$permissiontoread) {
 	accessforbidden();
 }
+dolitraceCheckAccess($user, $object);
 if (empty($object->id) || $upload_dir === null) {
 	accessforbidden();
 }

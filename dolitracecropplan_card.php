@@ -98,6 +98,7 @@ include_once DOL_DOCUMENT_ROOT.'/projet/class/project.class.php';
 dol_include_once('/dolitrace/class/dolitracecropplan.class.php');
 // [MOD] Inclusione libreria per funzioni helper (getFarmTypeId)
 dol_include_once('/dolitrace/lib/dolitrace_cropplan.lib.php');
+dol_include_once('/dolitrace/lib/dolitrace_access.lib.php');
 
 // Load translation files required by the page
 $langs->loadLangs(array("dolitrace@dolitrace", "other", "projects"));
@@ -187,6 +188,7 @@ if (!isModEnabled($object->module)) {
 if (!$permissiontoread) {
     accessforbidden();
 }
+dolitraceCheckAccess($user, $object);
 
 $error = 0;
 

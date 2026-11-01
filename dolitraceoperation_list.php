@@ -73,6 +73,7 @@ include_once DOL_DOCUMENT_ROOT.'/core/lib/company.lib.php';
 
 // Load module libraries
 include_once __DIR__.'/class/dolitraceoperation.class.php';
+dol_include_once('/dolitrace/lib/dolitrace_access.lib.php');
 // [ROBUST] Include linked classes to ensure showOutputField works for Foreign Keys (es. CropPlan)
 include_once __DIR__.'/class/dolitracecropplan.class.php'; 
 
@@ -293,6 +294,7 @@ if (!empty($object->ismultientitymanaged) && (int) $object->ismultientitymanaged
 } else {
     $sql .= " WHERE 1 = 1";
 }
+$sql .= dolitraceSqlCropplanSocFilter($user, 't.fk_cropplan');
 
 // Filter handling
 foreach ($search as $key => $val) {

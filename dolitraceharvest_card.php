@@ -38,6 +38,7 @@ include_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
 dol_include_once('/dolitrace/class/dolitraceharvest.class.php');
 dol_include_once('/dolitrace/class/dolitracecropplan.class.php'); 
 dol_include_once('/dolitrace/lib/dolitrace_harvest.lib.php');
+dol_include_once('/dolitrace/lib/dolitrace_access.lib.php');
 
 // Load translation files required by the page
 $langs->loadLangs(array("dolitrace@dolitrace", "other"));
@@ -130,6 +131,7 @@ $upload_dir = $conf->dolitrace->multidir_output[isset($object->entity) ? $object
 
 if (!isModEnabled($object->module)) accessforbidden("Module ".$object->module." not enabled");
 if (!$permissiontoread) accessforbidden();
+dolitraceCheckAccess($user, $object);
 
 $error = 0;
 
@@ -351,6 +353,14 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
         $formconfirm = $form->formconfirm($_SERVER["PHP_SELF"].'?id='.$object->id, $langs->trans('DeleteDoliTraceHarvest'), $langs->trans('ConfirmDeleteObject'), 'confirm_delete', '', 0, 'action-delete');
     }
     
+    // Confirmation to validate and to set back to draft: both move the stock
+    if ($action == 'validate') {
+        $formconfirm = $form->formconfirm($_SERVER["PHP_SELF"].'?id='.$object->id, $langs->trans('Validate'), $langs->trans('HarvestConfirmValidate'), 'confirm_validate', '', 0, 1);
+    }
+    if ($action == 'setdraft') {
+        $formconfirm = $form->formconfirm($_SERVER["PHP_SELF"].'?id='.$object->id, $langs->trans('SetToDraft'), $langs->trans('HarvestConfirmSetDraft'), 'confirm_setdraft', '', 0, 1);
+    }
+
     // Confirmation to delete line
     if ($action == 'deleteline') {
         $formconfirm = $form->formconfirm($_SERVER["PHP_SELF"].'?id='.$object->id.'&lineid='.$lineid, $langs->trans('DeleteLine'), $langs->trans('ConfirmDeleteLine'), 'confirm_deleteline', '', 0, 1);
@@ -440,14 +450,14 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
             // Validate
             if ($object->status == $object::STATUS_DRAFT) {
                 if ($permissiontoadd) {
-                    print dolGetButtonAction('', $langs->trans('Validate'), 'default', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=confirm_validate&confirm=yes&token='.newToken(), '', $permissiontoadd);
+                    print dolGetButtonAction('', $langs->trans('Validate'), 'default', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=validate&token='.newToken(), '', $permissiontoadd);
                 }
                 print dolGetButtonAction('', $langs->trans('Modify'), 'default', $_SERVER["PHP_SELF"].'?id='.$object->id.'&action=edit&token='.newToken(), '', $permissiontoadd);
             }
             
             // Reopen (Set to Draft)
             if ($object->status == $object::STATUS_VALIDATED && $permissiontoadd) {
-                 print dolGetButtonAction('', $langs->trans('SetToDraft'), 'default', $_SERVER["PHP_SELF"].'?id='.$object->id.'&action=confirm_setdraft&confirm=yes&token='.newToken(), '', $permissiontoadd);
+                 print dolGetButtonAction('', $langs->trans('SetToDraft'), 'default', $_SERVER["PHP_SELF"].'?id='.$object->id.'&action=setdraft&token='.newToken(), '', $permissiontoadd);
             }
 
             // Delete

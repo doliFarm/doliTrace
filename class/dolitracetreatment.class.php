@@ -1112,6 +1112,16 @@ class DoliTraceTreatment extends CommonObject
 			$warnings[] = $langs->transnoentities('WarningTreatmentWillBeLate');
 		}
 
+		// Areas without a crop plan in progress at the date (e.g. date changed after the choice of the areas): the validation will be refused
+		if ($this->status == self::STATUS_DRAFT && $this->technical_type == self::TECHNICAL_SURFACES) {
+			$cropplans = dolitraceTreatmentCropPlans($this->db, $this);
+			foreach ($this->targets as $target) {
+				if ($target->target_type == DoliTraceTreatmentTarget::TYPE_PLOT && !isset($cropplans[$target->fk_cropplan])) {
+					$warnings[] = $langs->transnoentities('ErrorTreatmentCropPlanNotInProgress', $target->location_ref, dol_print_date($this->date_start, 'day'));
+				}
+			}
+		}
+
 		$hectares = ($this->technical_type == self::TECHNICAL_SURFACES ? dolitraceTreatmentQtyInBasis($this, 'HA') : null);
 		$safetydays = 0;
 		$livestockn = 0;

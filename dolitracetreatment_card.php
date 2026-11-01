@@ -279,6 +279,11 @@ if (empty($reshook)) {
 				$target->location_ref = $building->ref;
 			}
 			$target->treated_unit = (GETPOST('treated_unit', 'aZ09') == 'M3' ? 'M3' : 'M2');
+			// Quantity not given: volume or covered surface of the building, as the surface of the plot
+			if ($building && $target->treated_qty === null) {
+				$size = ($target->treated_unit == 'M3' ? $building->volume : $building->surface_covered);
+				$target->treated_qty = ($size > 0 ? $size : null);
+			}
 		} else {
 			$target->seed_batch = GETPOST('seed_batch', 'alphanohtml');
 			if ($target->seed_batch === '') {
@@ -648,7 +653,12 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	$morehtmlref .= '</div>';
 
 
-	dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref);
+	// Late record: badge before the status, the box in the card is not very visible
+	$morehtmlstatus = '';
+	if (!empty($object->late)) {
+		$morehtmlstatus = dolGetBadge($langs->trans('TreatmentLate'), '', 'warning', '', '', array('attr' => array('title' => $langs->trans('TreatmentLateHelp')))).' ';
+	}
+	dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref, '', 0, '', $morehtmlstatus);
 
 	print '<div class="fichecenter">';
 	print '<div class="fichehalfleft">';
@@ -722,11 +732,23 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	print '</tr>';
 
 	$buildings = ($targettype == DoliTraceTreatmentTarget::TYPE_BUILDING ? dolitraceTreatmentBuildings($db, $object->fk_soc) : array());
+	// Refs of the crop plans of the areas
+	$cropplanrefs = array();
+	foreach ($object->targets as $target) {
+		if ($target->fk_cropplan > 0) {
+			$cropplanrefs[(int) $target->fk_cropplan] = (int) $target->fk_cropplan;
+		}
+	}
+	if (count($cropplanrefs)) {
+		$cropplanrefs = dolitraceTreatmentFetchRows($db, "SELECT rowid, ref FROM ".$db->prefix()."dolitrace_cropplan WHERE rowid IN (".$db->sanitize(implode(',', $cropplanrefs)).")");
+	}
+	$unitlabels = array('HA' => 'ha', 'M2' => 'm²', 'M3' => 'm³', 'KG' => 'kg', 'T' => 't');
 	foreach ($object->targets as $target) {
 		print '<tr class="oddeven">';
 		if ($target->target_type == DoliTraceTreatmentTarget::TYPE_PLOT) {
 			$url = dol_buildpath('/dolitrace/dolitracecropplan_card.php', 1).'?id='.((int) $target->fk_cropplan);
-			print '<td>'.img_picto('', 'fa-clipboard-list', 'class="pictofixedwidth"').'<a href="'.$url.'">'.$langs->trans('TreatmentCropPlan').' '.((int) $target->fk_cropplan).'</a></td>';
+			$cropplanref = isset($cropplanrefs[$target->fk_cropplan]) ? $cropplanrefs[$target->fk_cropplan]->ref : $langs->trans('TreatmentCropPlan').' '.((int) $target->fk_cropplan);
+			print '<td>'.img_picto('', 'fa-clipboard-list', 'class="pictofixedwidth"').'<a href="'.$url.'">'.dol_escape_htmltag($cropplanref).'</a></td>';
 			print '<td>'.dol_escape_htmltag($target->crop_label).($target->crop_eppo ? ' <span class="opacitymedium">('.dol_escape_htmltag($target->crop_eppo).')</span>' : '').'</td>';
 			print '<td>'.dol_escape_htmltag($target->location_ref).'</td>';
 			print '<td class="center">'.yn($target->zone_zvn).'</td>';
@@ -737,7 +759,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		} else {
 			print '<td colspan="5">'.dol_escape_htmltag($target->seed_batch).'</td>';
 		}
-		print '<td class="right nowraponall">'.price($target->treated_qty, 0, $langs, 0, -1, -1).' '.dol_escape_htmltag($target->treated_unit).'</td>';
+		print '<td class="right nowraponall">'.price($target->treated_qty, 0, $langs, 0, -1, -1).' '.dol_escape_htmltag(isset($unitlabels[$target->treated_unit]) ? $unitlabels[$target->treated_unit] : $target->treated_unit).'</td>';
 		print '<td class="right">';
 		if ($caneditrows) {
 			print '<a class="reposition" href="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'&action=deletetarget&lineid='.$target->id.'&token='.newToken().'">'.img_delete().'</a>';
@@ -765,7 +787,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 			}
 			print '</td>';
 			print '<td class="center"><input type="text" name="bbch" class="width50 center" maxlength="3" value="'.dol_escape_htmltag(GETPOST('bbch', 'alphanohtml')).'" placeholder="BBCH"></td>';
-			print '<td class="right nowraponall"><input type="text" name="treated_qty" class="width75 right" value="'.dol_escape_htmltag(GETPOST('treated_qty', 'alpha')).'" title="'.dol_escape_htmltag($langs->trans('TreatmentTreatedQtyPlotHelp')).'" placeholder="'.dol_escape_htmltag($langs->trans('TreatmentFromPlot')).'"> HA</td>';
+			print '<td class="right nowraponall"><input type="text" name="treated_qty" class="width75 right" value="'.dol_escape_htmltag(GETPOST('treated_qty', 'alpha')).'" title="'.dol_escape_htmltag($langs->trans('TreatmentTreatedQtyPlotHelp')).'" placeholder="'.dol_escape_htmltag($langs->trans('TreatmentFromPlot')).'"> ha</td>';
 		} else {
 			print '<td colspan="5">';
 			if ($targettype == DoliTraceTreatmentTarget::TYPE_BUILDING) {
@@ -780,7 +802,8 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 				$units = array('KG' => 'kg', 'T' => 't');
 			}
 			print '</td>';
-			print '<td class="right nowraponall"><input type="text" name="treated_qty" class="width75 right" value="'.dol_escape_htmltag(GETPOST('treated_qty', 'alpha')).'"> ';
+			$placeholder = ($targettype == DoliTraceTreatmentTarget::TYPE_BUILDING ? ' title="'.dol_escape_htmltag($langs->trans('TreatmentTreatedQtyBuildingHelp')).'" placeholder="'.dol_escape_htmltag($langs->trans('TreatmentFromBuilding')).'"' : '');
+			print '<td class="right nowraponall"><input type="text" name="treated_qty" class="width75 right" value="'.dol_escape_htmltag(GETPOST('treated_qty', 'alpha')).'"'.$placeholder.'> ';
 			print $form->selectarray('treated_unit', $units, GETPOST('treated_unit', 'aZ09'), 0, 0, 0, '', 0, 0, 0, '', 'width75');
 			print '</td>';
 		}
@@ -829,7 +852,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		} else {
 			$npk = array();
 			foreach (array('n_content', 'p2o5_content', 'k2o_content') as $key) {
-				$npk[] = ($product->$key !== null && $product->$key !== '') ? price($product->$key, 0, $langs, 0, -1, -1) : '-';
+				$npk[] = price((float) $product->$key, 0, $langs, 0, 0, -1);
 			}
 			print '<td>'.implode('-', $npk).($product->n_applied > 0 ? ' <span class="opacitymedium">('.$langs->trans('TreatmentNAppliedShort', price($product->n_applied, 0, $langs, 0, -1, 2)).')</span>' : '').'</td>';
 		}

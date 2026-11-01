@@ -89,6 +89,7 @@ include_once DOL_DOCUMENT_ROOT.'/core/lib/company.lib.php';
 include_once DOL_DOCUMENT_ROOT.'/core/lib/functions2.lib.php';
 dol_include_once('/dolitrace/class/dolitraceharvest.class.php');
 dol_include_once('/dolitrace/lib/dolitrace_harvest.lib.php');
+dol_include_once('/dolitrace/lib/dolitrace_access.lib.php');
 
 // Load translation files required by the page
 $langs->loadLangs(array("dolitrace@dolitrace", "other"));
@@ -165,6 +166,7 @@ if (!isModEnabled("dolitrace")) {
 if (!$permissiontoread) {
 	accessforbidden();
 }
+dolitraceCheckAccess($user, $object);
 
 
 /*

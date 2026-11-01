@@ -69,6 +69,7 @@ include_once DOL_DOCUMENT_ROOT.'/contact/class/contact.class.php';
 include_once DOL_DOCUMENT_ROOT.'/core/class/html.formcompany.class.php';
 dol_include_once('/dolitrace/class/dolitraceharvest.class.php');
 dol_include_once('/dolitrace/lib/dolitrace_harvest.lib.php');
+dol_include_once('/dolitrace/lib/dolitrace_access.lib.php');
 
 // Load translation files required by the page
 $langs->loadLangs(array("dolitrace@dolitrace", "companies", "other", "mails"));
@@ -112,6 +113,7 @@ if (!isModEnabled("dolitrace")) {
 if (!$permissiontoread) {
 	accessforbidden();
 }
+dolitraceCheckAccess($user, $object);
 
 
 /*
