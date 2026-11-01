@@ -141,6 +141,7 @@ class DoliTraceOperation extends CommonObject
 		"entity" => array("type" => "integer", "label" => "Entity", "enabled" => "1", 'position' => 20, 'notnull' => 1, "visible" => "0", "default" => "1", "index" => 1,),
 		"fk_cropplan" => array("type" => "integer:DoliTraceCropplan:dolitrace/class/dolitracecropplan.class.php","label" => "CropPlan","enabled" => "1","position" => 25,"notnull" => 1,"visible" => "1","index" => 1,"css" => "minwidth300", ),
 		"date_op" => array("type" => "datetime", "label" => "Dateop", "enabled" => "1", 'position' => 30, 'notnull' => 1, "visible" => "-1",),
+		"date_op_end" => array("type" => "datetime", "label" => "OperationDateEnd", "help" => "OperationDateEndHelp", "enabled" => "1", 'position' => 31, 'notnull' => 0, "visible" => "-1",),
 		//"fk_operation_type" => array("type" => "varchar(32)", "label" => "Fkoperationtype", "enabled" => "1", 'position' => 35, 'notnull' => 1, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
 		"fk_operation_type" => array(
         "type" => "varchar(32)",
@@ -191,6 +192,11 @@ class DoliTraceOperation extends CommonObject
 	public $ref;
 	public $fk_cropplan;
 	public $date_op;
+
+	/**
+	 * @var int|string|null	End of the operation (AGEA field notebook: start and end of each crop operation and phenological stage)
+	 */
+	public $date_op_end;
 	public $fk_operation_type;
 	public $label;
 	public $weather_cond;
@@ -623,6 +629,27 @@ class DoliTraceOperation extends CommonObject
 		global $langs;
 
 		$langs->load('dolitrace@dolitrace');
+		$start = $this->date_op;
+		$end = $this->date_op_end;
+		if ($start !== null && $start !== '' && !is_numeric($start)) {
+			$start = dol_stringtotime($start);
+		}
+		if ($end !== null && $end !== '' && !is_numeric($end)) {
+			$end = dol_stringtotime($end);
+		}
+		if (!empty($start) && !empty($end) && $end < $start) {
+			$this->error = $langs->trans('ErrorOperationDateEnd');
+			return -1;
+		}
+		// BBCH code: two digits, the first is the main stage
+		$this->fk_pheno_stage = trim((string) $this->fk_pheno_stage);
+		if ($this->fk_pheno_stage !== '' && !preg_match('/^[0-9]{1,2}$/', $this->fk_pheno_stage)) {
+			$this->error = $langs->trans('ErrorOperationBbch');
+			return -1;
+		}
+		if ($this->fk_pheno_stage === '') {
+			$this->fk_pheno_stage = null;
+		}
 		$isirrigation = ($this->fk_operation_type == self::TYPE_IRRIGATION);
 		if (!$isirrigation) {
 			// Irrigation data left by a change of type are not kept

@@ -13,3 +13,6 @@ UPDATE llx_dolitrace_c_irrigation_method SET agea_value = 'a pioggia' WHERE code
 UPDATE llx_dolitrace_c_irrigation_method SET agea_value = 'in manichetta' WHERE code = 'DRIP' AND agea_value IS NULL;
 UPDATE llx_dolitrace_c_irrigation_method SET agea_value = 'microjet' WHERE code = 'MICRO' AND agea_value IS NULL;
 UPDATE llx_dolitrace_c_irrigation_method SET agea_value = 'per scorrimento' WHERE code IN ('FURROW', 'FLOOD') AND agea_value IS NULL;
+
+-- Crop operations: end of the operation (sheet 2, start and end of each crop operation and phenological stage)
+ALTER TABLE llx_dolitrace_operation ADD COLUMN date_op_end datetime;

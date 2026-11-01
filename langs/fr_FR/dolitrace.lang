@@ -221,6 +221,10 @@ DictionaryIrrigationMethod = Méthodes d'irrigation
 IrrigationMethodCodeHelp = Code de la méthode d'irrigation, en majuscules
 OperationBbch = Stade BBCH
 OperationBbchHelp = Stade phénologique de la culture sur l'échelle BBCH (par exemple 65 = pleine floraison)
+OperationDateEnd = Fin de l'opération
+OperationDateEndHelp = Pour les opérations de plusieurs jours, et pour clore un stade phénologique (cahier de campagne AGEA : début et fin de chaque stade)
+ErrorOperationDateEnd = La fin de l'opération est antérieure à son début
+ErrorOperationBbch = Le stade BBCH est un nombre de 0 à 99
 IrrigationMethod = Méthode d'irrigation
 IrrigationOnlyHelp = Seulement pour les opérations de type Irrigation
 IrrigationWaterVolume = Volume d'eau (m³)

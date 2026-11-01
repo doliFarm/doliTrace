@@ -313,6 +313,10 @@ DictionaryIrrigationMethod = Metodi di irrigazione
 IrrigationMethodCodeHelp = Codice del metodo di irrigazione, in maiuscolo
 OperationBbch = Fase BBCH
 OperationBbchHelp = Fase fenologica della coltura nella scala BBCH (per esempio 65 = piena fioritura)
+OperationDateEnd = Fine operazione
+OperationDateEndHelp = Per le operazioni di più giorni e per chiudere una fase fenologica (quaderno di campagna AGEA: inizio e fine di ogni fase)
+ErrorOperationDateEnd = La fine dell'operazione è precedente all'inizio
+ErrorOperationBbch = La fase BBCH è un numero da 0 a 99
 IrrigationMethod = Metodo di irrigazione
 IrrigationOnlyHelp = Solo per le operazioni di tipo Irrigazione
 IrrigationWaterVolume = Volume d'acqua (m³)

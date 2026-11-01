@@ -137,6 +137,24 @@ class DoliTraceTreatmentExport
 	}
 
 	/**
+	 * Main BBCH stage as in the AGEA list of the phenological stages (sheet 2)
+	 *
+	 * @param	string|null		$bbch		BBCH code, two digits
+	 * @return	string						For example "BBCH 6 - Fioritura", '' if not a BBCH code
+	 */
+	public function bbchStageAgea($bbch)
+	{
+		$stages = array('Germinazione', 'Sviluppo Fogliare', 'Formazione germogli laterali', 'Allungamento dello stelo', 'Sviluppo parti vegetative',
+			'Emergenza infiorescenza', 'Fioritura', 'Sviluppo dei frutti', 'Maturazione', 'Senescenza');
+		$bbch = trim((string) $bbch);
+		if (!preg_match('/^[0-9]{1,2}$/', $bbch)) {
+			return '';
+		}
+		$stage = (strlen($bbch) == 2 ? (int) $bbch[0] : 0);
+		return 'BBCH '.$stage.' - '.$stages[$stage];
+	}
+
+	/**
 	 * Row of a dictionary by its code, with cache
 	 *
 	 * @param	string		$table		Table without prefix
@@ -243,6 +261,7 @@ class DoliTraceTreatmentExport
 				'crop_eppo' => $content['targets'][$i]['crop_eppo'],
 				'crop_label' => $content['targets'][$i]['crop_label'],
 				'bbch' => $content['targets'][$i]['bbch'],
+				'bbch_stage_agea' => $this->bbchStageAgea($content['targets'][$i]['bbch']),
 				'building_ref' => $building ? $building->ref : '',
 				'seed_batch' => $content['targets'][$i]['seed_batch'],
 				'treated_qty' => $content['targets'][$i]['treated_qty'],
@@ -337,7 +356,7 @@ class DoliTraceTreatmentExport
 	 */
 	public function getOperations(User $user, $socid, $datefrom, $dateto)
 	{
-		$sql = "SELECT o.rowid, o.ref, o.date_op, o.fk_operation_type, o.label, o.fk_pheno_stage, o.status,";
+		$sql = "SELECT o.rowid, o.ref, o.date_op, o.date_op_end, o.fk_operation_type, o.label, o.fk_pheno_stage, o.status,";
 		$sql .= " o.irrigation_method, o.water_volume, o.irrigated_area, o.fertigation, o.fk_treatment,";
 		$sql .= " cp.ref as cropplan_ref, cp.pcg_ref, cp.fk_soc, p.ref as plot_ref, p.iacs_parcel,";
 		$sql .= " c.eppo_code as crop_eppo, c.label as crop_label, s.nom as farm_name, s.idprof4 as farm_cuaa,";
@@ -382,6 +401,7 @@ class DoliTraceTreatmentExport
 				'type_label' => (string) ($obj->type_label ? $obj->type_label : $obj->fk_operation_type),
 				'type_agea' => (string) $obj->type_agea,
 				'date' => $this->dateIso($this->db->jdate($obj->date_op), true),
+				'date_end' => $this->dateIso($this->db->jdate($obj->date_op_end), true),
 				'label' => (string) $obj->label,
 				'farm' => array('name' => (string) $obj->farm_name, 'cuaa' => (string) $obj->farm_cuaa),
 				'cropplan_ref' => (string) $obj->cropplan_ref,
@@ -391,6 +411,7 @@ class DoliTraceTreatmentExport
 				'crop_eppo' => (string) $obj->crop_eppo,
 				'crop_label' => $langs->transnoentitiesnoconv((string) $obj->crop_label),
 				'bbch' => (string) $obj->fk_pheno_stage,
+				'bbch_stage_agea' => $this->bbchStageAgea($obj->fk_pheno_stage),
 			);
 			if ($obj->fk_operation_type == DoliTraceOperation::TYPE_IRRIGATION) {
 				$operation['irrigation'] = array(
