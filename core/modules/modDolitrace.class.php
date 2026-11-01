@@ -500,6 +500,21 @@ class modDolitrace extends DolibarrModules
 			'user' => 2,
 			'object' => 'DoliTraceHarvest'
 		);
+		// Registers of organic production: stock in and out, mass balance, summary by plot (read only)
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitraceharvest',
+			'type' => 'left',
+			'titre' => 'BioRegister',
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitrace_bioregister',
+			'url' => '/dolitrace/dolitrace_bioregister.php',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "read")',
+			'target' => '',
+			'user' => 2,
+		);
 		/*
 		$this->menu[$r++] = array(
 			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitraceharvest',

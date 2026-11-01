@@ -388,9 +388,12 @@ class DoliTraceTreatmentExport
 	 *
 	 * @param	DoliTraceTreatment[]	$records	Records
 	 * @param	array<string,string>	$filters	Filters of the export (farm, period)
+	 * @param	array<int,array<string,mixed>>	$operations	Crop events and irrigations
+	 * @param	array<int,array<string,mixed>>	$storage	Storage sites
+	 * @param	?array<string,mixed>	$organic	Organic production (DoliTraceBioRegister::getOrganicSection), null when not exported
 	 * @return	string							JSON
 	 */
-	public function toJson($records, $filters, $operations = array(), $storage = array())
+	public function toJson($records, $filters, $operations = array(), $storage = array(), ?array $organic = null)
 	{
 		$data = array(
 			'format' => self::FORMAT,
@@ -404,6 +407,8 @@ class DoliTraceTreatmentExport
 			'storage' => $storage,
 			'operators' => array(),
 			'machines' => array(),
+			// Organic production: status and history of the plots, status of the lots, mass balance, summary by plot
+			'organic' => $organic,
 		);
 		foreach ($records as $record) {
 			$data['records'][] = $this->getRecordData($record);

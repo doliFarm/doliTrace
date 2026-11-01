@@ -130,7 +130,18 @@ if ($action == 'export' && in_array($format, array('json', 'csv', 'pdf'))) {
 					$storage = array();
 				}
 			}
-			$content = $export->toJson($records, $filters, $operations, $storage);
+			// Organic production, for the users who can read the harvests
+			$organic = null;
+			if ($user->hasRight('dolitrace', 'dolitraceharvest', 'read')) {
+				dol_include_once('/dolitrace/class/dolitracebioregister.class.php');
+				$bioregister = new DoliTraceBioRegister($db);
+				$organic = $bioregister->getOrganicSection($user, $socid, $datefrom, $dateto);
+				if (!is_array($organic)) {
+					dol_syslog('Export of the organic production: '.$bioregister->error, LOG_ERR);
+					$organic = null;
+				}
+			}
+			$content = $export->toJson($records, $filters, $operations, $storage, $organic);
 			$mime = 'application/json';
 		} elseif ($format == 'csv') {
 			$content = $export->toCsv($records);
