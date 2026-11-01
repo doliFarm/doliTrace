@@ -1189,14 +1189,15 @@ class DoliTraceOperation extends CommonObject
 	 */
 	public function info($id)
 	{
-		$sql = "SELECT t.rowid, t.date_creation as datec, t.fk_user_creat, t.fk_user_modif";
+		// The table of the operations has the columns datec and date_valid (not date_creation and date_validation)
+		$sql = "SELECT t.rowid, t.datec, t.fk_user_creat, t.fk_user_modif";
 		if (!empty($this->isextrafieldmanaged) && $this->isextrafieldmanaged == 1) {
 			$sql .= ", GREATEST(t.tms, te.tms) as datem";
 		} else {
 			$sql .= ", t.tms as datem";
 		}
-		if (!empty($this->fields['date_validation'])) {
-			$sql .= ", t.date_validation as datev";
+		if (!empty($this->fields['date_valid'])) {
+			$sql .= ", t.date_valid as datev";
 		}
 		if (!empty($this->fields['fk_user_creat'])) {
 			$sql .= ", t.fk_user_creat";
