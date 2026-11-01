@@ -974,7 +974,7 @@ class DoliTraceTreatment extends CommonObject
 				}
 			}
 			if ($product->fk_fertilizer > 0) {
-				$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, label, registration_number, fk_product, n_content, p2o5_content, k2o_content FROM ".$this->db->prefix()."dolifarm_fertilizer WHERE rowid = ".((int) $product->fk_fertilizer));
+				$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, label, registration_number, fk_product, n_content, p2o5_content, k2o_content, cu_content, efficiency, dry_matter FROM ".$this->db->prefix()."dolifarm_fertilizer WHERE rowid = ".((int) $product->fk_fertilizer));
 				if (isset($rows[$product->fk_fertilizer])) {
 					$fertilizer = $rows[$product->fk_fertilizer];
 					$product->product_label = $fertilizer->label;
@@ -983,6 +983,9 @@ class DoliTraceTreatment extends CommonObject
 					$product->n_content = $fertilizer->n_content;
 					$product->p2o5_content = $fertilizer->p2o5_content;
 					$product->k2o_content = $fertilizer->k2o_content;
+					$product->cu_content = $fertilizer->cu_content;
+					$product->efficiency = $fertilizer->efficiency;
+					$product->dry_matter = $fertilizer->dry_matter;
 				}
 			}
 			if ($product->fk_adversity > 0) {
@@ -1308,7 +1311,7 @@ class DoliTraceTreatment extends CommonObject
 			);
 		}
 		foreach ($this->products as $product) {
-			$content['products'][] = array(
+			$line = array(
 				'fk_agrodrug' => (int) $product->fk_agrodrug,
 				'fk_fertilizer' => (int) $product->fk_fertilizer,
 				'product_label' => (string) $product->product_label,
@@ -1325,6 +1328,13 @@ class DoliTraceTreatment extends CommonObject
 				'n_applied' => $num($product->n_applied),
 				'batch' => (string) $product->batch,
 			);
+			// Data added for the AGEA field notebook: only when filled in, so the fingerprints of the older records do not change
+			foreach (array('cu_content', 'efficiency', 'dry_matter') as $key) {
+				if ($num($product->$key) !== '') {
+					$line[$key] = $num($product->$key);
+				}
+			}
+			$content['products'][] = $line;
 		}
 		return $content;
 	}
@@ -2464,6 +2474,9 @@ class DoliTraceTreatmentProduct extends DoliTraceTreatmentRow
 		'n_content' => array('type' => 'double(24,8)', 'label' => 'TreatmentNContent', 'enabled' => 1, 'position' => 15, 'notnull' => 0, 'visible' => 1),
 		'p2o5_content' => array('type' => 'double(24,8)', 'label' => 'TreatmentP2O5Content', 'enabled' => 1, 'position' => 16, 'notnull' => 0, 'visible' => 1),
 		'k2o_content' => array('type' => 'double(24,8)', 'label' => 'TreatmentK2OContent', 'enabled' => 1, 'position' => 17, 'notnull' => 0, 'visible' => 1),
+		'cu_content' => array('type' => 'double(24,8)', 'label' => 'TreatmentCuContent', 'enabled' => 1, 'position' => 18, 'notnull' => 0, 'visible' => 0),
+		'efficiency' => array('type' => 'double(24,8)', 'label' => 'TreatmentEfficiency', 'enabled' => 1, 'position' => 18, 'notnull' => 0, 'visible' => 0),
+		'dry_matter' => array('type' => 'double(24,8)', 'label' => 'TreatmentDryMatter', 'enabled' => 1, 'position' => 18, 'notnull' => 0, 'visible' => 0),
 		'fk_adversity' => array('type' => 'integer', 'label' => 'TreatmentAdversity', 'enabled' => 1, 'position' => 20, 'notnull' => 0, 'visible' => 1),
 		'adversity_code' => array('type' => 'varchar(10)', 'label' => 'TreatmentAdversityCode', 'enabled' => 1, 'position' => 21, 'notnull' => 0, 'visible' => 1),
 		'adversity_label' => array('type' => 'varchar(255)', 'label' => 'TreatmentAdversity', 'enabled' => 1, 'position' => 22, 'notnull' => 0, 'visible' => 1),
@@ -2520,6 +2533,21 @@ class DoliTraceTreatmentProduct extends DoliTraceTreatmentRow
 	 * @var float|string|null
 	 */
 	public $k2o_content;
+
+	/**
+	 * @var float|string|null	Copies of copper (%), efficiency (0-1) and dry matter (%) of the fertilizer
+	 */
+	public $cu_content;
+
+	/**
+	 * @var float|string|null
+	 */
+	public $efficiency;
+
+	/**
+	 * @var float|string|null
+	 */
+	public $dry_matter;
 
 	/**
 	 * @var ?int

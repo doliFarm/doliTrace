@@ -16,3 +16,8 @@ UPDATE llx_dolitrace_c_irrigation_method SET agea_value = 'per scorrimento' WHER
 
 -- Crop operations: end of the operation (sheet 2, start and end of each crop operation and phenological stage)
 ALTER TABLE llx_dolitrace_operation ADD COLUMN date_op_end datetime;
+
+-- Lines of the records: copies of copper, efficiency and dry matter of the fertilizer (sheets 6 and 7)
+ALTER TABLE llx_dolitrace_treatment_product ADD COLUMN cu_content double(24,8);
+ALTER TABLE llx_dolitrace_treatment_product ADD COLUMN efficiency double(24,8);
+ALTER TABLE llx_dolitrace_treatment_product ADD COLUMN dry_matter double(24,8);

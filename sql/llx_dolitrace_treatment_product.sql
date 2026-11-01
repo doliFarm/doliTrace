@@ -26,6 +26,9 @@ CREATE TABLE IF NOT EXISTS llx_dolitrace_treatment_product(
 	n_content			double(24,8),						-- copy (%)
 	p2o5_content		double(24,8),						-- copy (%)
 	k2o_content			double(24,8),						-- copy (%)
+	cu_content			double(24,8),						-- copy (%)
+	efficiency			double(24,8),						-- copy (0-1)
+	dry_matter			double(24,8),						-- copy (%)
 	fk_adversity		integer,							-- llx_dolitrace_c_adversity
 	adversity_code		varchar(10),						-- copy of the EPPO code
 	adversity_label		varchar(255),						-- copy
