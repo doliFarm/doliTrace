@@ -384,3 +384,5 @@ SeedStatusInConversion = In conversion
 SeedStatusNonBio = Non organic
 WarningOperationSeedStatusMissing = Sowing or planting on plot %s in conversion or organic: give the status of the reproductive material
 WarningOperationSeedNoDerogation = Non organic material on plot %s in conversion or organic without BDSB derogation
+WarningTreatmentRevoked = %s: product revoked from %s in the database of the Ministry of Health (check in the decree the time allowed to use up the stocks)
+WarningTreatmentSuspended = %s: authorisation suspended in the database of the Ministry of Health

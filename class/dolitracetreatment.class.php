@@ -1243,7 +1243,7 @@ class DoliTraceTreatment extends CommonObject
 		$livestockn = 0;
 		foreach ($this->products as $product) {
 			if ($product->fk_agrodrug > 0) {
-				$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, auth_expiration_date, max_dose_ha, safety_days_default FROM ".$this->db->prefix()."dolifarm_agrodrug WHERE rowid = ".((int) $product->fk_agrodrug));
+				$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, auth_expiration_date, admin_status, date_revocation, max_dose_ha, safety_days_default FROM ".$this->db->prefix()."dolifarm_agrodrug WHERE rowid = ".((int) $product->fk_agrodrug));
 				$agrodrug = isset($rows[$product->fk_agrodrug]) ? $rows[$product->fk_agrodrug] : null;
 				if (!$agrodrug) {
 					continue;
@@ -1251,6 +1251,15 @@ class DoliTraceTreatment extends CommonObject
 				$authend = $this->db->jdate($agrodrug->auth_expiration_date);
 				if (!empty($authend) && $authend < $day) {
 					$warnings[] = $langs->transnoentities('WarningTreatmentAuthExpired', $product->product_label, dol_print_date($authend, 'day'));
+				}
+				// Status of the catalogue of the Ministry of Health: revoked from a date (the time allowed to use up the stocks
+				// is in the decree, not in the open data) or suspended
+				$status = strtolower(trim((string) $agrodrug->admin_status));
+				$revoked = $this->db->jdate($agrodrug->date_revocation);
+				if (str_starts_with($status, 'revocat') && (empty($revoked) || $revoked <= $day)) {
+					$warnings[] = $langs->transnoentities('WarningTreatmentRevoked', $product->product_label, $revoked ? dol_print_date($revoked, 'day') : '-');
+				} elseif (str_starts_with($status, 'sospes')) {
+					$warnings[] = $langs->transnoentities('WarningTreatmentSuspended', $product->product_label);
 				}
 				// Dose by hectare in kg or l, compared with the maximum of the product
 				if ($agrodrug->max_dose_ha > 0 && $hectares > 0 && $product->qty_total > 0 && in_array($product->qty_unit, array('kg', 'l', 't'))) {

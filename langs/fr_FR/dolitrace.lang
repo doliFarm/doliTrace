@@ -360,3 +360,5 @@ SeedStatusInConversion = En conversion
 SeedStatusNonBio = Non bio
 WarningOperationSeedStatusMissing = Semis ou plantation sur la parcelle %s en conversion ou bio : indiquer le statut du matériel de reproduction
 WarningOperationSeedNoDerogation = Matériel non bio sur la parcelle %s en conversion ou bio sans dérogation BDSB
+WarningTreatmentRevoked = %s : produit retiré depuis le %s dans la base du ministère de la Santé (vérifier dans le décret les délais d'écoulement des stocks)
+WarningTreatmentSuspended = %s : autorisation suspendue dans la base du ministère de la Santé
