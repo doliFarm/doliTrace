@@ -193,6 +193,7 @@ TreatmentStockRegularized = Stock regularized
 ErrorTreatmentNoWarehouse = No inputs warehouse for the farm: set it in the farm dossier or in the doliFarm setup
 ErrorTreatmentBatchRequired = The product is managed by lots: give the lot
 ErrorTreatmentStockMovement = Stock movement failed
+ErrorTreatmentStockUnit = The unit of the product %s (%s) cannot be converted from the unit of the record (%s): set a weight or volume unit on the product
 
 # Register - export and import
 TreatmentExport = Export treatment register

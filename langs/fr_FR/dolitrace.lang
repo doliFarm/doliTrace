@@ -156,6 +156,7 @@ TreatmentStockRegularized = Stock régularisé
 ErrorTreatmentNoWarehouse = Aucun entrepôt d'intrants pour l'exploitation : l'indiquer dans le dossier de l'exploitation ou dans la configuration de doliFarm
 ErrorTreatmentBatchRequired = Le produit est géré par lots : indiquer le lot
 ErrorTreatmentStockMovement = Mouvement de stock échoué
+ErrorTreatmentStockUnit = L'unité du produit %s (%s) ne peut pas être convertie depuis l'unité de l'enregistrement (%s) : indiquer une unité de poids ou de volume sur le produit
 
 # Register - export and import
 TreatmentExport = Exporter le registre des traitements

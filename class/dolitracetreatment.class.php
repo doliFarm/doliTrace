@@ -1558,14 +1558,25 @@ class DoliTraceTreatment extends CommonObject
 				continue;
 			}
 			$batch = ($prod->hasbatch() ? (string) $product->batch : '');
+			$stockqty = 0;
 			if (!$reverse) {
 				$rowwarehouse = $warehouseid;
 				if ($warehouseid <= 0) {
-					$error = $langs->trans('ErrorTreatmentNoWarehouse');
+					$error = $langs->transnoentitiesnoconv('ErrorTreatmentNoWarehouse');
 				} elseif (!($product->qty_total > 0)) {
-					$error = $langs->trans('ErrorTreatmentQtyTotal', $product->product_label);
+					$error = $langs->transnoentitiesnoconv('ErrorTreatmentQtyTotal', $product->product_label);
 				} elseif ($prod->hasbatch() && $batch === '') {
-					$error = $langs->trans('ErrorTreatmentBatchRequired');
+					$error = $langs->transnoentitiesnoconv('ErrorTreatmentBatchRequired');
+				} else {
+					$stockqty = $this->stockQty($prod, $product, $error);
+				}
+			} else {
+				// The same quantity that was taken out, also if the unit of the product changed since then
+				$mouvout = new MouvementStock($this->db);
+				if ($movementid > 0 && $mouvout->fetch($movementid) > 0 && $mouvout->qty != 0) {
+					$stockqty = abs((float) $mouvout->qty);
+				} else {
+					$stockqty = $this->stockQty($prod, $product, $error);
 				}
 			}
 
@@ -1575,10 +1586,10 @@ class DoliTraceTreatment extends CommonObject
 				$mouv->setOrigin($this->element.'@dolitrace', $this->id);
 				if ($reverse) {
 					$label = $langs->trans('TreatmentStockReversal', $this->ref);
-					$result = $mouv->reception($user, $prod->id, $rowwarehouse, (float) $product->qty_total, (float) $prod->pmp, $label, '', '', $batch, dol_now());
+					$result = $mouv->reception($user, $prod->id, $rowwarehouse, $stockqty, (float) $prod->pmp, $label, '', '', $batch, dol_now());
 				} else {
 					$label = $langs->trans('TreatmentStockTaken', $this->ref);
-					$result = $mouv->livraison($user, $prod->id, $rowwarehouse, (float) $product->qty_total, (float) $prod->pmp, $label, $this->date_start, '', '', $batch);
+					$result = $mouv->livraison($user, $prod->id, $rowwarehouse, $stockqty, (float) $prod->pmp, $label, $this->date_start, '', '', $batch);
 				}
 				if ($result > 0) {
 					$this->db->commit();
@@ -1589,7 +1600,7 @@ class DoliTraceTreatment extends CommonObject
 					$this->db->rollback();
 					$error = dol_string_nohtmltag(dol_html_entity_decode($mouv->error ? $mouv->error : implode(', ', $mouv->errors), ENT_QUOTES | ENT_HTML5));
 					if ($error === '') {
-						$error = $langs->trans('ErrorTreatmentStockMovement');
+						$error = $langs->transnoentitiesnoconv('ErrorTreatmentStockMovement');
 					}
 				}
 			}
@@ -1601,13 +1612,60 @@ class DoliTraceTreatment extends CommonObject
 				dol_syslog(__METHOD__.' record '.$this->id.' product '.$product->id.': '.$error, LOG_WARNING);
 			}
 			$this->saveStockStatus($product, $status, $error, $rowwarehouse, $movementid);
-			$changes[] = array('product' => $product->product_label, 'qty' => $product->qty_total, 'unit' => $product->qty_unit, 'batch' => $batch,
+			$changes[] = array('product' => $product->product_label, 'qty' => $product->qty_total, 'unit' => $product->qty_unit, 'stock_qty' => $stockqty, 'batch' => $batch,
 				'warehouse' => (int) $rowwarehouse, 'movement' => ($error === '' && !$reverse ? (int) $movementid : 0), 'reverse' => $reverse ? 1 : 0, 'error' => $error);
 		}
 		if (count($changes)) {
 			$this->addLog($user, 'STOCK', '', $changes);
 		}
 		return ($failed ? -1 : $moved);
+	}
+
+	/**
+	 * Quantity of a product of the record in the unit of the Dolibarr product
+	 *
+	 * The register keeps the total in kg, l, t or m³. A product without unit is moved in the unit of the register;
+	 * a product with a unit of another kind (e.g. pieces, or litres for a quantity in kg) cannot be converted.
+	 *
+	 * @param	Product						$prod		Dolibarr product
+	 * @param	DoliTraceTreatmentProduct	$product	Product of the record
+	 * @param	string						$error		Set when the units cannot be converted
+	 * @return	float								Quantity to move, 0 if the units cannot be converted
+	 */
+	private function stockQty($prod, $product, &$error)
+	{
+		global $langs;
+
+		// Kind and size of the units: weight in kg, volume in litres
+		$registerunits = array('kg' => array('weight', 1), 't' => array('weight', 1000), 'l' => array('volume', 1), 'm3' => array('volume', 1000));
+		$productunits = array(
+			'T' => array('weight', 1000), 'KG' => array('weight', 1), 'G' => array('weight', 0.001), 'MG' => array('weight', 0.000001),
+			'M3' => array('volume', 1000), 'DM3' => array('volume', 1), 'L' => array('volume', 1), 'CM3' => array('volume', 0.001),
+		);
+
+		$qty = (float) $product->qty_total;
+		if (empty($prod->fk_unit)) {
+			return $qty;
+		}
+		$code = '';
+		$label = '';
+		$sql = "SELECT code, short_label FROM ".$this->db->prefix()."c_units WHERE rowid = ".((int) $prod->fk_unit);
+		$resql = $this->db->query($sql);
+		if ($resql) {
+			$obj = $this->db->fetch_object($resql);
+			if ($obj) {
+				$code = (string) $obj->code;
+				$label = (string) $obj->short_label;
+			}
+			$this->db->free($resql);
+		}
+		$from = isset($registerunits[$product->qty_unit]) ? $registerunits[$product->qty_unit] : null;
+		$to = isset($productunits[$code]) ? $productunits[$code] : null;
+		if (!$from || !$to || $from[0] != $to[0]) {
+			$error = $langs->transnoentitiesnoconv('ErrorTreatmentStockUnit', $product->product_label, ($label !== '' ? $label : $code), $product->qty_unit);
+			return 0;
+		}
+		return $qty * $from[1] / $to[1];
 	}
 
 	/**
