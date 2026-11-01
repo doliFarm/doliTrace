@@ -1,16 +1,16 @@
--- Copyright (C) 2026      SuperAdmin
+-- Copyright (C) 2026      Luigi Grillo - doliFarm.com	<info@dolifarm.com>
 --
 -- This program is free software: you can redistribute it and/or modify
--- it under the terms of the GNU General Public License as published by
+-- it under the terms of the GNU Affero General Public License as published by
 -- the Free Software Foundation, either version 3 of the License, or
 -- (at your option) any later version.
 --
 -- This program is distributed in the hope that it will be useful,
 -- but WITHOUT ANY WARRANTY; without even the implied warranty of
 -- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
--- GNU General Public License for more details.
+-- GNU Affero General Public License for more details.
 --
--- You should have received a copy of the GNU General Public License
+-- You should have received a copy of the GNU Affero General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
 -- Register of the treatments and fertilizations (Reg. EU 2023/564): one record per treatment or fertilization.
@@ -38,6 +38,11 @@ CREATE TABLE IF NOT EXISTS llx_dolitrace_treatment(
 	fk_machine				integer,
 	machine_label			varchar(255),						-- copy
 	machine_check_end		date,								-- copy
+	machine_check_date		date,								-- copy
+	machine_cert_ref		varchar(64),						-- copy
+	application_method		varchar(32),
+	justification_type		varchar(32),						-- organic: llx_dolitrace_c_justification
+	justification_ref		varchar(255),						-- organic: reference of the document of the need
 	water_volume			double(24,8),						-- l/ha
 	weather					varchar(255),
 	version					integer DEFAULT 1 NOT NULL,

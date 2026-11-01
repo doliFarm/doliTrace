@@ -18,18 +18,28 @@ Modulo esterno Dolibarr per la tracciabilità agricola: piani colturali (piani d
 
 ## Ambienti e compatibilità
 
-| | WS (Windows, sviluppo) | VPS (Linux, Docker, test) |
+| | Sviluppo (Docker sulla WS) | VPS (Linux, Docker, test) |
 |---|---|---|
+| URL | http://localhost:8089 | — |
 | Dolibarr | 24.0.2 | 24.0.2 |
-| PHP | 7.4.26 | 8.4 / 8.5 |
-| Database | MariaDB 10.6.5 | MySQL 8.x |
+| PHP | 8.4 | 8.4 / 8.5 |
+| Database | MySQL 8.4 | MySQL 8.x |
+
+- **Unica piattaforma di sviluppo e di prova: l'istanza Docker** in `C:\dolibarr\docker-php8` (vedi il README lì). Monta `C:\dolibarr\www\dolibarr\htdocs`; database e documenti sono suoi. L'installazione DoliWamp della WS (porta 8088, PHP 7.4, MariaDB) **non si usa più** (deciso il 01/11/2026): niente prove, reinizializzazioni o controlli lì.
 
 - Requisito minimo: **Dolibarr 23**, come doliFarm.
-- Il codice deve funzionare **da PHP 7.4 a PHP 8.5**:
-  - niente sintassi solo PHP 8: `match`, `?->`, argomenti nominati, union types, enum, `readonly`, promozione dei parametri nel costruttore, `str_contains()`/`str_starts_with()`;
+- PHP **8.2 o successivo** (`$this->phpmin = array(8, 2)`), provato su 8.4; la VPS può passare a 8.5:
+  - la sintassi di PHP 8 è ammessa (`match`, `?->`, `str_contains()`, ...); non serve più la compatibilità con PHP 7;
   - niente deprecazioni PHP 8.x: dichiarare sempre le proprietà delle classi, non passare `null` alle funzioni native, nullable esplicito (`?Tipo $x = null`), niente `curl_close()`.
-- SQL compatibile con **MariaDB 10.6 e MySQL 8**. Nomi di tabelle e colonne in minuscolo.
-- Verifica della sintassi sulla WS: `C:\dolibarr\bin\php\php7.4.26\php.exe -l <file>`.
+- SQL per **MySQL 8**, provato nell'istanza Docker. Restare su SQL semplice e portabile (niente funzioni solo MySQL se c'è un'alternativa standard), così da non escludere MariaDB. Nomi di tabelle e colonne in minuscolo: sulla VPS i nomi sono case-sensitive.
+- Verifica della sintassi (Git Bash): `cd /c/dolibarr/docker-php8 && MSYS_NO_PATHCONV=1 docker compose exec -T web php -l /var/www/html/custom/<modulo>/<file>`.
+- Script di prova da riga di comando nel container: `MSYS_NO_PATHCONV=1 docker compose exec -T -w /var/www/html web php < script.php` (percorsi `/var/www/html/...`).
+
+## Licenza e intestazioni
+
+- Licenza del modulo: **AGPL v3 o successiva** (`COPYING`, `LICENSE`). Titolare: Luigi Grillo - doliFarm.com <info@dolifarm.com>.
+- Ogni file nuovo ha l'intestazione AGPL con `Copyright (C) <anno> Luigi Grillo - doliFarm.com <info@dolifarm.com>`.
+- I file derivati dai modelli di ModuleBuilder con il copyright di autori di Dolibarr mantengono la loro intestazione **GPL v3 o successiva** (testo in `COPYING-GPL-3.0`): non cambiarla, aggiungere solo la riga del titolare.
 
 ## Struttura
 

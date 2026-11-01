@@ -39,12 +39,15 @@ $listOfModuleContent = [
 	'class',
 	'css',
 	'COPYING',
+	'LICENSE',
+	'COPYING-GPL-3.0',
 	'core',
 	'img',
 	'js',
 	'langs',
 	'lib',
 	'sql',
+	'pwa',
 	'tpl',
 	'*.md',
 	'*.json',
@@ -60,7 +63,8 @@ $listOfModuleContent = [
 $exclude_list = [
 	'/^.git$/',
 	'/.*js.map/',
-	'/DEV.md/'
+	'/DEV.md/',
+	'/CLAUDE.md/',
 ];
 
 // ============================================= end of configuration

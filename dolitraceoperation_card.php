@@ -1,7 +1,7 @@
 <?php
 /* Copyright (C) 2017       Laurent Destailleur     <eldy@users.sourceforge.net>
  * Copyright (C) 2024-2025  Frédéric France         <frederic.france@free.fr>
- * Copyright (C) 2026       SuperAdmin
+ * Copyright (C) 2026       Luigi Grillo - doliFarm.com	<info@dolifarm.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -71,6 +71,7 @@ include_once DOL_DOCUMENT_ROOT.'/core/class/html.formfile.class.php';
 include_once DOL_DOCUMENT_ROOT.'/core/class/html.formprojet.class.php';
 dol_include_once('/dolitrace/class/dolitraceoperation.class.php');
 dol_include_once('/dolitrace/lib/dolitrace_operation.lib.php');
+dol_include_once('/dolitrace/lib/dolitrace_access.lib.php');
 
 // Load translation files required by the page
 $langs->loadLangs(array("dolitrace@dolitrace", "other"));
@@ -145,6 +146,7 @@ if (!isModEnabled($object->module)) {
 if (!$permissiontoread) {
     accessforbidden();
 }
+dolitraceCheckAccess($user, $object);
 
 $error = 0;
 
@@ -386,6 +388,12 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
     print '</div>';
 
     print '<div class="clearboth"></div>';
+
+    // Organic production: status of the reproductive material and derogation on organic plots
+    $organicwarnings = $object->getOrganicWarnings();
+    if (count($organicwarnings)) {
+        print info_admin(implode('<br>', array_map('dol_escape_htmltag', $organicwarnings)), 0, 0, 'warning');
+    }
 
     print dol_get_fiche_end();
 

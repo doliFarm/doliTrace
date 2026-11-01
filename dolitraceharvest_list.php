@@ -1,7 +1,7 @@
 <?php
 /* Copyright (C) 2007-2017  Laurent Destailleur     <eldy@users.sourceforge.net>
  * Copyright (C) 2024       Frédéric France         <frederic.france@free.fr>
- * Copyright (C) 2026		SuperAdmin
+ * Copyright (C) 2026		Luigi Grillo - doliFarm.com	<info@dolifarm.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -92,6 +92,7 @@ include_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
 include_once DOL_DOCUMENT_ROOT.'/core/lib/company.lib.php';
 // load module libraries
 include_once __DIR__.'/class/dolitraceharvest.class.php';
+dol_include_once('/dolitrace/lib/dolitrace_access.lib.php');
 // for other modules
 //dol_include_once('/othermodule/class/otherobject.class.php');
 
@@ -339,6 +340,7 @@ if (!empty($object->ismultientitymanaged) && (int) $object->ismultientitymanaged
 } else {
 	$sql .= " WHERE 1 = 1";
 }
+$sql .= dolitraceSqlCropplanSocFilter($user, 't.fk_cropplan');
 foreach ($search as $key => $val) {
 	if (array_key_exists($key, $object->fields)) {
 		if ($key == 'status' && $search[$key] == -1) {

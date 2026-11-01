@@ -1,7 +1,7 @@
 <?php
 /* Copyright (C) 2017       Laurent Destailleur     <eldy@users.sourceforge.net>
  * Copyright (C) 2024-2025  Frédéric France         <frederic.france@free.fr>
- * Copyright (C) 2026       SuperAdmin
+ * Copyright (C) 2026       Luigi Grillo - doliFarm.com	<info@dolifarm.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -98,6 +98,7 @@ include_once DOL_DOCUMENT_ROOT.'/projet/class/project.class.php';
 dol_include_once('/dolitrace/class/dolitracecropplan.class.php');
 // [MOD] Inclusione libreria per funzioni helper (getFarmTypeId)
 dol_include_once('/dolitrace/lib/dolitrace_cropplan.lib.php');
+dol_include_once('/dolitrace/lib/dolitrace_access.lib.php');
 
 // Load translation files required by the page
 $langs->loadLangs(array("dolitrace@dolitrace", "other", "projects"));
@@ -187,6 +188,7 @@ if (!isModEnabled($object->module)) {
 if (!$permissiontoread) {
     accessforbidden();
 }
+dolitraceCheckAccess($user, $object);
 
 $error = 0;
 
@@ -267,16 +269,16 @@ $help_url = '';
 llxHeader('', $title, $help_url, '', 0, 0, '', '', '', 'mod-dolitrace page-card');
 
 // ==============================================================================
-// [MOD] PREPARAZIONE FILTRO FARM (SQL Standard per select_company)
+// [MOD] PREPARAZIONE FILTRO FARM (Universal Search Filter per select_company)
 // ==============================================================================
 dol_include_once('/dolifarm/lib/dolifarm.lib.php');
 
 $farm_type_id = getFarmTypeId($db); 
 if ($farm_type_id > 0) {
-    // Usiamo SQL standard qui perché select_company non usa il parser ':=:'
-    $filter_farm_sql = "status=1 AND fk_typent = " . ((int)$farm_type_id);
+    // select_company() accepts only the Universal Search Filter syntax: raw SQL is rejected with a technical error
+    $filter_farm_sql = "(s.status:=:1) AND (s.fk_typent:=:" . ((int)$farm_type_id) . ")";
 } else {
-    $filter_farm_sql = "status=1";
+    $filter_farm_sql = "(s.status:=:1)";
 }
 
 // Part to create
@@ -335,7 +337,10 @@ if ($action == 'create') {
     // -------------------------------------------------------------------------
     // [MOD] 2. PLOT: Configurazione Dinamica prima del Template
     // -------------------------------------------------------------------------
-    if ($object->fk_soc > 0) {
+    // The farm can come from the URL: plots only of a farm the user can see
+    if ($object->fk_soc > 0 && !dolifarmUserCanSeeSoc($user, (int) $object->fk_soc)) {
+        $object->fields['fk_plot']['type'] = "integer:DoliFarmPlot:dolifarm/class/dolifarmplot.class.php:1:(rowid:=:-1)";
+    } elseif ($object->fk_soc > 0) {
         // Sovrascriviamo definizione (=) per evitare errori di sintassi
         $filter_plot_dynamic = "(fk_soc:=:" . ((int)$object->fk_soc) . ") AND (status:=:1)";
         $object->fields['fk_plot']['type'] = "integer:DoliFarmPlot:dolifarm/class/dolifarmplot.class.php:1:" . $filter_plot_dynamic;
@@ -408,7 +413,7 @@ if (($id || $ref) && $action == 'edit') {
     // -------------------------------------------------------------------------
     // [MOD] 2. PLOT: Configurazione Dinamica
     // -------------------------------------------------------------------------
-    if ($object->fk_soc > 0) {
+    if ($object->fk_soc > 0 && dolifarmUserCanSeeSoc($user, (int) $object->fk_soc)) {
         $filter_plot_dynamic = "(fk_soc:=:" . ((int)$object->fk_soc) . ") AND (status:=:1)";
         $object->fields['fk_plot']['type'] = "integer:DoliFarmPlot:dolifarm/class/dolifarmplot.class.php:1:" . $filter_plot_dynamic;
     } else {

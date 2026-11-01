@@ -2,7 +2,7 @@
 /* Copyright (C) 2004-2018	Laurent Destailleur			<eldy@users.sourceforge.net>
  * Copyright (C) 2018-2019	Nicolas ZABOURI				<info@inovea-conseil.com>
  * Copyright (C) 2019-2024	Frédéric France				<frederic.france@free.fr>
- * Copyright (C) 2026		SuperAdmin
+ * Copyright (C) 2026		Luigi Grillo - doliFarm.com	<info@dolifarm.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -79,7 +79,7 @@ class modDolitrace extends DolibarrModules
 		$this->editor_squarred_logo = '';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@dolitrace'
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = '1.1.0';
+		$this->version = '1.2.0';
 		// Url to the file with your last numberversion of this module
 		//$this->url_last_version = 'http://www.example.com/versionmodule.txt';
 
@@ -123,11 +123,10 @@ class modDolitrace extends DolibarrModules
 			// Set here all hooks context managed by module. To find available hook context, make a "grep -r '>initHooks(' *" on source code. You can also set hook context to 'all'
 			/* BEGIN MODULEBUILDER HOOKSCONTEXTS */
 			'hooks' => array(
-				//   'data' => array(
-				//       'hookcontext1',
-				//       'hookcontext2',
-				//   ),
-				//   'entity' => '0',
+				'data' => array(
+					'index',	// Home page: group of the field register in the dashboard of open elements
+				),
+				'entity' => '0',
 			),
 			/* END MODULEBUILDER HOOKSCONTEXTS */
 			// Set this to 1 if features of module are opened to external users
@@ -164,7 +163,7 @@ class modDolitrace extends DolibarrModules
 		$this->langfiles = array("dolitrace@dolitrace");
 
 		// Prerequisites
-		$this->phpmin = array(7, 2); // Minimum version of PHP required by module
+		$this->phpmin = array(8, 2); // Minimum version of PHP required by module
 		// $this->phpmax = array(8, 0); // Maximum version of PHP required by module
 		$this->need_dolibarr_version = array(23, 0); // Minimum version of Dolibarr required by module (same as doliFarm)
 		// $this->max_dolibarr_version = array(19, -3); // Maximum version of Dolibarr required by module
@@ -251,7 +250,7 @@ class modDolitrace extends DolibarrModules
 		 // Name of columns with primary key (try to always name it 'rowid')
 		 'tabrowid' => array("rowid", "rowid", "rowid"),
 		 // Condition to show each dictionary
-		 'tabcond' => array(isModEnabled('dolitrace'), isModEnabled('dolitrace'), isModEnabled('dolitrace')),
+		 'tabcond' => array(isModEnabled('dolitrace'), isModEnabled('dolitrace'), isModEnabled('dolitrace'), isModEnabled('dolitrace')),
 		 // Tooltip for every fields of dictionaries: DO NOT PUT AN EMPTY ARRAY
 		 'tabhelp' => array(array('code' => $langs->trans('CodeTooltipHelp'), 'field2' => 'field2tooltip'), array('code' => $langs->trans('CodeTooltipHelp'), 'field2' => 'field2tooltip'), ...),
 		 );
@@ -260,22 +259,28 @@ class modDolitrace extends DolibarrModules
 		// Register of the treatments and fertilizations: adversities (EPPO codes) and units of dose
 		$this->dictionaries = array(
 			'langs' => 'dolitrace@dolitrace',
-			'tabname' => array('dolitrace_c_adversity', 'dolitrace_c_dose_unit'),
-			'tablib' => array('DictionaryAdversity', 'DictionaryDoseUnit'),
+			'tabname' => array('dolitrace_c_adversity', 'dolitrace_c_dose_unit', 'dolitrace_c_irrigation_method', 'dolitrace_c_application_method', 'dolitrace_c_justification'),
+			'tablib' => array('DictionaryAdversity', 'DictionaryDoseUnit', 'DictionaryIrrigationMethod', 'DictionaryApplicationMethod', 'DictionaryJustification'),
 			'tabsql' => array(
 				'SELECT rowid, code, label, category, active, position FROM '.MAIN_DB_PREFIX.'dolitrace_c_adversity',
 				'SELECT rowid, code, label, kind, technical_type, basis, qty_unit, factor, active, position FROM '.MAIN_DB_PREFIX.'dolitrace_c_dose_unit',
+				'SELECT rowid, code, label, agea_value, active, position FROM '.MAIN_DB_PREFIX.'dolitrace_c_irrigation_method',
+				'SELECT rowid, code, label, kind, fert_group, agea_value, active, position FROM '.MAIN_DB_PREFIX.'dolitrace_c_application_method',
+				'SELECT rowid, code, label, active, position FROM '.MAIN_DB_PREFIX.'dolitrace_c_justification',
 			),
-			'tabsqlsort' => array('position ASC, label ASC', 'position ASC, code ASC'),
-			'tabfield' => array('code,label,category,position', 'code,label,kind,technical_type,basis,qty_unit,factor,position'),
-			'tabfieldvalue' => array('code,label,category,position', 'code,label,kind,technical_type,basis,qty_unit,factor,position'),
-			'tabfieldinsert' => array('code,label,category,position', 'code,label,kind,technical_type,basis,qty_unit,factor,position'),
-			'tabrowid' => array('rowid', 'rowid'),
-			'tabcond' => array(isModEnabled('dolitrace'), isModEnabled('dolitrace')),
+			'tabsqlsort' => array('position ASC, label ASC', 'position ASC, code ASC', 'position ASC, label ASC', 'kind ASC, position ASC, label ASC', 'position ASC, label ASC'),
+			'tabfield' => array('code,label,category,position', 'code,label,kind,technical_type,basis,qty_unit,factor,position', 'code,label,agea_value,position', 'code,label,kind,fert_group,agea_value,position', 'code,label,position'),
+			'tabfieldvalue' => array('code,label,category,position', 'code,label,kind,technical_type,basis,qty_unit,factor,position', 'code,label,agea_value,position', 'code,label,kind,fert_group,agea_value,position', 'code,label,position'),
+			'tabfieldinsert' => array('code,label,category,position', 'code,label,kind,technical_type,basis,qty_unit,factor,position', 'code,label,agea_value,position', 'code,label,kind,fert_group,agea_value,position', 'code,label,position'),
+			'tabrowid' => array('rowid', 'rowid', 'rowid', 'rowid', 'rowid'),
+			'tabcond' => array(isModEnabled('dolitrace'), isModEnabled('dolitrace'), isModEnabled('dolitrace'), isModEnabled('dolitrace'), isModEnabled('dolitrace')),
 			'tabhelp' => array(
 				array('code' => $langs->trans('AdversityCodeHelp'), 'category' => $langs->trans('AdversityCategoryHelp')),
 				array('code' => $langs->trans('DoseUnitCodeHelp'), 'kind' => $langs->trans('DoseUnitKindHelp'), 'technical_type' => $langs->trans('DoseUnitTechnicalTypeHelp'),
 					'basis' => $langs->trans('DoseUnitBasisHelp'), 'qty_unit' => $langs->trans('DoseUnitQtyUnitHelp'), 'factor' => $langs->trans('DoseUnitFactorHelp')),
+				array('code' => $langs->trans('IrrigationMethodCodeHelp'), 'agea_value' => $langs->trans('AgeaValueHelp')),
+				array('code' => $langs->trans('ApplicationMethodCodeHelp'), 'kind' => $langs->trans('ApplicationMethodKindHelp'), 'fert_group' => $langs->trans('ApplicationMethodFertGroupHelp'), 'agea_value' => $langs->trans('AgeaValueHelp')),
+				array('code' => $langs->trans('JustificationCodeHelp')),
 			),
 		);
 		/* END MODULEBUILDER DICTIONARIES */
@@ -494,6 +499,21 @@ class modDolitrace extends DolibarrModules
 			'target' => '',
 			'user' => 2,
 			'object' => 'DoliTraceHarvest'
+		);
+		// Registers of organic production: stock in and out, mass balance, summary by plot (read only)
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitraceharvest',
+			'type' => 'left',
+			'titre' => 'BioRegister',
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitrace_bioregister',
+			'url' => '/dolitrace/dolitrace_bioregister.php',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "read")',
+			'target' => '',
+			'user' => 2,
 		);
 		/*
 		$this->menu[$r++] = array(

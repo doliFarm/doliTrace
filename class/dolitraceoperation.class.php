@@ -1,7 +1,7 @@
 <?php
 /* Copyright (C) 2017       Laurent Destailleur      <eldy@users.sourceforge.net>
  * Copyright (C) 2023-2025  Frédéric France          <frederic.france@free.fr>
- * Copyright (C) 2026		SuperAdmin
+ * Copyright (C) 2026		Luigi Grillo - doliFarm.com	<info@dolifarm.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -73,7 +73,7 @@ class DoliTraceOperation extends CommonObject
 	 * @var int<0,1>|string		Does this object support multicompany module ?
 	 * 							0=No test on entity, 1=Test with field entity in local table, 'field@table'=Test entity into the field@table (example 'fk_soc@societe')
 	 */
-	public $ismultientitymanaged = 0;
+	public $ismultientitymanaged = 1;
 
 	/**
      * @var array|null  Cache dei tipi operazione per evitare query multiple
@@ -83,6 +83,14 @@ class DoliTraceOperation extends CommonObject
 	const STATUS_DRAFT = 0;
 	const STATUS_VALIDATED = 1;
 	const STATUS_CANCELED = 9;
+
+	// Type of the irrigations (register of the irrigations)
+	const TYPE_IRRIGATION = 'IRRIGATION';
+
+	/**
+	 * @var string[]	Types of the sowing and planting: the reproductive material has an organic status (Reg. EU 2018/848, annex II part I point 1.8)
+	 */
+	public static $seedingTypes = array('PLANTING', 'SOWING_DIRECT', 'TRANSPLANTING', 'OVERSEEDING', 'PLANTATION');
 
 	/**
 	 *  'type' field format:
@@ -135,8 +143,10 @@ class DoliTraceOperation extends CommonObject
 	public $fields = array(
 		"rowid" => array("type" => "int", "label" => "TechnicalID", "enabled" => "1", 'position' => 10, 'notnull' => 1, "visible" => "0",),
 		"ref" => array("type" => "varchar(128)", "label" => "Ref", "enabled" => "1", 'position' => 15, 'notnull' => 0, "visible" => "5", "csslist" => "tdoverflowmax150", "showoncombobox" => "1",),
+		"entity" => array("type" => "integer", "label" => "Entity", "enabled" => "1", 'position' => 20, 'notnull' => 1, "visible" => "0", "default" => "1", "index" => 1,),
 		"fk_cropplan" => array("type" => "integer:DoliTraceCropplan:dolitrace/class/dolitracecropplan.class.php","label" => "CropPlan","enabled" => "1","position" => 25,"notnull" => 1,"visible" => "1","index" => 1,"css" => "minwidth300", ),
 		"date_op" => array("type" => "datetime", "label" => "Dateop", "enabled" => "1", 'position' => 30, 'notnull' => 1, "visible" => "-1",),
+		"date_op_end" => array("type" => "datetime", "label" => "OperationDateEnd", "help" => "OperationDateEndHelp", "enabled" => "1", 'position' => 31, 'notnull' => 0, "visible" => "-1",),
 		//"fk_operation_type" => array("type" => "varchar(32)", "label" => "Fkoperationtype", "enabled" => "1", 'position' => 35, 'notnull' => 1, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
 		"fk_operation_type" => array(
         "type" => "varchar(32)",
@@ -153,27 +163,36 @@ class DoliTraceOperation extends CommonObject
 		
 		"label" => array("type" => "varchar(255)", "label" => "Label", "enabled" => "1", 'position' => 40, 'notnull' => 0, "visible" => "1", "alwayseditable" => "1", "css" => "minwidth300", "cssview" => "wordbreak", "csslist" => "tdoverflowmax150",),
 		"weather_cond" => array("type" => "varchar(128)", "label" => "Weathercond", "enabled" => "1", 'position' => 45, 'notnull' => 0, "visible" => "-1",),
-		"fk_pheno_stage" => array("type" => "varchar(64)", "label" => "Fkphenostage", "enabled" => "1", 'position' => 50, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
+		"fk_pheno_stage" => array("type" => "varchar(64)", "label" => "OperationBbch", "help" => "OperationBbchHelp", "enabled" => "1", 'position' => 50, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
 		"fk_adversity" => array("type" => "varchar(64)", "label" => "Fkadversity", "enabled" => "1", 'position' => 55, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
 		"fk_machine" => array("type" => "int", "label" => "Fkmachine", "enabled" => "1", 'position' => 60, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
 		"duration_min" => array("type" => "int", "label" => "Durationmin", "enabled" => "1", 'position' => 65, 'notnull' => 0, "visible" => "-1",),
 		"depth_cm" => array("type" => "decimal(5,2)", "label" => "Depthcm", "enabled" => "1", 'position' => 70, 'notnull' => 0, "visible" => "-1",),
 		"fk_product" => array("type" => "integer:Product:product/class/product.class.php:1", "label" => "Fkproduct", "picto" => "product", "enabled" => "1", 'position' => 75, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx", "csslist" => "tdoverflowmax150",),
 		"batch_input" => array("type" => "varchar(128)", "label" => "Batchinput", "enabled" => "1", 'position' => 80, 'notnull' => 0, "visible" => "-1",),
+		// Organic production: sowing and planting (copied from the product when empty)
+		"seed_status" => array("type" => "varchar(16)", "label" => "OperationSeedStatus", "enabled" => "1", 'position' => 81, 'notnull' => 0, "visible" => "-1", "arrayofkeyval" => array('BIO' => 'SeedStatusBio', 'INCONV' => 'SeedStatusInConversion', 'NONBIO' => 'SeedStatusNonBio'), "help" => "OperationSeedStatusHelp",),
+		"bdsb_ref" => array("type" => "varchar(64)", "label" => "OperationBdsbRef", "enabled" => "1", 'position' => 82, 'notnull' => 0, "visible" => "-1", "help" => "OperationBdsbRefHelp",),
+		"bdsb_date" => array("type" => "date", "label" => "OperationBdsbDate", "enabled" => "1", 'position' => 83, 'notnull' => 0, "visible" => "-1",),
 		"qty_used" => array("type" => "decimal(24,8)", "label" => "Qtyused", "enabled" => "1", 'position' => 85, 'notnull' => 0, "visible" => "-1",),
-		"water_vol_ha" => array("type" => "decimal(24,8)", "label" => "Watervolha", "enabled" => "1", 'position' => 90, 'notnull' => 0, "visible" => "-1",),
+		"water_vol_ha" => array("type" => "decimal(24,8)", "label" => "Watervolha", "enabled" => "1", 'position' => 88, 'notnull' => 0, "visible" => "-1",),
+		"irrigation_method" => array("type" => "sellist:dolitrace_c_irrigation_method:label:code::active=1", "label" => "IrrigationMethod", "enabled" => "1", 'position' => 89, 'notnull' => 0, "visible" => "-1", "help" => "IrrigationOnlyHelp", "css" => "maxwidth300",),
+		"water_volume" => array("type" => "double(24,8)", "label" => "IrrigationWaterVolume", "enabled" => "1", 'position' => 90, 'notnull' => 0, "visible" => "-1", "help" => "IrrigationWaterVolumeHelp", "isameasure" => 1,),
+		"irrigated_area" => array("type" => "double(24,8)", "label" => "IrrigatedArea", "enabled" => "1", 'position' => 91, 'notnull' => 0, "visible" => "-1", "help" => "IrrigatedAreaHelp", "isameasure" => 1,),
+		"fertigation" => array("type" => "boolean", "label" => "Fertigation", "enabled" => "1", 'position' => 92, 'notnull' => 0, "visible" => "-1", "default" => "0", "help" => "FertigationHelp",),
+		"fk_treatment" => array("type" => "integer:DoliTraceTreatment:dolitrace/class/dolitracetreatment.class.php:0:(t.kind:=:2)", "label" => "FertigationRecord", "enabled" => "1", 'position' => 93, 'notnull' => 0, "visible" => "-1", "help" => "FertigationRecordHelp", "css" => "maxwidth300",),
 		"cost_material" => array("type" => "decimal(24,8)", "label" => "Costmaterial", "enabled" => "1", 'position' => 95, 'notnull' => 0, "visible" => "-1",),
 		"cost_manpower" => array("type" => "decimal(24,8)", "label" => "Costmanpower", "enabled" => "1", 'position' => 100, 'notnull' => 0, "visible" => "-1",),
 		"cost_energy" => array("type" => "decimal(24,8)", "label" => "Costenergy", "enabled" => "1", 'position' => 105, 'notnull' => 0, "visible" => "-1",),
-		"status" => array("type" => "int", "label" => "Status", "enabled" => "1", 'position' => 500, 'notnull' => 0, "visible" => "-1",),
+		"status" => array("type" => "int", "label" => "Status", "enabled" => "1", 'position' => 500, 'notnull' => 0, "visible" => "5",),
 		"fk_user_operator" => array("type" => "integer:User:user/class/user.class.php", "label" => "Fkuseroperator", "picto" => "user", "enabled" => "1", 'position' => 115, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx", "csslist" => "tdoverflowmax150",),
-		"note_private" => array("type" => "text", "label" => "NotePublic", "enabled" => "1", 'position' => 120, 'notnull' => 0, "visible" => "0", "cssview" => "wordbreak",),
-		"note_public" => array("type" => "text", "label" => "NotePrivate", "enabled" => "1", 'position' => 125, 'notnull' => 0, "visible" => "0", "cssview" => "wordbreak",),
+		"note_private" => array("type" => "text", "label" => "NotePrivate", "enabled" => "1", 'position' => 120, 'notnull' => 0, "visible" => "0", "cssview" => "wordbreak",),
+		"note_public" => array("type" => "text", "label" => "NotePublic", "enabled" => "1", 'position' => 125, 'notnull' => 0, "visible" => "0", "cssview" => "wordbreak",),
 		"model_pdf" => array("type" => "varchar(255)", "label" => "Modelpdf", "enabled" => "1", 'position' => 130, 'notnull' => 0, "visible" => "0",),
-		"last_main_doc" => array("type" => "varchar(255)", "label" => "Lastmaindoc", "enabled" => "1", 'position' => 135, 'notnull' => 0, "visible" => "-1",),
-		"datec" => array("type" => "datetime", "label" => "DateCreation", "enabled" => "1", 'position' => 140, 'notnull' => 0, "visible" => "-1",),
-		"date_valid" => array("type" => "datetime", "label" => "DateValidation", "enabled" => "1", 'position' => 145, 'notnull' => 0, "visible" => "-1",),
-		"tms" => array("type" => "timestamp", "label" => "DateModification", "enabled" => "1", 'position' => 150, 'notnull' => 0, "visible" => "-1",),
+		"last_main_doc" => array("type" => "varchar(255)", "label" => "Lastmaindoc", "enabled" => "1", 'position' => 135, 'notnull' => 0, "visible" => "0",),
+		"datec" => array("type" => "datetime", "label" => "DateCreation", "enabled" => "1", 'position' => 140, 'notnull' => 0, "visible" => "-2",),
+		"date_valid" => array("type" => "datetime", "label" => "DateValidation", "enabled" => "1", 'position' => 145, 'notnull' => 0, "visible" => "-2",),
+		"tms" => array("type" => "timestamp", "label" => "DateModification", "enabled" => "1", 'position' => 150, 'notnull' => 0, "visible" => "-2",),
 		"fk_user_creat" => array("type" => "integer:User:user/class/user.class.php", "label" => "UserAuthor", "picto" => "user", "enabled" => "1", 'position' => 155, 'notnull' => 0, "visible" => "-2", "css" => "maxwidth500 widthcentpercentminusxx", "csslist" => "tdoverflowmax150",),
 		"fk_user_modif" => array("type" => "integer:User:user/class/user.class.php", "label" => "UserModif", "picto" => "user", "enabled" => "1", 'position' => 160, 'notnull' => -1, "visible" => "-2", "css" => "maxwidth500 widthcentpercentminusxx", "csslist" => "tdoverflowmax150",),
 		"import_key" => array("type" => "varchar(14)", "label" => "ImportId", "enabled" => "1", 'position' => 900, 'notnull' => 0, "visible" => "-2",),
@@ -182,6 +201,11 @@ class DoliTraceOperation extends CommonObject
 	public $ref;
 	public $fk_cropplan;
 	public $date_op;
+
+	/**
+	 * @var int|string|null	End of the operation (AGEA field notebook: start and end of each crop operation and phenological stage)
+	 */
+	public $date_op_end;
 	public $fk_operation_type;
 	public $label;
 	public $weather_cond;
@@ -192,8 +216,29 @@ class DoliTraceOperation extends CommonObject
 	public $depth_cm;
 	public $fk_product;
 	public $batch_input;
+
+	/**
+	 * @var string|null		Organic status of the reproductive material: BIO, INCONV or NONBIO
+	 */
+	public $seed_status;
+
+	/**
+	 * @var string|null		Number of the derogation of the BDSB (banca dati sementi biologiche) for non organic material
+	 */
+	public $bdsb_ref;
+
+	/**
+	 * @var int|string|null	Date of the derogation
+	 */
+	public $bdsb_date;
 	public $qty_used;
 	public $water_vol_ha;
+	public $entity;
+	public $irrigation_method;
+	public $water_volume;
+	public $irrigated_area;
+	public $fertigation;
+	public $fk_treatment;
 	public $cost_material;
 	public $cost_manpower;
 	public $cost_energy;
@@ -263,6 +308,11 @@ class DoliTraceOperation extends CommonObject
 		
 		dol_include_once('/dolifarm/lib/dolifarm_icons.lib.php');
 		$this->picto = dolifarm_get_fa_icon('operation');
+		// Drop-down lists only with the farms the user can see (doliFarm >= 1.3.1)
+		dol_include_once('/dolifarm/lib/dolifarm_access.lib.php');
+		if (function_exists('dolifarmRestrictLinkFields')) {
+			dolifarmRestrictLinkFields($this, array('fk_cropplan', 'fk_treatment'));
+		}
 
 		if (!getDolGlobalInt('MAIN_SHOW_TECHNICAL_ID') && isset($this->fields['rowid']) && !empty($this->fields['ref'])) {
 			$this->fields['rowid']['visible'] = 0;
@@ -342,6 +392,15 @@ class DoliTraceOperation extends CommonObject
 	 */
 	public function create(User $user, $notrigger = 0)
 	{
+		global $conf;
+
+		// createCommon() does not fill the entity
+		if (empty($this->entity)) {
+			$this->entity = $conf->entity;
+		}
+		if ($this->checkData() < 0) {
+			return -1;
+		}
 		$result = $this->createCommon($user, $notrigger);
 
 		// uncomment lines below if you want to validate object after creation
@@ -576,7 +635,150 @@ class DoliTraceOperation extends CommonObject
 	 */
 	public function update(User $user, $notrigger = 0)
 	{
+		if ($this->checkData() < 0) {
+			return -1;
+		}
 		return $this->updateCommon($user, $notrigger);
+	}
+
+	/**
+	 * Check the data of the register of the crop events and of the irrigations before saving
+	 *
+	 * Irrigation data only on irrigations; the fertigation is linked to a fertilization record of the same farm.
+	 *
+	 * @return	int		Return integer <0 if KO, >0 if OK
+	 */
+	public function checkData()
+	{
+		global $langs;
+
+		$langs->load('dolitrace@dolitrace');
+		$start = $this->date_op;
+		$end = $this->date_op_end;
+		if ($start !== null && $start !== '' && !is_numeric($start)) {
+			$start = dol_stringtotime($start);
+		}
+		if ($end !== null && $end !== '' && !is_numeric($end)) {
+			$end = dol_stringtotime($end);
+		}
+		if (!empty($start) && !empty($end) && $end < $start) {
+			$this->error = $langs->trans('ErrorOperationDateEnd');
+			return -1;
+		}
+		// BBCH code: two digits, the first is the main stage
+		$this->fk_pheno_stage = trim((string) $this->fk_pheno_stage);
+		if ($this->fk_pheno_stage !== '' && !preg_match('/^[0-9]{1,2}$/', $this->fk_pheno_stage)) {
+			$this->error = $langs->trans('ErrorOperationBbch');
+			return -1;
+		}
+		if ($this->fk_pheno_stage === '') {
+			$this->fk_pheno_stage = null;
+		}
+		// Organic status of the reproductive material: only on sowing and planting, copied from the product when empty
+		if (!in_array((string) $this->fk_operation_type, self::$seedingTypes)) {
+			$this->seed_status = null;
+			$this->bdsb_ref = null;
+			$this->bdsb_date = null;
+		} else {
+			if (!in_array((string) $this->seed_status, array('BIO', 'INCONV', 'NONBIO'))) {
+				$this->seed_status = $this->productSeedStatus();
+			}
+			// The derogation is for non organic material only
+			if ($this->seed_status != 'NONBIO') {
+				$this->bdsb_ref = null;
+				$this->bdsb_date = null;
+			}
+		}
+		$isirrigation = ($this->fk_operation_type == self::TYPE_IRRIGATION);
+		if (!$isirrigation) {
+			// Irrigation data left by a change of type are not kept
+			$this->irrigation_method = null;
+			$this->water_volume = null;
+			$this->irrigated_area = null;
+			$this->fertigation = 0;
+			$this->fk_treatment = null;
+			return 1;
+		}
+		foreach (array('water_volume', 'irrigated_area') as $key) {
+			if ($this->$key !== null && $this->$key !== '' && (float) $this->$key < 0) {
+				$this->error = $langs->trans('ErrorValueMustBePositive', $langs->transnoentitiesnoconv($this->fields[$key]['label']));
+				return -1;
+			}
+		}
+		if (empty($this->fertigation)) {
+			$this->fk_treatment = null;
+		} elseif (!empty($this->fk_treatment)) {
+			$sql = "SELECT t.kind, t.fk_soc, cp.fk_soc as cropplan_soc FROM ".$this->db->prefix()."dolitrace_treatment as t";
+			$sql .= " LEFT JOIN ".$this->db->prefix()."dolitrace_cropplan as cp ON cp.rowid = ".((int) $this->fk_cropplan);
+			$sql .= " WHERE t.rowid = ".((int) $this->fk_treatment);
+			$resql = $this->db->query($sql);
+			$obj = $resql ? $this->db->fetch_object($resql) : null;
+			if (!$obj || (int) $obj->kind != 2 || (int) $obj->fk_soc != (int) $obj->cropplan_soc) {
+				$this->error = $langs->trans('ErrorOperationFertigationRecord');
+				return -1;
+			}
+		}
+		return 1;
+	}
+
+	/**
+	 * Organic status of the reproductive material from the product (extrafield of doliFarm)
+	 *
+	 * @return	string|null		BIO, INCONV, NONBIO, null when not set
+	 */
+	private function productSeedStatus()
+	{
+		if (!($this->fk_product > 0)) {
+			return null;
+		}
+		$sql = "SELECT dolifarm_seed_status FROM ".$this->db->prefix()."product_extrafields WHERE fk_object = ".((int) $this->fk_product);
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			// The extrafield is created by the activation of doliFarm: not there yet on older installations
+			return null;
+		}
+		$obj = $this->db->fetch_object($resql);
+		$this->db->free($resql);
+		return ($obj && in_array((string) $obj->dolifarm_seed_status, array('BIO', 'INCONV', 'NONBIO')) ? (string) $obj->dolifarm_seed_status : null);
+	}
+
+	/**
+	 * Warnings of the organic production on a sowing or planting (they do not block the saving)
+	 *
+	 * On a plot in conversion or organic at the date of the operation (Reg. EU 2018/848, annex II part I point 1.8;
+	 * DM 15130/2017): the status of the material must be given, and non organic material needs a derogation of the BDSB.
+	 *
+	 * @return	string[]	Warnings, translated
+	 */
+	public function getOrganicWarnings()
+	{
+		global $langs;
+
+		$warnings = array();
+		if (!in_array((string) $this->fk_operation_type, self::$seedingTypes) || empty($this->fk_cropplan) || empty($this->date_op)
+			|| !dol_include_once('/dolifarm/lib/dolifarm_bio.lib.php') || !function_exists('dolifarmBioStatusAt')) {
+			return $warnings;
+		}
+		$langs->loadLangs(array('dolitrace@dolitrace', 'dolifarm@dolifarm'));
+		$sql = "SELECT cp.fk_plot, p.ref FROM ".$this->db->prefix()."dolitrace_cropplan as cp";
+		$sql .= " INNER JOIN ".$this->db->prefix()."dolifarm_plot as p ON p.rowid = cp.fk_plot";
+		$sql .= " WHERE cp.rowid = ".((int) $this->fk_cropplan);
+		$resql = $this->db->query($sql);
+		$plot = $resql ? $this->db->fetch_object($resql) : null;
+		if (!$plot) {
+			return $warnings;
+		}
+		$date = (is_numeric($this->date_op) ? (int) $this->date_op : dol_stringtotime($this->date_op));
+		$status = dolifarmBioStatusAt($this->db, (int) $plot->fk_plot, $date);
+		if (!dolifarmBioIsOrganic($status)) {
+			return $warnings;
+		}
+		if ((string) $this->seed_status === '') {
+			$warnings[] = $langs->transnoentities('WarningOperationSeedStatusMissing', $plot->ref);
+		} elseif ($this->seed_status == 'NONBIO' && trim((string) $this->bdsb_ref) === '') {
+			$warnings[] = $langs->transnoentities('WarningOperationSeedNoDerogation', $plot->ref);
+		}
+		return $warnings;
 	}
 
 	/**
@@ -1086,14 +1288,15 @@ class DoliTraceOperation extends CommonObject
 	 */
 	public function info($id)
 	{
-		$sql = "SELECT t.rowid, t.date_creation as datec, t.fk_user_creat, t.fk_user_modif";
+		// The table of the operations has the columns datec and date_valid (not date_creation and date_validation)
+		$sql = "SELECT t.rowid, t.datec, t.fk_user_creat, t.fk_user_modif";
 		if (!empty($this->isextrafieldmanaged) && $this->isextrafieldmanaged == 1) {
 			$sql .= ", GREATEST(t.tms, te.tms) as datem";
 		} else {
 			$sql .= ", t.tms as datem";
 		}
-		if (!empty($this->fields['date_validation'])) {
-			$sql .= ", t.date_validation as datev";
+		if (!empty($this->fields['date_valid'])) {
+			$sql .= ", t.date_valid as datev";
 		}
 		if (!empty($this->fields['fk_user_creat'])) {
 			$sql .= ", t.fk_user_creat";

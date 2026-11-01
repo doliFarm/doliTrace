@@ -1,8 +1,8 @@
 <?php
-/* Copyright (C) 2026       SuperAdmin
+/* Copyright (C) 2026       Luigi Grillo - doliFarm.com	<info@dolifarm.com>
  *
  * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
+ * it under the terms of the GNU Affero General Public License as published by
  * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  */
@@ -37,6 +37,7 @@ require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 dol_include_once('/dolitrace/class/dolitracecropplan.class.php');
 dol_include_once('/dolitrace/class/dolitraceharvest.class.php');
 dol_include_once('/dolitrace/lib/dolitrace_cropplan.lib.php');
+dol_include_once('/dolitrace/lib/dolitrace_access.lib.php');
 
 // Langs
 $langs->loadLangs(array("dolitrace@dolitrace", "products", "other"));
@@ -63,6 +64,7 @@ $permissiontoread = $user->hasRight('dolitrace', 'dolitraceharvest', 'read');
 $permissiontowrite = $user->hasRight('dolitrace', 'dolitraceharvest', 'write');
 
 if (!$permissiontoread) accessforbidden();
+dolitraceCheckAccess($user, $object);
 
 
 /*

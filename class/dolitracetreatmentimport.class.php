@@ -1,17 +1,17 @@
 <?php
-/* Copyright (C) 2026      SuperAdmin
+/* Copyright (C) 2026      Luigi Grillo - doliFarm.com	<info@dolifarm.com>
  *
  * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
+ * it under the terms of the GNU Affero General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
@@ -66,6 +66,11 @@ class DoliTraceTreatmentImport
 	public $import_key = '';
 
 	/**
+	 * @var array<string,string>	Areas of the records created in this run (kind, start and area => record of the file)
+	 */
+	private $imported = array();
+
+	/**
 	 * Constructor
 	 *
 	 * @param	DoliDB	$db		Database handler
@@ -84,7 +89,7 @@ class DoliTraceTreatmentImport
 	{
 		$example = array(
 			'record' => '1', 'kind' => 'plant_protection', 'technical_type' => 'surfaces', 'date_start' => '2026-04-10 08:30',
-			'operator_license' => 'PAN-0000', 'machine' => 'MAC-001', 'water_volume' => '500', 'weather' => 'Sereno',
+			'operator_license' => 'PAN-0000', 'machine' => 'MAC-001', 'water_volume' => '500', 'weather' => 'Sereno', 'application_method' => 'PPP_ATOMIZER',
 			'target_type' => 'plot', 'plot_ref' => 'APPEZ-0001', 'crop_eppo' => 'TRZDU', 'bbch' => '31', 'treated_qty' => '1.5', 'treated_unit' => 'HA',
 			'product_type' => 'plant_protection_product', 'reg_number' => '12345', 'adversity_eppo' => 'PLASVI', 'dose' => '2.5', 'dose_unit' => 'KG_HA', 'batch' => 'L2026-01',
 		);
@@ -168,6 +173,7 @@ class DoliTraceTreatmentImport
 
 		$langs->loadLangs(array('dolitrace@dolitrace', 'dolifarm@dolifarm'));
 		$this->results = array();
+		$this->imported = array();
 		$this->import_key = dol_print_date(dol_now(), '%Y%m%d%H%M%S');
 		$farm = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, nom, idprof4 FROM ".$this->db->prefix()."societe WHERE rowid = ".((int) $socid)." AND entity IN (".getEntity('societe').")");
 		if (!isset($farm[$socid])) {
@@ -261,15 +267,25 @@ class DoliTraceTreatmentImport
 			$result['errors'][] = $langs->transnoentities('ErrorTreatmentImportValue', 'water_volume', $value($head, 'water_volume'));
 			$object->water_volume = null;
 		}
-
-		// Same farm, kind and start: the record is already in the register (the file was already imported)
-		$sql = "SELECT rowid, ref FROM ".$this->db->prefix()."dolitrace_treatment";
-		$sql .= " WHERE entity IN (".getEntity('dolitracetreatment').") AND fk_soc = ".((int) $object->fk_soc)." AND kind = ".((int) $object->kind);
-		$sql .= " AND date_start = '".$this->db->idate($object->date_start)."' AND status IN (0, 1)";
-		$existing = dolitraceTreatmentFetchRows($this->db, $sql);
-		if (count($existing)) {
-			$result['errors'][] = $langs->transnoentities('ErrorTreatmentImportExists', reset($existing)->ref);
-			return null;
+		if ($value($head, 'application_method') !== '') {
+			$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, code FROM ".$this->db->prefix()."dolitrace_c_application_method WHERE active = 1 AND kind = ".((int) $object->kind)." AND code = '".$this->db->escape($value($head, 'application_method'))."'");
+			if (count($rows) == 1) {
+				$object->application_method = reset($rows)->code;
+			} else {
+				$result['warnings'][] = $langs->transnoentities('WarningTreatmentImportApplicationMethod', $value($head, 'application_method'));
+			}
+		}
+		// Organic production: document justifying the need of the plant protection
+		if ($value($head, 'justification_type') !== '') {
+			$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, code FROM ".$this->db->prefix()."dolitrace_c_justification WHERE active = 1 AND code = '".$this->db->escape($value($head, 'justification_type'))."'");
+			if (count($rows) == 1) {
+				$object->justification_type = reset($rows)->code;
+			} else {
+				$result['warnings'][] = $langs->transnoentities('WarningTreatmentImportJustification', $value($head, 'justification_type'));
+			}
+		}
+		if ($value($head, 'justification_ref') !== '') {
+			$object->justification_ref = dol_trunc($value($head, 'justification_ref'), 255, 'right', 'UTF-8', 1);
 		}
 
 		// Operator, machine and contractor: if not found the draft is created without them and the user completes it
@@ -354,6 +370,10 @@ class DoliTraceTreatmentImport
 		if (count($result['errors'])) {
 			return null;
 		}
+		$areakeys = $this->checkDuplicate($object, $targetrows, $result);
+		if (count($result['errors'])) {
+			return null;
+		}
 
 		$object->import_key = $this->import_key;
 		if ($object->create($user) < 0) {
@@ -372,7 +392,59 @@ class DoliTraceTreatmentImport
 			$result['errors'][] = $object->error ? $object->error : implode(', ', $object->errors);
 			return null;
 		}
+		foreach ($areakeys as $areakey) {
+			$this->imported[$areakey] = $result['record'];
+		}
 		return $object;
+	}
+
+	/**
+	 * Check that the record is not already in the register or twice in the file: same farm, kind and start on a same area
+	 *
+	 * Records with the same start on other areas are different treatments (e.g. a date without time).
+	 *
+	 * @param	DoliTraceTreatment			$object		Record to create
+	 * @param	DoliTraceTreatmentTarget[]	$targetrows	Areas of the record
+	 * @param	array<string,mixed>			$result		Result, errors are added
+	 * @return	string[]							Keys of the areas, to find the duplicates in the rest of the file
+	 */
+	private function checkDuplicate($object, $targetrows, &$result)
+	{
+		global $langs;
+
+		$areakeys = array();
+		$where = array();
+		foreach ($targetrows as $target) {
+			if (!empty($target->fk_cropplan)) {
+				$area = 'cropplan:'.((int) $target->fk_cropplan);
+				$where[] = "tt.fk_cropplan = ".((int) $target->fk_cropplan);
+			} elseif (!empty($target->fk_building)) {
+				$area = 'building:'.((int) $target->fk_building);
+				$where[] = "tt.fk_building = ".((int) $target->fk_building);
+			} else {
+				$area = 'seeds:'.$target->seed_batch;
+				$where[] = "tt.seed_batch = '".$this->db->escape($target->seed_batch)."'";
+			}
+			$areakey = ((int) $object->kind).'|'.((int) $object->date_start).'|'.$area;
+			if (isset($this->imported[$areakey])) {
+				$result['errors'][] = $langs->transnoentities('ErrorTreatmentImportDuplicate', $this->imported[$areakey]);
+				return array();
+			}
+			$areakeys[] = $areakey;
+		}
+
+		// Records created before this run (those of this run are found above, also in a check)
+		$sql = "SELECT DISTINCT t.rowid, t.ref FROM ".$this->db->prefix()."dolitrace_treatment as t";
+		$sql .= " INNER JOIN ".$this->db->prefix()."dolitrace_treatment_target as tt ON tt.fk_treatment = t.rowid";
+		$sql .= " WHERE t.entity IN (".getEntity('dolitracetreatment').") AND t.fk_soc = ".((int) $object->fk_soc)." AND t.kind = ".((int) $object->kind);
+		$sql .= " AND t.date_start = '".$this->db->idate($object->date_start)."' AND t.status IN (0, 1)";
+		$sql .= " AND (t.import_key IS NULL OR t.import_key <> '".$this->db->escape($this->import_key)."')";
+		$sql .= " AND (".implode(' OR ', $where).")";
+		$existing = dolitraceTreatmentFetchRows($this->db, $sql);
+		if (count($existing)) {
+			$result['errors'][] = $langs->transnoentities('ErrorTreatmentImportExists', reset($existing)->ref);
+		}
+		return $areakeys;
 	}
 
 	/**
@@ -502,13 +574,8 @@ class DoliTraceTreatmentImport
 			$product->fk_product = ($found->fk_product > 0 ? (int) $found->fk_product : null);
 			$product->product_label = $found->label;
 			$product->reg_number = $found->reg_number;
-			$adversity = null;
-			foreach (dolitraceTreatmentAdversities($this->db) as $row) {
-				if (strtoupper((string) $row->code) == strtoupper($data['adversity_eppo'])) {
-					$adversity = $row;
-					break;
-				}
-			}
+			// Any pest code of the EPPO database: added to the dictionary when missing
+			$adversity = dolitraceTreatmentAdversityByCode($this->db, $data['adversity_eppo']);
 			if (!$adversity) {
 				$result['errors'][] = $prefix.$langs->transnoentities('ErrorTreatmentImportNotFound', $langs->transnoentitiesnoconv('TreatmentAdversity'), $data['adversity_eppo']);
 				return null;

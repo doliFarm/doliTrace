@@ -1,5 +1,5 @@
 <?php
-/* Copyright (C) 2026      SuperAdmin
+/* Copyright (C) 2026      Luigi Grillo - doliFarm.com	<info@dolifarm.com>
  * Copyright (C) 2025       Frédéric France         <frederic.france@free.fr>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -204,6 +204,63 @@ function dolitraceTreatmentAdversities($db)
 }
 
 /**
+ * Adversity of the dictionary with an EPPO code. When the code is not in the dictionary but is an active pest code
+ * of the EPPO data imported in doliFarm, it is added to the dictionary (label = Italian or preferred name): any
+ * adversity of the EPPO database can be used and the dictionary keeps the adversities really used.
+ *
+ * @param	DoliDB			$db		Database handler
+ * @param	string			$code	EPPO code
+ * @param	string			$error	Error message, when not found
+ * @return	stdClass|null			Row of the dictionary (rowid, code, label, category), null if not found
+ */
+function dolitraceTreatmentAdversityByCode($db, $code, &$error = '')
+{
+	global $langs;
+
+	$error = '';
+	$code = strtoupper(trim((string) $code));
+	if ($code === '') {
+		return null;
+	}
+	$sql = "SELECT t.rowid, t.code, t.label, t.category FROM ".$db->prefix()."dolitrace_c_adversity as t WHERE t.code = '".$db->escape($code)."'";
+	$rows = dolitraceTreatmentFetchRows($db, $sql);
+	if (count($rows)) {
+		return reset($rows);
+	}
+	$langs->load('dolifarm@dolifarm');
+	if (!dol_include_once('/dolifarm/lib/dolifarm_eppo.lib.php') || !function_exists('dolifarmEppoDataAvailable') || !dolifarmEppoDataAvailable()) {
+		$error = $langs->trans('ErrorEppoCodeNotFound', $code);
+		return null;
+	}
+	$error = dolifarmEppoCheckCode($db, $code, 'pest');
+	if ($error !== '') {
+		return null;
+	}
+	$eppo = dolifarmEppoFetch($db, $code);
+	if (!$eppo || empty($eppo->is_active)) {
+		$error = $langs->trans('ErrorEppoCodeNotFound', $code);
+		return null;
+	}
+	$label = dol_trunc((string) ($eppo->name_it ?: $eppo->prefname), 250, 'right', 'UTF-8', 1);
+	$label = mb_strtoupper(mb_substr($label, 0, 1, 'UTF-8'), 'UTF-8').mb_substr($label, 1, null, 'UTF-8');
+	$category = ($eppo->datatype == 'PFL' ? 'WEED' : 'OTHER');
+	$sql = "INSERT INTO ".$db->prefix()."dolitrace_c_adversity (code, label, category, active, position)";
+	$sql .= " VALUES ('".$db->escape($code)."', '".$db->escape($label)."', '".$db->escape($category)."', 1, 0)";
+	if (!$db->query($sql)) {
+		$error = $db->lasterror();
+		dol_syslog(__FUNCTION__.' '.$error, LOG_ERR);
+		return null;
+	}
+	dol_syslog(__FUNCTION__.' adversity '.$code.' added to the dictionary from the EPPO data', LOG_INFO);
+	$row = new stdClass();
+	$row->rowid = (int) $db->last_insert_id($db->prefix()."dolitrace_c_adversity");
+	$row->code = $code;
+	$row->label = $label;
+	$row->category = $category;
+	return $row;
+}
+
+/**
  * Units of dose for a kind and a technical type of record
  *
  * @param	DoliDB		$db					Database handler
@@ -261,6 +318,7 @@ function dolitraceTreatmentQtyInBasis($object, $basis)
 		'M3' => array('M3' => 1),
 		'KG' => array('KG' => 1, 'T' => 1000),
 		'T' => array('T' => 1, 'KG' => 0.001),
+		'KSEED' => array('KSEED' => 1),
 	);
 	if (empty($conversions[$basis])) {
 		return null;

@@ -1,16 +1,16 @@
--- Copyright (C) 2026      SuperAdmin
+-- Copyright (C) 2026      Luigi Grillo - doliFarm.com	<info@dolifarm.com>
 --
 -- This program is free software: you can redistribute it and/or modify
--- it under the terms of the GNU General Public License as published by
+-- it under the terms of the GNU Affero General Public License as published by
 -- the Free Software Foundation, either version 3 of the License, or
 -- (at your option) any later version.
 --
 -- This program is distributed in the hope that it will be useful,
 -- but WITHOUT ANY WARRANTY; without even the implied warranty of
 -- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
--- GNU General Public License for more details.
+-- GNU Affero General Public License for more details.
 --
--- You should have received a copy of the GNU General Public License
+-- You should have received a copy of the GNU Affero General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
 -- Dictionaries of the register of the treatments and fertilizations.
@@ -208,3 +208,88 @@ INSERT IGNORE INTO llx_dolitrace_c_dose_unit (code, label, kind, technical_type,
 ('ML_KGSEED', 'ml/kg di seme', 1, 3, 'KG', 'l', 0.001, 1, 190),
 ('G_QSEED', 'g/q di seme', 1, 3, 'KG', 'kg', 0.00001, 1, 200),
 ('ML_QSEED', 'ml/q di seme', 1, 3, 'KG', 'l', 0.00001, 1, 210);
+
+-- Irrigation methods (register of the irrigations, section "registro irrigazioni" of the AGEA QDCA)
+CREATE TABLE IF NOT EXISTS llx_dolitrace_c_irrigation_method (
+	rowid			integer AUTO_INCREMENT PRIMARY KEY,
+	code			varchar(16) NOT NULL,
+	label			varchar(64) NOT NULL,
+	agea_value		varchar(128),
+	active			tinyint DEFAULT 1 NOT NULL,
+	position		integer DEFAULT 0,
+	UNIQUE INDEX uk_dolitrace_c_irrigation_method_code (code)
+) ENGINE=innodb;
+
+INSERT IGNORE INTO llx_dolitrace_c_irrigation_method (code, label, active, position) VALUES
+('SPRINKLER', 'Aspersione', 1, 10),
+('DRIP', 'Goccia', 1, 20),
+('MICRO', 'Microirrigazione / Spruzzo', 1, 30),
+('SUBSURFACE', 'Subirrigazione', 1, 40),
+('FURROW', 'Scorrimento / Infiltrazione laterale', 1, 50),
+('FLOOD', 'Sommersione', 1, 60),
+('OTHER', 'Altro', 1, 900);
+
+-- Methods of application or distribution of the records (AGEA field notebook: sheet 3 plant protection, 6 organic and 7 mineral fertilization).
+-- kind: 1 plant protection, 2 fertilization; fert_group: ORG organic, MIN mineral; agea_value: item of the AGEA list (no official codes yet)
+CREATE TABLE IF NOT EXISTS llx_dolitrace_c_application_method (
+	rowid			integer AUTO_INCREMENT PRIMARY KEY,
+	code			varchar(32) NOT NULL,
+	label			varchar(128) NOT NULL,
+	kind			smallint DEFAULT 1 NOT NULL,
+	fert_group		varchar(8),
+	agea_value		varchar(128),
+	active			tinyint DEFAULT 1 NOT NULL,
+	position		integer DEFAULT 0,
+	UNIQUE INDEX uk_dolitrace_c_application_method_code (code)
+) ENGINE=innodb;
+
+INSERT IGNORE INTO llx_dolitrace_c_application_method (code, label, kind, fert_group, agea_value, active, position) VALUES
+('PPP_ATOMIZER', 'Atomizzatore', 1, NULL, 'Atomizzatori', 1, 10),
+('PPP_SPRAYER', 'Irroratrice', 1, NULL, 'Irroratrici', 1, 20),
+('PPP_DUSTER', 'Impolveratrice', 1, NULL, 'Impolveratrici', 1, 30),
+('PPP_MICROGRAN', 'Microgranulatore', 1, NULL, 'Microgranulatore', 1, 40),
+('PPP_GREENHOUSE', 'Impianto fisso per serra', 1, NULL, 'Impianti fissi per serra', 1, 50),
+('PPP_HOSE', 'Manichetta', 1, NULL, 'Manichetta', 1, 60),
+('ORG_SPLASH_PLATE', 'Piatto deviatore', 2, 'ORG', 'piatto deviatore', 1, 110),
+('ORG_BOOM', 'Barra di distribuzione', 2, 'ORG', 'barra di distribuzione', 1, 120),
+('ORG_REEL', 'Rotolone a bassa pressione', 2, 'ORG', 'rotolone a bassa pressione', 1, 130),
+('ORG_BAND', 'Rasoterra in banda', 2, 'ORG', 'rasoterra in banda', 1, 140),
+('ORG_BAND_SHOE', 'Rasoterra in banda con deflettore', 2, 'ORG', 'rasoterra in banda con deflettore', 1, 150),
+('ORG_DISC_OPEN', 'Sotto-superficiale a dischi (solco aperto)', 2, 'ORG', 'sotto-superficiale a dischi (solco aperto)', 1, 160),
+('ORG_RIPPER_UMB', 'Sotto-superficiale ripper e ombelicale', 2, 'ORG', 'sotto-superficiale ripper e ombelicale', 1, 170),
+('ORG_RIPPER_CLOSED', 'Sotto-superficiale ripper (solco chiuso)', 2, 'ORG', 'sotto-superficiale ripper (solco chiuso)', 1, 180),
+('ORG_INJ_SELFPROP', 'Sotto-superficiale assolcatore (solco chiuso), operatrice semovente', 2, 'ORG', 'sotto-superficiale assolcatore (solco chiuso) operatrice semovente', 1, 190),
+('ORG_INJ_TRAILED', 'Sotto-superficiale assolcatore (solco chiuso), botte trainata', 2, 'ORG', 'sotto-superficiale assolcatore (solco chiuso) botte trainata', 1, 200),
+('ORG_DEEP_INJ', 'Iniezione profonda', 2, 'ORG', 'iniezione profonda', 1, 210),
+('ORG_FERTIG_PIVOT', 'Fertirrigazione superficiale (ranger o pivot)', 2, 'ORG', 'Fertirrigazione superficiale (ranger o pivot)', 1, 220),
+('ORG_FERTIG_HOSE', 'Fertirrigazione superficiale (manichette)', 2, 'ORG', 'Fertirrigazione superficiale (con manichette)', 1, 230),
+('ORG_FERTIG_SUB', 'Fertirrigazione sotto-superficiale (subirrigazione)', 2, 'ORG', 'Fertirrigazione sotto-superficiale (subirrigazione)', 1, 240),
+('MIN_HOSE', 'In manichetta', 2, 'MIN', 'In manichetta', 1, 310),
+('MIN_RAIN', 'A pioggia', 2, 'MIN', 'a pioggia', 1, 320),
+('MIN_SOIL', 'Al terreno', 2, 'MIN', 'al terreno', 1, 330),
+('MIN_FERTIG', 'Fertirrigazione', 2, 'MIN', 'fertirrigazione', 1, 340),
+('MIN_FOLIAR', 'Fogliare', 2, 'MIN', 'fogliare', 1, 350);
+
+-- Seeds counted by number (AGEA field notebook, sheet 5): treated quantity in thousands of seeds
+INSERT IGNORE INTO llx_dolitrace_c_dose_unit (code, label, kind, technical_type, basis, qty_unit, factor, active, position) VALUES
+('G_KSEED', 'g/1000 semi', 1, 3, 'KSEED', 'kg', 0.001, 1, 220),
+('ML_KSEED', 'ml/1000 semi', 1, 3, 'KSEED', 'l', 0.001, 1, 230);
+
+-- Organic production: type of the document justifying the need of a plant protection product
+-- (Reg. EU 2018/848, annex II part I point 1.10.2; DM 229771/2022 art. 4 c. 8)
+CREATE TABLE IF NOT EXISTS llx_dolitrace_c_justification (
+	rowid			integer AUTO_INCREMENT PRIMARY KEY,
+	code			varchar(32) NOT NULL,
+	label			varchar(128) NOT NULL,
+	active			tinyint DEFAULT 1 NOT NULL,
+	position		integer DEFAULT 0,
+	UNIQUE INDEX uk_dolitrace_c_justification_code (code)
+) ENGINE=innodb;
+
+INSERT IGNORE INTO llx_dolitrace_c_justification (code, label, active, position) VALUES
+('AGRONOMIC_REPORT', 'Relazione tecnico agronomica', 1, 10),
+('PHYTO_REPORT', 'Relazione fitopatologica', 1, 20),
+('BULLETIN', 'Bollettino fitosanitario', 1, 30),
+('FORECAST_MODEL', 'Modello previsionale', 1, 40),
+('TRAP_CATCHES', 'Catture in trappola', 1, 50),
+('OTHER', 'Altro', 1, 900);

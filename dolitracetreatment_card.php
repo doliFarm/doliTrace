@@ -2,7 +2,7 @@
 /* Copyright (C) 2017       Laurent Destailleur     <eldy@users.sourceforge.net>
  * Copyright (C) 2024-2025  Frédéric France         <frederic.france@free.fr>
  * Copyright (C) 2025		Anthony Berton 			<anthony.berton@bb2a.fr>
- * Copyright (C) 2026      SuperAdmin
+ * Copyright (C) 2026      Luigi Grillo - doliFarm.com	<info@dolifarm.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -204,6 +204,11 @@ if (empty($reshook)) {
 	if (in_array($action, array('confirm_validate', 'confirm_correct', 'confirm_cancelrecord')) && !$permissiontovalidate) {
 		$action = '';
 	}
+	// Product not allowed on an organic area: the validation must be confirmed explicitly (the plot starts the conversion again)
+	if ($action == 'confirm_validate' && $confirm == 'yes' && count($object->getOrganicBreaches()) && GETPOST('organic_confirm', 'alpha') === '') {
+		setEventMessages($langs->trans('ErrorTreatmentOrganicConfirm'), null, 'errors');
+		$action = '';
+	}
 
 	// Correction: a new draft version of a validated record
 	if ($action == 'confirm_correct' && $confirm == 'yes') {
@@ -279,13 +284,18 @@ if (empty($reshook)) {
 				$target->location_ref = $building->ref;
 			}
 			$target->treated_unit = (GETPOST('treated_unit', 'aZ09') == 'M3' ? 'M3' : 'M2');
+			// Quantity not given: volume or covered surface of the building, as the surface of the plot
+			if ($building && $target->treated_qty === null) {
+				$size = ($target->treated_unit == 'M3' ? $building->volume : $building->surface_covered);
+				$target->treated_qty = ($size > 0 ? $size : null);
+			}
 		} else {
 			$target->seed_batch = GETPOST('seed_batch', 'alphanohtml');
 			if ($target->seed_batch === '') {
 				$error++;
 				setEventMessages($langs->trans('ErrorFieldRequired', $langs->transnoentitiesnoconv('TreatmentSeedBatch')), null, 'errors');
 			}
-			$target->treated_unit = (GETPOST('treated_unit', 'aZ09') == 'T' ? 'T' : 'KG');
+			$target->treated_unit = (in_array(GETPOST('treated_unit', 'aZ09'), array('T', 'KSEED')) ? GETPOST('treated_unit', 'aZ09') : 'KG');
 		}
 		if (!$error && !($target->treated_qty > 0)) {
 			$error++;
@@ -314,8 +324,14 @@ if (empty($reshook)) {
 		if ($object->kind == $object::KIND_PLANTPROTECTION) {
 			$agrodrugs = dolitraceTreatmentAgroDrugs($db);
 			$agrodrug = isset($agrodrugs[GETPOSTINT('fk_agrodrug')]) ? $agrodrugs[GETPOSTINT('fk_agrodrug')] : null;
-			$adversities = dolitraceTreatmentAdversities($db);
-			$adversity = isset($adversities[GETPOSTINT('fk_adversity')]) ? $adversities[GETPOSTINT('fk_adversity')] : null;
+			$adversityerror = '';
+			if (GETPOST('adversity_eppo', 'alphanohtml') !== '') {
+				// Search on the whole EPPO database: the code is added to the dictionary when missing
+				$adversity = dolitraceTreatmentAdversityByCode($db, GETPOST('adversity_eppo', 'alphanohtml'), $adversityerror);
+			} else {
+				$adversities = dolitraceTreatmentAdversities($db);
+				$adversity = isset($adversities[GETPOSTINT('fk_adversity')]) ? $adversities[GETPOSTINT('fk_adversity')] : null;
+			}
 			if (!$agrodrug) {
 				$error++;
 				setEventMessages($langs->trans('ErrorFieldRequired', $langs->transnoentitiesnoconv('TreatmentAgroDrug')), null, 'errors');
@@ -327,7 +343,7 @@ if (empty($reshook)) {
 			}
 			if (!$adversity) {
 				$error++;
-				setEventMessages($langs->trans('ErrorFieldRequired', $langs->transnoentitiesnoconv('TreatmentAdversity')), null, 'errors');
+				setEventMessages($adversityerror !== '' ? $adversityerror : $langs->trans('ErrorFieldRequired', $langs->transnoentitiesnoconv('TreatmentAdversity')), null, 'errors');
 			} else {
 				$product->fk_adversity = (int) $adversity->rowid;
 				$product->adversity_code = $adversity->code;
@@ -556,7 +572,12 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	// Confirmation to validate: the record can no longer be modified
 	if ($action == 'validate') {
 		$text = $langs->trans('ConfirmValidateTreatment').($warningshtml ? '<br><br>'.$warningshtml : '');
-		$formconfirm = $form->formconfirm($_SERVER["PHP_SELF"].'?id='.$object->id, $langs->trans('Validate'), $text, 'confirm_validate', '', 0, 1, count($warnings) ? 350 : 0, 650);
+		// Product not allowed on an organic area: explicit confirmation
+		$formquestion = '';
+		if (count($object->getOrganicBreaches())) {
+			$formquestion = array(array('type' => 'checkbox', 'name' => 'organic_confirm', 'label' => '<b>'.$langs->trans('TreatmentOrganicConfirm').'</b>', 'value' => false));
+		}
+		$formconfirm = $form->formconfirm($_SERVER["PHP_SELF"].'?id='.$object->id, $langs->trans('Validate'), $text, 'confirm_validate', $formquestion, 0, 1, count($warnings) ? 400 : 0, 650);
 	}
 
 	// Confirmation to correct or to cancel a validated record: the reason is required
@@ -648,7 +669,12 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	$morehtmlref .= '</div>';
 
 
-	dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref);
+	// Late record: badge before the status, the box in the card is not very visible
+	$morehtmlstatus = '';
+	if (!empty($object->late)) {
+		$morehtmlstatus = dolGetBadge($langs->trans('TreatmentLate'), '', 'warning', '', '', array('attr' => array('title' => $langs->trans('TreatmentLateHelp')))).' ';
+	}
+	dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref, '', 0, '', $morehtmlstatus);
 
 	print '<div class="fichecenter">';
 	print '<div class="fichehalfleft">';
@@ -666,10 +692,13 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
 	// Integrity of a validated record and its correction
 	$correctionid = $object->getCorrectionId();
-	$check = ($object->status != $object::STATUS_DRAFT ? $object->checkHash() : -1);
-	if ($check >= 0) {
+	$check = ($object->status != $object::STATUS_DRAFT ? $object->checkHash() : -2);
+	if ($check >= -1) {
 		print '<tr><td>'.$form->textwithpicto($langs->trans('TreatmentIntegrity'), $langs->trans('TreatmentIntegrityHelp')).'</td><td>';
-		if ($check > 0) {
+		if ($check == -1) {
+			// Validated without fingerprint: the content cannot be checked
+			print img_picto('', 'fa-exclamation-triangle', 'class="pictofixedwidth" style="color: #bc9526"').'<span class="warning">'.$langs->trans('TreatmentIntegrityNone').'</span>';
+		} elseif ($check > 0) {
 			print img_picto('', 'fa-check-circle', 'class="pictofixedwidth" style="color: #28a745"').$langs->trans('TreatmentIntegrityOk');
 		} elseif ($check == 0) {
 			print img_picto('', 'fa-exclamation-triangle', 'class="pictofixedwidth error"').'<span class="error">'.$langs->trans('TreatmentIntegrityKo').'</span>';
@@ -722,13 +751,32 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	print '</tr>';
 
 	$buildings = ($targettype == DoliTraceTreatmentTarget::TYPE_BUILDING ? dolitraceTreatmentBuildings($db, $object->fk_soc) : array());
+	// Refs of the crop plans of the areas
+	$cropplanrefs = array();
+	foreach ($object->targets as $target) {
+		if ($target->fk_cropplan > 0) {
+			$cropplanrefs[(int) $target->fk_cropplan] = (int) $target->fk_cropplan;
+		}
+	}
+	if (count($cropplanrefs)) {
+		$cropplanrefs = dolitraceTreatmentFetchRows($db, "SELECT rowid, ref FROM ".$db->prefix()."dolitrace_cropplan WHERE rowid IN (".$db->sanitize(implode(',', $cropplanrefs)).")");
+	}
+	$unitlabels = array('HA' => 'ha', 'M2' => 'm²', 'M3' => 'm³', 'KG' => 'kg', 'T' => 't', 'KSEED' => $langs->trans('TreatmentThousandSeeds'));
 	foreach ($object->targets as $target) {
 		print '<tr class="oddeven">';
 		if ($target->target_type == DoliTraceTreatmentTarget::TYPE_PLOT) {
 			$url = dol_buildpath('/dolitrace/dolitracecropplan_card.php', 1).'?id='.((int) $target->fk_cropplan);
-			print '<td>'.img_picto('', 'fa-clipboard-list', 'class="pictofixedwidth"').'<a href="'.$url.'">'.$langs->trans('TreatmentCropPlan').' '.((int) $target->fk_cropplan).'</a></td>';
+			$cropplanref = isset($cropplanrefs[$target->fk_cropplan]) ? $cropplanrefs[$target->fk_cropplan]->ref : $langs->trans('TreatmentCropPlan').' '.((int) $target->fk_cropplan);
+			print '<td>'.img_picto('', 'fa-clipboard-list', 'class="pictofixedwidth"').'<a href="'.$url.'">'.dol_escape_htmltag($cropplanref).'</a></td>';
 			print '<td>'.dol_escape_htmltag($target->crop_label).($target->crop_eppo ? ' <span class="opacitymedium">('.dol_escape_htmltag($target->crop_eppo).')</span>' : '').'</td>';
-			print '<td>'.dol_escape_htmltag($target->location_ref).'</td>';
+			print '<td>'.dol_escape_htmltag($target->location_ref);
+			// Organic status at the date, copied at the validation
+			if (preg_match('/^BIO_CONV_([0-9])$/', (string) $target->bio_status, $reg)) {
+				print ' <span class="badge badge-status1" title="'.dol_escape_htmltag($langs->trans('TreatmentBioStatus')).'">'.$langs->trans('TreatmentBioConvShort', $reg[1]).'</span>';
+			} elseif (in_array((string) $target->bio_status, array('BIO_FULL', 'BIODYNAMIC'))) {
+				print ' <span class="badge badge-status4" title="'.dol_escape_htmltag($langs->trans('TreatmentBioStatus')).'">'.$langs->trans($target->bio_status == 'BIODYNAMIC' ? 'TreatmentBiodynamicShort' : 'TreatmentBioShort').'</span>';
+			}
+			print '</td>';
 			print '<td class="center">'.yn($target->zone_zvn).'</td>';
 			print '<td class="center">'.dol_escape_htmltag($target->bbch).'</td>';
 		} elseif ($target->target_type == DoliTraceTreatmentTarget::TYPE_BUILDING) {
@@ -737,7 +785,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		} else {
 			print '<td colspan="5">'.dol_escape_htmltag($target->seed_batch).'</td>';
 		}
-		print '<td class="right nowraponall">'.price($target->treated_qty, 0, $langs, 0, -1, -1).' '.dol_escape_htmltag($target->treated_unit).'</td>';
+		print '<td class="right nowraponall">'.price($target->treated_qty, 0, $langs, 0, -1, -1).' '.dol_escape_htmltag(isset($unitlabels[$target->treated_unit]) ? $unitlabels[$target->treated_unit] : $target->treated_unit).'</td>';
 		print '<td class="right">';
 		if ($caneditrows) {
 			print '<a class="reposition" href="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'&action=deletetarget&lineid='.$target->id.'&token='.newToken().'">'.img_delete().'</a>';
@@ -765,7 +813,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 			}
 			print '</td>';
 			print '<td class="center"><input type="text" name="bbch" class="width50 center" maxlength="3" value="'.dol_escape_htmltag(GETPOST('bbch', 'alphanohtml')).'" placeholder="BBCH"></td>';
-			print '<td class="right nowraponall"><input type="text" name="treated_qty" class="width75 right" value="'.dol_escape_htmltag(GETPOST('treated_qty', 'alpha')).'" title="'.dol_escape_htmltag($langs->trans('TreatmentTreatedQtyPlotHelp')).'" placeholder="'.dol_escape_htmltag($langs->trans('TreatmentFromPlot')).'"> HA</td>';
+			print '<td class="right nowraponall"><input type="text" name="treated_qty" class="width75 right" value="'.dol_escape_htmltag(GETPOST('treated_qty', 'alpha')).'" title="'.dol_escape_htmltag($langs->trans('TreatmentTreatedQtyPlotHelp')).'" placeholder="'.dol_escape_htmltag($langs->trans('TreatmentFromPlot')).'"> ha</td>';
 		} else {
 			print '<td colspan="5">';
 			if ($targettype == DoliTraceTreatmentTarget::TYPE_BUILDING) {
@@ -777,10 +825,11 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 				$units = array('M2' => 'm²', 'M3' => 'm³');
 			} else {
 				print '<input type="text" name="seed_batch" class="minwidth200" value="'.dol_escape_htmltag(GETPOST('seed_batch', 'alphanohtml')).'">';
-				$units = array('KG' => 'kg', 'T' => 't');
+				$units = array('KG' => 'kg', 'T' => 't', 'KSEED' => $langs->trans('TreatmentThousandSeeds'));
 			}
 			print '</td>';
-			print '<td class="right nowraponall"><input type="text" name="treated_qty" class="width75 right" value="'.dol_escape_htmltag(GETPOST('treated_qty', 'alpha')).'"> ';
+			$placeholder = ($targettype == DoliTraceTreatmentTarget::TYPE_BUILDING ? ' title="'.dol_escape_htmltag($langs->trans('TreatmentTreatedQtyBuildingHelp')).'" placeholder="'.dol_escape_htmltag($langs->trans('TreatmentFromBuilding')).'"' : '');
+			print '<td class="right nowraponall"><input type="text" name="treated_qty" class="width75 right" value="'.dol_escape_htmltag(GETPOST('treated_qty', 'alpha')).'"'.$placeholder.'> ';
 			print $form->selectarray('treated_unit', $units, GETPOST('treated_unit', 'aZ09'), 0, 0, 0, '', 0, 0, 0, '', 'width75');
 			print '</td>';
 		}
@@ -825,13 +874,15 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		print '<td><a href="'.$url.'">'.dol_escape_htmltag($product->product_label).'</a></td>';
 		print '<td>'.dol_escape_htmltag($product->reg_number).'</td>';
 		if ($product->fk_agrodrug > 0) {
-			print '<td>'.dol_escape_htmltag($product->adversity_label).' <span class="opacitymedium">('.dol_escape_htmltag($product->adversity_code).')</span></td>';
+			print '<td>'.dol_escape_htmltag($product->adversity_label).' <span class="opacitymedium">('.dol_escape_htmltag($product->adversity_code).')</span>';
+			print ($product->cu_applied > 0 ? ' <span class="opacitymedium">('.$langs->trans('TreatmentCuAppliedShort', price($product->cu_applied, 0, $langs, 0, -1, 3)).')</span>' : '').'</td>';
 		} else {
 			$npk = array();
 			foreach (array('n_content', 'p2o5_content', 'k2o_content') as $key) {
-				$npk[] = ($product->$key !== null && $product->$key !== '') ? price($product->$key, 0, $langs, 0, -1, -1) : '-';
+				$npk[] = price((float) $product->$key, 0, $langs, 0, 0, -1);
 			}
-			print '<td>'.implode('-', $npk).($product->n_applied > 0 ? ' <span class="opacitymedium">('.$langs->trans('TreatmentNAppliedShort', price($product->n_applied, 0, $langs, 0, -1, 2)).')</span>' : '').'</td>';
+			print '<td>'.implode('-', $npk).($product->n_applied > 0 ? ' <span class="opacitymedium">('.$langs->trans('TreatmentNAppliedShort', price($product->n_applied, 0, $langs, 0, -1, 2)).')</span>' : '');
+			print ($product->cu_applied > 0 ? ' <span class="opacitymedium">('.$langs->trans('TreatmentCuAppliedShort', price($product->cu_applied, 0, $langs, 0, -1, 3)).')</span>' : '').'</td>';
 		}
 		print '<td class="right nowraponall">'.price($product->dose, 0, $langs, 0, -1, -1).' '.dol_escape_htmltag($product->dose_unit_label).'</td>';
 		print '<td class="right nowraponall">'.($product->qty_total !== null && $product->qty_total !== '' ? price($product->qty_total, 0, $langs, 0, -1, -1).' '.dol_escape_htmltag($product->qty_unit) : '').'</td>';
@@ -868,11 +919,16 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 				$options[$agrodrug->rowid] = $agrodrug->label.($agrodrug->reg_number ? ' ('.$agrodrug->reg_number.')' : '');
 			}
 			print '<td colspan="2">'.$form->selectarray('fk_agrodrug', $options, GETPOSTINT('fk_agrodrug'), 1, 0, 0, '', 0, 0, 0, '', 'minwidth200 maxwidth300', 1).'</td>';
-			$options = array();
-			foreach (dolitraceTreatmentAdversities($db) as $adversity) {
-				$options[$adversity->rowid] = $adversity->label.' ('.$adversity->code.')';
+			if (dol_include_once('/dolifarm/lib/dolifarm_eppo.lib.php') && function_exists('dolifarmEppoSelect') && dolifarmEppoDataAvailable() && !empty($conf->use_javascript_ajax)) {
+				// Whole EPPO database (pests, diseases, weeds), not only the dictionary
+				print '<td>'.dolifarmEppoSelect($db, 'adversity_eppo', GETPOST('adversity_eppo', 'alphanohtml'), 'pest', 'minwidth200 maxwidth300').'</td>';
+			} else {
+				$options = array();
+				foreach (dolitraceTreatmentAdversities($db) as $adversity) {
+					$options[$adversity->rowid] = $adversity->label.' ('.$adversity->code.')';
+				}
+				print '<td>'.$form->selectarray('fk_adversity', $options, GETPOSTINT('fk_adversity'), 1, 0, 0, '', 0, 0, 0, '', 'minwidth200 maxwidth300', 1).'</td>';
 			}
-			print '<td>'.$form->selectarray('fk_adversity', $options, GETPOSTINT('fk_adversity'), 1, 0, 0, '', 0, 0, 0, '', 'minwidth200 maxwidth300', 1).'</td>';
 		} else {
 			foreach (dolitraceTreatmentFertilizers($db) as $fertilizer) {
 				$options[$fertilizer->rowid] = $fertilizer->label;
@@ -899,6 +955,30 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	}
 	if ($warningshtml) {
 		print info_admin($warningshtml, 0, 0, 'warning');
+	}
+	// Validated record with a product not allowed on an organic area: proposal of the new conversion of the plot
+	// (Reg. EU 2018/848, annex II part I point 1.7.3), until the history of the plot has a period from the date of the record
+	if ($object->status == $object::STATUS_VALIDATED && dol_include_once('/dolifarm/lib/dolifarm_bio.lib.php')) {
+		$restart = '';
+		$day = dol_print_date($object->date_start, '%Y-%m-%d', 'tzserver');
+		$done = array();
+		foreach ($object->getOrganicBreaches() as $breach) {
+			if (isset($done[$breach['fk_plot']])) {
+				continue;
+			}
+			$done[$breach['fk_plot']] = 1;
+			$history = dolifarmBioHistory($db, $breach['fk_plot']);
+			$last = (count($history) ? $history[count($history) - 1] : null);
+			if ($last && dol_print_date($last->date_start, '%Y-%m-%d', 'tzserver') >= $day) {
+				continue;
+			}
+			$params = array('id' => $breach['fk_plot'], 'status' => 'CONVERSION', 'reason' => 'RESTART', 'reference' => $object->ref,
+				'date_startday' => (int) dol_print_date($object->date_start, '%d', 'tzserver'), 'date_startmonth' => (int) dol_print_date($object->date_start, '%m', 'tzserver'), 'date_startyear' => (int) dol_print_date($object->date_start, '%Y', 'tzserver'));
+			$restart .= '<br>- '.dol_escape_htmltag($breach['location']).': <a href="'.dolBuildUrl(dol_buildpath('/dolifarm/dolifarmplot_bio.php', 1), $params).'">'.$langs->trans('TreatmentOrganicRestartLink').'</a>';
+		}
+		if ($restart) {
+			print info_admin('<b>'.$langs->trans('TreatmentOrganicRestart').'</b>'.$restart, 0, 0, 'warning');
+		}
 	}
 
 	// Buttons for actions
@@ -983,7 +1063,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 				$text .= ' <a href="'.$_SERVER['PHP_SELF'].'?id='.((int) $changes['previous']).'">'.dol_escape_htmltag($changes['previous_ref']).'</a>';
 			}
 			print '<tr class="oddeven">';
-			print '<td class="nowraponall">'.dol_print_date($db->jdate($line->datec), 'dayhour').'</td>';
+			print '<td class="nowraponall">'.dol_print_date($db->jdate($line->datec), 'dayhour', 'tzuser').'</td>';
 			print '<td class="tdoverflowmax150">'.($users[$line->fk_user]->id > 0 ? $users[$line->fk_user]->getNomUrl(-1) : '').'</td>';
 			print '<td class="center">'.((int) $line->version).'</td>';
 			print '<td>'.$text.'</td>';

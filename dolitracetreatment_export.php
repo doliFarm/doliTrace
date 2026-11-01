@@ -1,17 +1,17 @@
 <?php
-/* Copyright (C) 2026      SuperAdmin
+/* Copyright (C) 2026      Luigi Grillo - doliFarm.com	<info@dolifarm.com>
  *
  * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
+ * it under the terms of the GNU Affero General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
@@ -112,7 +112,36 @@ if ($action == 'export' && in_array($format, array('json', 'csv', 'pdf'))) {
 		);
 		$filename = 'registro_trattamenti'.($socid > 0 ? '_'.$socid : '').'_'.$filters['date_from'].'_'.$filters['date_to'].'.'.$format;
 		if ($format == 'json') {
-			$content = $export->toJson($records, $filters);
+			// Crop events and irrigations of the field notebook, for the users who can read the crop operations
+			$operations = array();
+			if ($user->hasRight('dolitrace', 'dolitraceoperation', 'read')) {
+				$operations = $export->getOperations($user, $socid, $datefrom, $dateto);
+				if (!is_array($operations)) {
+					dol_syslog('Export of the crop operations: '.$export->error, LOG_ERR);
+					$operations = array();
+				}
+			}
+			// Storage sites with the stock of the products at the start and at the end of the period
+			$storage = array();
+			if (isModEnabled('stock') && $user->hasRight('stock', 'lire')) {
+				$storage = $export->getStorage($user, $socid, $datefrom, $dateto);
+				if (!is_array($storage)) {
+					dol_syslog('Export of the storage sites: '.$export->error, LOG_ERR);
+					$storage = array();
+				}
+			}
+			// Organic production, for the users who can read the harvests
+			$organic = null;
+			if ($user->hasRight('dolitrace', 'dolitraceharvest', 'read')) {
+				dol_include_once('/dolitrace/class/dolitracebioregister.class.php');
+				$bioregister = new DoliTraceBioRegister($db);
+				$organic = $bioregister->getOrganicSection($user, $socid, $datefrom, $dateto);
+				if (!is_array($organic)) {
+					dol_syslog('Export of the organic production: '.$bioregister->error, LOG_ERR);
+					$organic = null;
+				}
+			}
+			$content = $export->toJson($records, $filters, $operations, $storage, $organic);
 			$mime = 'application/json';
 		} elseif ($format == 'csv') {
 			$content = $export->toCsv($records);

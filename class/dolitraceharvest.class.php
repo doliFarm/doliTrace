@@ -1,7 +1,7 @@
 <?php
 /* Copyright (C) 2017      Laurent Destailleur     <eldy@users.sourceforge.net>
  * Copyright (C) 2023-2025 Frédéric France         <frederic.france@free.fr>
- * Copyright (C) 2026      SuperAdmin
+ * Copyright (C) 2026      Luigi Grillo - doliFarm.com	<info@dolifarm.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -134,15 +134,17 @@ class DoliTraceHarvest extends CommonObject
         "uuid" => array("type" => "varchar(36)", "label" => "Uuid", "enabled" => "1", 'position' => 20, 'notnull' => 0, "visible" => "-1",),
         "label" => array("type" => "varchar(255)", "label" => "Label", "enabled" => "1", 'position' => 25, 'notnull' => 0, "visible" => "1", "alwayseditable" => "1", "css" => "minwidth300", "cssview" => "wordbreak", "csslist" => "tdoverflowmax150",),
         
-        "fk_cropplan" => array("type" => "integer:DoliTraceCropplan:custom/dolitrace/class/dolitracecropplan.class.php", "label" => "Fkcropplan", "enabled" => "1", 'position' => 30, 'notnull' => 1, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
+        "fk_cropplan" => array("type" => "integer:DoliTraceCropplan:custom/dolitrace/class/dolitracecropplan.class.php", "label" => "HarvestCropPlan", "enabled" => "1", 'position' => 30, 'notnull' => 1, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
         
-        "date_harvest" => array("type" => "date", "label" => "Dateharvest", "enabled" => "1", 'position' => 35, 'notnull' => 1, "visible" => "-1",),
+        "date_harvest" => array("type" => "date", "label" => "HarvestDate", "enabled" => "1", 'position' => 35, 'notnull' => 1, "visible" => "-1",),
         
-        "fk_product_out" => array("type" => "integer:Product:product/class/product.class.php:1", "label" => "Fkproductout", "picto" => "product", "enabled" => "1", 'position' => 40, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx", "csslist" => "tdoverflowmax150",),
+        "fk_product_out" => array("type" => "integer:Product:product/class/product.class.php:1", "label" => "HarvestProduct", "picto" => "product", "enabled" => "1", 'position' => 40, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx", "csslist" => "tdoverflowmax150",),
         
-        "qty_harvested" => array("type" => "double(24,8)", "label" => "Qtyharvested", "enabled" => "1", 'position' => 45, 'notnull' => 0, "visible" => "-1",),
-        "qty_unit" => array("type" => "varchar(30)", "label" => "Qtyunit", "enabled" => "1", 'position' => 50, 'notnull' => 0, "visible" => "-1",),
-        "batch_number" => array("type" => "varchar(128)", "label" => "Batchnumber", "enabled" => "1", 'position' => 55, 'notnull' => 0, "visible" => "-1",),
+        "qty_harvested" => array("type" => "double(24,8)", "label" => "HarvestQty", "enabled" => "1", 'position' => 45, 'notnull' => 0, "visible" => "-1",),
+        "qty_unit" => array("type" => "varchar(30)", "label" => "HarvestUnit", "enabled" => "1", 'position' => 50, 'notnull' => 0, "visible" => "-1",),
+        "batch_number" => array("type" => "varchar(128)", "label" => "HarvestBatch", "enabled" => "1", 'position' => 55, 'notnull' => 0, "visible" => "-1",),
+        // Organic status of the harvested product, set at the validation from the status of the plot at the date
+        "bio_status" => array("type" => "varchar(16)", "label" => "HarvestBioStatus", "enabled" => "1", 'position' => 56, 'notnull' => 0, "visible" => "5", "arrayofkeyval" => array('BIO' => 'SeedStatusBio', 'INCONV' => 'SeedStatusInConversion', 'NONBIO' => 'SeedStatusNonBio'), "help" => "HarvestBioStatusHelp",),
         
         "cost_material" => array("type" => "double(24,8)", "label" => "Costmaterial", "enabled" => "1", 'position' => 60, 'notnull' => 0, "visible" => "-1",),
         "cost_manpower" => array("type" => "double(24,8)", "label" => "Costmanpower", "enabled" => "1", 'position' => 65, 'notnull' => 0, "visible" => "-1",),
@@ -150,8 +152,8 @@ class DoliTraceHarvest extends CommonObject
         
         "status" => array("type" => "int", "label" => "Status", "enabled" => "1", 'position' => 500, 'notnull' => 0, "visible" => "-2",),
         
-        "note_public" => array("type" => "text", "label" => "NotePrivate", "enabled" => "1", 'position' => 95, 'notnull' => 0, "visible" => "0", "cssview" => "wordbreak",),
-        "note_private" => array("type" => "text", "label" => "NotePublic", "enabled" => "1", 'position' => 96, 'notnull' => 0, "visible" => "0", "cssview" => "wordbreak",),
+        "note_public" => array("type" => "text", "label" => "NotePublic", "enabled" => "1", 'position' => 95, 'notnull' => 0, "visible" => "0", "cssview" => "wordbreak",),
+        "note_private" => array("type" => "text", "label" => "NotePrivate", "enabled" => "1", 'position' => 96, 'notnull' => 0, "visible" => "0", "cssview" => "wordbreak",),
         
         "datec" => array("type" => "datetime", "label" => "DateCreation", "enabled" => "1", 'position' => 125, 'notnull' => 0, "visible" => "-2",),
         "date_valid" => array("type" => "datetime", "label" => "DateValidation", "enabled" => "1", 'position' => 126, 'notnull' => 0, "visible" => "-2",),
@@ -174,6 +176,10 @@ class DoliTraceHarvest extends CommonObject
     public $qty_harvested;
     public $qty_unit;
     public $batch_number;
+    /**
+     * @var string|null	BIO, INCONV, NONBIO
+     */
+    public $bio_status;
     public $cost_material;
     public $cost_manpower;
     public $cost_energy;
@@ -242,6 +248,11 @@ class DoliTraceHarvest extends CommonObject
 
 		dol_include_once('/dolifarm/lib/dolifarm_icons.lib.php');
 		$this->picto = dolifarm_get_fa_icon('harvest');
+		// Drop-down lists only with the farms the user can see (doliFarm >= 1.3.1)
+		dol_include_once('/dolifarm/lib/dolifarm_access.lib.php');
+		if (function_exists('dolifarmRestrictLinkFields')) {
+			dolifarmRestrictLinkFields($this, array('fk_cropplan'));
+		}
 
         if (!getDolGlobalInt('MAIN_SHOW_TECHNICAL_ID') && isset($this->fields['rowid']) && !empty($this->fields['ref'])) {
             $this->fields['rowid']['visible'] = 0;
@@ -284,6 +295,11 @@ class DoliTraceHarvest extends CommonObject
      */
     public function create(User $user, $notrigger = 0)
     {
+        // status is not in the create form: without it createCommon() stores NULL
+        if ($this->status === null || $this->status === '') {
+            $this->status = self::STATUS_DRAFT;
+        }
+
         $result = $this->createCommon($user, $notrigger);
 
         // uncomment lines below if you want to validate object after creation
@@ -1190,6 +1206,91 @@ class DoliTraceHarvest extends CommonObject
         // ...
 
         return parent::validateField($fields, $fieldKey, $fieldValue);
+    }
+
+    /**
+     * Organic status of the harvested product: status of the plot of the crop plan at the date of the harvest
+     * (history of doliFarm), converted to BIO, INCONV, NONBIO
+     *
+     * @return string BIO, INCONV, NONBIO, '' when unknown
+     */
+    public function computeBioStatus()
+    {
+        if (!($this->fk_cropplan > 0) || empty($this->date_harvest) || !dol_include_once('/dolifarm/lib/dolifarm_bio.lib.php') || !function_exists('dolifarmBioProductStatus')) {
+            return '';
+        }
+        $resql = $this->db->query("SELECT fk_plot FROM ".$this->db->prefix()."dolitrace_cropplan WHERE rowid = ".((int) $this->fk_cropplan));
+        $obj = $resql ? $this->db->fetch_object($resql) : null;
+        if (!$obj || !($obj->fk_plot > 0)) {
+            return '';
+        }
+        return dolifarmBioProductStatus(dolifarmBioStatusAt($this->db, (int) $obj->fk_plot, $this->date_harvest));
+    }
+
+    /**
+     * Warnings of separation of organic and non organic products (Reg. EU 2018/848 art. 9.10) for the warehouse of the
+     * harvest: warehouse dedicated to another status, other lots of the same product with another status in it.
+     * The status of the other lots comes from their suffix (-BIO, -INCONV) or from the harvest that made them.
+     *
+     * @param  int      $warehouseid Warehouse, 0 = the one of the stock movement of the harvest
+     * @return string[]              Warnings
+     */
+    public function getBioWarnings($warehouseid = 0)
+    {
+        global $langs;
+
+        $warnings = array();
+        $status = (string) $this->bio_status;
+        if ($status === '' || !isModEnabled('stock') || !dol_include_once('/dolifarm/lib/dolifarm_bio.lib.php') || !function_exists('dolifarmBioWarehouseDedication')) {
+            return $warnings;
+        }
+        $langs->loadLangs(array('dolitrace@dolitrace', 'dolifarm@dolifarm'));
+        $prefix = $this->db->prefix();
+        $productid = (int) $this->fk_product_out;
+        $batch = (string) $this->batch_number;
+        if ($warehouseid <= 0) {
+            $sql = "SELECT fk_entrepot, fk_product, batch FROM ".$prefix."stock_mouvement WHERE origintype = '".$this->db->escape($this->element.'@dolitrace')."' AND fk_origin = ".((int) $this->id)." AND value > 0 ORDER BY rowid DESC";
+            $resql = $this->db->query($sql.$this->db->plimit(1));
+            if ($resql && ($obj = $this->db->fetch_object($resql))) {
+                $warehouseid = (int) $obj->fk_entrepot;
+                $productid = (int) $obj->fk_product;
+                $batch = (string) $obj->batch;
+            }
+        }
+        if ($warehouseid <= 0) {
+            return $warnings;
+        }
+        $names = array('BIO' => $langs->transnoentities('SeedStatusBio'), 'INCONV' => $langs->transnoentities('SeedStatusInConversion'), 'NONBIO' => $langs->transnoentities('SeedStatusNonBio'));
+        $resql = $this->db->query("SELECT ref FROM ".$prefix."entrepot WHERE rowid = ".((int) $warehouseid));
+        $warehouse = ($resql && ($obj = $this->db->fetch_object($resql))) ? (string) $obj->ref : (string) $warehouseid;
+
+        $dedicated = dolifarmBioWarehouseDedication($this->db, $warehouseid);
+        if ($dedicated !== '' && $dedicated != $status) {
+            $warnings[] = $langs->transnoentities('WarningHarvestWarehouseStatus', $warehouse, $names[$dedicated] ?? $dedicated, $names[$status] ?? $status);
+        }
+
+        // Other lots of the product in stock in the warehouse, with another known status
+        if ($productid > 0) {
+            $sql = "SELECT pb.batch, h.bio_status FROM ".$prefix."product_batch as pb";
+            $sql .= " INNER JOIN ".$prefix."product_stock as ps ON ps.rowid = pb.fk_product_stock";
+            $sql .= " LEFT JOIN ".$prefix."dolitrace_harvest as h ON h.batch_number = pb.batch AND h.fk_product_out = ps.fk_product AND h.status = 1";
+            $sql .= " WHERE ps.fk_entrepot = ".((int) $warehouseid)." AND ps.fk_product = ".$productid." AND pb.qty > 0 AND pb.batch <> '".$this->db->escape($batch)."'";
+            $others = array();
+            $resql = $this->db->query($sql);
+            if ($resql) {
+                while ($obj = $this->db->fetch_object($resql)) {
+                    $lotstatus = (str_ends_with((string) $obj->batch, '-BIO') ? 'BIO' : (str_ends_with((string) $obj->batch, '-INCONV') ? 'INCONV' : (string) $obj->bio_status));
+                    if ($lotstatus !== '' && $lotstatus != $status) {
+                        $others[$obj->batch] = $obj->batch.' ('.($names[$lotstatus] ?? $lotstatus).')';
+                    }
+                }
+                $this->db->free($resql);
+            }
+            if (count($others)) {
+                $warnings[] = $langs->transnoentities('WarningHarvestMixedLots', $warehouse, $names[$status] ?? $status, implode(', ', $others));
+            }
+        }
+        return $warnings;
     }
 
     /**

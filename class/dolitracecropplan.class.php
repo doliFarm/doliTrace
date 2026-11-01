@@ -1,7 +1,7 @@
 <?php
 /* Copyright (C) 2017      Laurent Destailleur     <eldy@users.sourceforge.net>
  * Copyright (C) 2023-2025 Frédéric France         <frederic.france@free.fr>
- * Copyright (C) 2026      SuperAdmin
+ * Copyright (C) 2026      Luigi Grillo - doliFarm.com	<info@dolifarm.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -141,7 +141,8 @@ class DoliTraceCropplan extends CommonObject
         "fk_soc" => array("type" => "integer:Societe:societe/class/societe.class.php:1", "label" => "ThirdParty", "picto" => "company", "enabled" => "1", 'position' => 30, 'notnull' => 1, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx", "csslist" => "tdoverflowmax150",),
         "fk_dossier" => array("type" => "integer:DoliFarmFarmDossier:dolifarm/class/dolifarmfarmdossier.class.php:1", "label" => "FarmDossier", "enabled" => "1", "position" => 32, "notnull" => 1, "visible" => "1", "index" => 1,),
         "fk_plot" => array("type" => "integer:DoliFarmPlot:custom/dolifarm/class/dolifarmplot.class.php:1", "label" => "Fkplot", "enabled" => "1", 'position' => 35, 'notnull' => 1, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
-        
+        "pcg_ref" => array("type" => "varchar(64)", "label" => "CropPlanPcgRef", "enabled" => "1", 'position' => 36, 'notnull' => 0, "visible" => "-1", "alwayseditable" => "1", "help" => "CropPlanPcgRefHelp", "css" => "maxwidth200",),
+
         // Link to Crop (DoliTrace) - Note: Assuming you will create this class
         "fk_output_product" => array("type" => "integer:Product:product/class/product.class.php","label" => "ProductOut","picto" => "product","enabled" => "1","position" => 38,"notnull" => 0,"visible" => "-2","index" => 1,),
         "fk_crop" => array("type" => "sellist:dolifarm_crops:label:rowid::status=1","label" => "Crop","enabled" => "1","position" => 40,"notnull" => 1,"visible" => "-1", "css" => "minwidth300",),        
@@ -157,7 +158,7 @@ class DoliTraceCropplan extends CommonObject
         "actual_cost" => array("type" => "double(24,8)", "label" => "Actualcost", "enabled" => "1", 'position' => 85, 'notnull' => 0, "visible" => "-1",),
         
         "status" => array("type" => "int", "label" => "Status", "enabled" => "1", 'position' => 500, 'notnull' => 0, "visible" => "-1",),
-        "note_public" => array("type" => "text", "label" => "NotePrivate", "enabled" => "1", 'position' => 95, 'notnull' => 0, "visible" => "0", "cssview" => "wordbreak",),
+        "note_public" => array("type" => "text", "label" => "NotePublic", "enabled" => "1", 'position' => 95, 'notnull' => 0, "visible" => "0", "cssview" => "wordbreak",),
         
         "datec" => array("type" => "datetime", "label" => "DateCreation", "enabled" => "1", 'position' => 125, 'notnull' => 0, "visible" => "-2",),
         "date_valid" => array("type" => "datetime", "label" => "DateValidation", "enabled" => "1", 'position' => 126, 'notnull' => 0, "visible" => "-2",),
@@ -176,6 +177,7 @@ class DoliTraceCropplan extends CommonObject
     public $fk_soc;
     public $fk_dossier;
     public $fk_plot;
+    public $pcg_ref;
     public $fk_crop;
     public $fk_project;
     public $fk_output_product;
@@ -251,6 +253,11 @@ class DoliTraceCropplan extends CommonObject
 
 		dol_include_once('/dolifarm/lib/dolifarm_icons.lib.php');
 		$this->picto = dolifarm_get_fa_icon('cropplan');
+		// Drop-down lists only with the farms the user can see (doliFarm >= 1.3.1)
+		dol_include_once('/dolifarm/lib/dolifarm_access.lib.php');
+		if (function_exists('dolifarmRestrictLinkFields')) {
+			dolifarmRestrictLinkFields($this, array('fk_dossier', 'fk_plot'));
+		}
 
         if (!getDolGlobalInt('MAIN_SHOW_TECHNICAL_ID') && isset($this->fields['rowid']) && !empty($this->fields['ref'])) {
             $this->fields['rowid']['visible'] = 0;

@@ -1,7 +1,7 @@
 <?php
 /* Copyright (C) 2007-2017  Laurent Destailleur     <eldy@users.sourceforge.net>
  * Copyright (C) 2024       Frédéric France         <frederic.france@free.fr>
- * Copyright (C) 2026		SuperAdmin
+ * Copyright (C) 2026		Luigi Grillo - doliFarm.com	<info@dolifarm.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -92,6 +92,7 @@ include_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
 include_once DOL_DOCUMENT_ROOT.'/core/lib/company.lib.php';
 // load module libraries
 include_once __DIR__.'/class/dolitracecropplan.class.php';
+dol_include_once('/dolitrace/lib/dolitrace_access.lib.php');
 // for other modules
 //dol_include_once('/othermodule/class/otherobject.class.php');
 
@@ -339,6 +340,10 @@ if (!empty($object->ismultientitymanaged) && (int) $object->ismultientitymanaged
 } else {
 	$sql .= " WHERE 1 = 1";
 }
+$sql .= dolifarmSqlSocFilter($user, 't.fk_soc');
+// Filter "Sales representative" chosen above the list
+$search_sale = dolifarmSaleFilterValue();
+$sql .= dolifarmSqlSaleFilter($search_sale, 't.fk_soc');
 foreach ($search as $key => $val) {
 	if (array_key_exists($key, $object->fields)) {
 		if ($key == 'status' && $search[$key] == -1) {
@@ -553,6 +558,9 @@ include DOL_DOCUMENT_ROOT.'/core/tpl/extrafields_list_search_param.tpl.php';
 $parameters = array('param' => &$param);
 $reshook = $hookmanager->executeHooks('printFieldListSearchParam', $parameters, $object, $action); // Note that $action and $object may have been modified by hook
 $param .= $hookmanager->resPrint;
+if ($search_sale) {
+	$param .= '&search_sale='.((int) $search_sale);
+}
 
 // List of mass actions available
 $arrayofmassactions = array(
@@ -613,6 +621,7 @@ if ($search_all) {
 }
 
 $moreforfilter = '';
+$moreforfilter .= dolifarmSaleFilterHtml($search_sale);
 /*$moreforfilter.='<div class="divsearchfield">';
 $moreforfilter.= $langs->trans('MyFilter') . ': <input type="text" name="search_myfield" value="'.dol_escape_htmltag($search_myfield).'">';
 $moreforfilter.= '</div>';*/
