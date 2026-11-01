@@ -384,6 +384,9 @@ if ($search_all) {
 }
 // Farms of the sales representative
 $sql .= dolifarmSqlSocFilter($user, 't.fk_soc');
+// Filter "Sales representative" chosen above the list
+$search_sale = dolifarmSaleFilterValue();
+$sql .= dolifarmSqlSaleFilter($search_sale, 't.fk_soc');
 /*
 // If the internal user must only see his customers, force searching by him
 $search_sale = 0;
@@ -550,6 +553,9 @@ include DOL_DOCUMENT_ROOT.'/core/tpl/extrafields_list_search_param.tpl.php';
 $parameters = array('param' => &$param);
 $reshook = $hookmanager->executeHooks('printFieldListSearchParam', $parameters, $object, $action); // Note that $action and $object may have been modified by hook
 $param .= $hookmanager->resPrint;
+if ($search_sale) {
+	$param .= '&search_sale='.((int) $search_sale);
+}
 
 // List of mass actions available
 $arrayofmassactions = array(
@@ -611,6 +617,7 @@ if ($search_all) {
 }
 
 $moreforfilter = '';
+$moreforfilter .= dolifarmSaleFilterHtml($search_sale);
 /*$moreforfilter.='<div class="divsearchfield">';
 $moreforfilter.= $langs->trans('MyFilter') . ': <input type="text" name="search_myfield" value="'.dol_escape_htmltag($search_myfield).'">';
 $moreforfilter.= '</div>';*/
