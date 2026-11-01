@@ -328,3 +328,12 @@ DashboardFieldRegister = Registre de culture
 DashboardTreatmentsDraft = Enregistrements en brouillon (en retard : plus de 30 jours après la fin de l'opération)
 DashboardTreatmentsDraftShort = Enregistrements en brouillon
 DashboardHarvestsDraft = Récoltes en brouillon
+# Production biologique
+TreatmentBioStatus = Statut bio à la date
+TreatmentBioConvShort = Conv. année %s
+TreatmentBioShort = Bio
+TreatmentBiodynamicShort = Bio/biodynamique
+TreatmentCuApplied = Cuivre métal apporté (kg/ha)
+TreatmentCuAppliedShort = Cu %s kg/ha
+WarningTreatmentNotOrganic = Le produit %s n'est pas indiqué comme autorisé en agriculture biologique (fiche du produit), mais il est utilisé sur des surfaces en conversion ou bio : %s
+WarningTreatmentCopper = Parcelle %s : %s kg/ha de cuivre métal sur les 7 dernières années, au-dessus de la limite de %s kg/ha (Règl. UE 2021/1165)

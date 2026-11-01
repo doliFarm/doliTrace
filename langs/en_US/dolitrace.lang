@@ -352,3 +352,12 @@ DashboardFieldRegister = Field register
 DashboardTreatmentsDraft = Draft records (late: more than 30 days after the end of the operation)
 DashboardTreatmentsDraftShort = Draft records
 DashboardHarvestsDraft = Draft harvests
+# Organic production
+TreatmentBioStatus = Organic status at the date
+TreatmentBioConvShort = Conv. year %s
+TreatmentBioShort = Organic
+TreatmentBiodynamicShort = Organic/biodynamic
+TreatmentCuApplied = Copper metal applied (kg/ha)
+TreatmentCuAppliedShort = Cu %s kg/ha
+WarningTreatmentNotOrganic = The product %s is not marked as allowed in organic farming (card of the product), but it is used on areas in conversion or organic: %s
+WarningTreatmentCopper = Plot %s: %s kg/ha of copper metal in the last 7 years, above the limit of %s kg/ha (Reg. EU 2021/1165)

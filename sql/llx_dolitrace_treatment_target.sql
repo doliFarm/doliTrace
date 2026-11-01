@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS llx_dolitrace_treatment_target(
 	fk_cropplan		integer,
 	location_ref	varchar(128),						-- copy: IACS parcel or cadastral reference
 	zone_zvn		smallint DEFAULT 0,					-- copy: nitrate vulnerable zone
+	bio_status		varchar(16),						-- copy: organic status of the plot at the date (llx_dolifarm_c_biostatus)
 	fk_crop			integer,
 	crop_eppo		varchar(10),						-- copy
 	crop_label		varchar(255),						-- copy

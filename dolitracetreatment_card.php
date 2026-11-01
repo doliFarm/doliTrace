@@ -753,7 +753,14 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 			$cropplanref = isset($cropplanrefs[$target->fk_cropplan]) ? $cropplanrefs[$target->fk_cropplan]->ref : $langs->trans('TreatmentCropPlan').' '.((int) $target->fk_cropplan);
 			print '<td>'.img_picto('', 'fa-clipboard-list', 'class="pictofixedwidth"').'<a href="'.$url.'">'.dol_escape_htmltag($cropplanref).'</a></td>';
 			print '<td>'.dol_escape_htmltag($target->crop_label).($target->crop_eppo ? ' <span class="opacitymedium">('.dol_escape_htmltag($target->crop_eppo).')</span>' : '').'</td>';
-			print '<td>'.dol_escape_htmltag($target->location_ref).'</td>';
+			print '<td>'.dol_escape_htmltag($target->location_ref);
+			// Organic status at the date, copied at the validation
+			if (preg_match('/^BIO_CONV_([0-9])$/', (string) $target->bio_status, $reg)) {
+				print ' <span class="badge badge-status1" title="'.dol_escape_htmltag($langs->trans('TreatmentBioStatus')).'">'.$langs->trans('TreatmentBioConvShort', $reg[1]).'</span>';
+			} elseif (in_array((string) $target->bio_status, array('BIO_FULL', 'BIODYNAMIC'))) {
+				print ' <span class="badge badge-status4" title="'.dol_escape_htmltag($langs->trans('TreatmentBioStatus')).'">'.$langs->trans($target->bio_status == 'BIODYNAMIC' ? 'TreatmentBiodynamicShort' : 'TreatmentBioShort').'</span>';
+			}
+			print '</td>';
 			print '<td class="center">'.yn($target->zone_zvn).'</td>';
 			print '<td class="center">'.dol_escape_htmltag($target->bbch).'</td>';
 		} elseif ($target->target_type == DoliTraceTreatmentTarget::TYPE_BUILDING) {
@@ -851,13 +858,15 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		print '<td><a href="'.$url.'">'.dol_escape_htmltag($product->product_label).'</a></td>';
 		print '<td>'.dol_escape_htmltag($product->reg_number).'</td>';
 		if ($product->fk_agrodrug > 0) {
-			print '<td>'.dol_escape_htmltag($product->adversity_label).' <span class="opacitymedium">('.dol_escape_htmltag($product->adversity_code).')</span></td>';
+			print '<td>'.dol_escape_htmltag($product->adversity_label).' <span class="opacitymedium">('.dol_escape_htmltag($product->adversity_code).')</span>';
+			print ($product->cu_applied > 0 ? ' <span class="opacitymedium">('.$langs->trans('TreatmentCuAppliedShort', price($product->cu_applied, 0, $langs, 0, -1, 3)).')</span>' : '').'</td>';
 		} else {
 			$npk = array();
 			foreach (array('n_content', 'p2o5_content', 'k2o_content') as $key) {
 				$npk[] = price((float) $product->$key, 0, $langs, 0, 0, -1);
 			}
-			print '<td>'.implode('-', $npk).($product->n_applied > 0 ? ' <span class="opacitymedium">('.$langs->trans('TreatmentNAppliedShort', price($product->n_applied, 0, $langs, 0, -1, 2)).')</span>' : '').'</td>';
+			print '<td>'.implode('-', $npk).($product->n_applied > 0 ? ' <span class="opacitymedium">('.$langs->trans('TreatmentNAppliedShort', price($product->n_applied, 0, $langs, 0, -1, 2)).')</span>' : '');
+			print ($product->cu_applied > 0 ? ' <span class="opacitymedium">('.$langs->trans('TreatmentCuAppliedShort', price($product->cu_applied, 0, $langs, 0, -1, 3)).')</span>' : '').'</td>';
 		}
 		print '<td class="right nowraponall">'.price($product->dose, 0, $langs, 0, -1, -1).' '.dol_escape_htmltag($product->dose_unit_label).'</td>';
 		print '<td class="right nowraponall">'.($product->qty_total !== null && $product->qty_total !== '' ? price($product->qty_total, 0, $langs, 0, -1, -1).' '.dol_escape_htmltag($product->qty_unit) : '').'</td>';

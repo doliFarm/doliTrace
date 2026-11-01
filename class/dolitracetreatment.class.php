@@ -918,17 +918,70 @@ class DoliTraceTreatment extends CommonObject
 				$kg = $qty * $kgfactors[$product->qty_unit];
 				$n_applied = price2num($kg * $product->n_content / 100 / $hectares, 'MS');
 			}
-			if ((string) $qty === (string) $product->qty_total && (string) $n_applied === (string) $product->n_applied) {
+			$cu_applied = $this->copperApplied($product, $qty, $hectares, $kgfactors);
+			if ((string) $qty === (string) $product->qty_total && (string) $n_applied === (string) $product->n_applied && (string) $cu_applied === (string) $product->cu_applied) {
 				continue;
 			}
 			$product->qty_total = $qty;
 			$product->n_applied = $n_applied;
+			$product->cu_applied = $cu_applied;
 			if ($product->update($user) < 0) {
 				$this->setErrorsFromObject($product);
 				return -1;
 			}
 		}
 		return 1;
+	}
+
+	/**
+	 * Copper metal applied by a product, in kg per hectare
+	 *
+	 * Plant protection products: g of copper for kg or l of product, from the card of the product (quantity in kg, l or t).
+	 * Fertilizers: copper in % of the mass, from the card of the fertilizer (liquids by their density).
+	 * The cards are read because the copies of the record are made only at the validation; the method runs on drafts
+	 * and during the validation, so the value saved stays as it was then.
+	 *
+	 * @param	DoliTraceTreatmentProduct	$product	Line
+	 * @param	float|string|null			$qty		Total quantity of the line
+	 * @param	float|null					$hectares	Treated hectares
+	 * @param	array<string,float>			$kgfactors	kg for one unit of quantity of the fertilizer
+	 * @return	string|null								kg/ha, null when there is no copper or it cannot be computed
+	 */
+	private function copperApplied($product, $qty, $hectares, $kgfactors)
+	{
+		if (!($qty > 0) || !($hectares > 0)) {
+			return null;
+		}
+		$prefix = $this->db->prefix();
+		if ($product->fk_agrodrug > 0) {
+			$factors = array('kg' => 1, 'l' => 1, 't' => 1000);
+			if (!isset($factors[$product->qty_unit])) {
+				return null;
+			}
+			$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, cu_content FROM ".$prefix."dolifarm_agrodrug WHERE rowid = ".((int) $product->fk_agrodrug));
+			$grams = isset($rows[$product->fk_agrodrug]) ? (float) $rows[$product->fk_agrodrug]->cu_content : 0;
+			return ($grams > 0 ? price2num($qty * $factors[$product->qty_unit] * $grams / 1000 / $hectares, 'MS') : null);
+		}
+		if ($product->fk_fertilizer > 0 && isset($kgfactors[$product->qty_unit])) {
+			$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, cu_content FROM ".$prefix."dolifarm_fertilizer WHERE rowid = ".((int) $product->fk_fertilizer));
+			$percent = isset($rows[$product->fk_fertilizer]) ? (float) $rows[$product->fk_fertilizer]->cu_content : 0;
+			return ($percent > 0 ? price2num($qty * $kgfactors[$product->qty_unit] * $percent / 100 / $hectares, 'MS') : null);
+		}
+		return null;
+	}
+
+	/**
+	 * Organic status of a plot at the date of the record, from the history of the plot in doliFarm
+	 *
+	 * @param	int		$plotid		Plot
+	 * @return	string				Code of the dictionary dolifarm_c_biostatus, '' when unknown
+	 */
+	private function plotBioStatus($plotid)
+	{
+		if (!($plotid > 0) || empty($this->date_start) || !dol_include_once('/dolifarm/lib/dolifarm_bio.lib.php') || !function_exists('dolifarmBioStatusAt')) {
+			return '';
+		}
+		return dolifarmBioStatusAt($this->db, $plotid, $this->date_start);
 	}
 
 	/**
@@ -1028,6 +1081,9 @@ class DoliTraceTreatment extends CommonObject
 			$target->crop_eppo = $cropplan->eppo_code;
 			$target->location_ref = $cropplan->iacs_parcel ? $cropplan->iacs_parcel : ($cropplan->cadastral_reference ? $cropplan->cadastral_reference : $cropplan->plot_ref);
 			$target->zone_zvn = (int) $cropplan->zone_zvn;
+			// Organic status of the plot at the date of the record (history of the plot in doliFarm)
+			$status = $this->plotBioStatus((int) $target->fk_plot);
+			$target->bio_status = ($status !== '' ? $status : null);
 			if ($target->update($user) < 0) {
 				$this->setErrorsFromObject($target);
 				return -1;
@@ -1231,6 +1287,11 @@ class DoliTraceTreatment extends CommonObject
 		// Resistance management: maximum of applications of the label and groups of the mode of action in a row
 		if ($this->kind == self::KIND_PLANTPROTECTION) {
 			$warnings = array_merge($warnings, $this->getResistanceWarnings());
+		}
+
+		// Organic production: products not allowed on organic areas, copper over 7 years
+		if ($this->technical_type == self::TECHNICAL_SURFACES) {
+			$warnings = array_merge($warnings, $this->getOrganicWarnings());
 		}
 
 		// Nitrogen of livestock origin in vulnerable zones: kg N/ha of the calendar year on each plot, this record included
@@ -1487,6 +1548,99 @@ class DoliTraceTreatment extends CommonObject
 	}
 
 	/**
+	 * Warnings of the organic production on the areas of the record
+	 *
+	 * - plant protection product not marked as allowed in organic farming (Reg. EU 2021/1165, annex I) on an area
+	 *   in conversion or organic at the date (Reg. EU 2018/848, annex II part I point 1.10);
+	 * - copper metal over the limit on a plot: kg/ha of the validated records of the last 7 years, this one included
+	 *   (Reg. EU 2021/1165, annex I: 28 kg/ha in 7 years; setup DOLITRACE_CU_LIMIT_7Y, 0 = no check).
+	 *
+	 * The status of the areas is the copy of the validation, or the history of the plot for drafts.
+	 *
+	 * @return	string[]	Warnings, translated
+	 */
+	public function getOrganicWarnings()
+	{
+		global $langs;
+
+		$langs->loadLangs(array('dolitrace@dolitrace', 'dolifarm@dolifarm'));
+		$warnings = array();
+		if (empty($this->date_start) || !dol_include_once('/dolifarm/lib/dolifarm_bio.lib.php') || !function_exists('dolifarmBioIsOrganic')) {
+			return $warnings;
+		}
+		$prefix = $this->db->prefix();
+
+		// Areas in conversion or organic at the date
+		$organic = array();
+		foreach ($this->targets as $target) {
+			if ($target->target_type != DoliTraceTreatmentTarget::TYPE_PLOT || !($target->fk_plot > 0)) {
+				continue;
+			}
+			$status = ($this->status != self::STATUS_DRAFT && (string) $target->bio_status !== '' ? (string) $target->bio_status : $this->plotBioStatus((int) $target->fk_plot));
+			if (dolifarmBioIsOrganic($status)) {
+				$organic[] = $target->location_ref.' ('.$this->bioStatusLabel($status).')';
+			}
+		}
+		if (count($organic)) {
+			foreach ($this->products as $product) {
+				if (!($product->fk_agrodrug > 0)) {
+					continue;
+				}
+				$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, organic_allowed FROM ".$prefix."dolifarm_agrodrug WHERE rowid = ".((int) $product->fk_agrodrug));
+				if (isset($rows[$product->fk_agrodrug]) && empty($rows[$product->fk_agrodrug]->organic_allowed)) {
+					$warnings[] = $langs->transnoentities('WarningTreatmentNotOrganic', $product->product_label, implode(', ', array_unique($organic)));
+				}
+			}
+		}
+
+		// Copper over 7 years on each plot
+		$limit = getDolGlobalInt('DOLITRACE_CU_LIMIT_7Y', 28);
+		$copper = 0;
+		foreach ($this->products as $product) {
+			$copper += (float) $product->cu_applied;
+		}
+		if ($limit <= 0 || !($copper > 0)) {
+			return $warnings;
+		}
+		$from = dol_time_plus_duree($this->date_start, -7, 'y');
+		$done = array();
+		foreach ($this->targets as $target) {
+			if (!($target->fk_plot > 0) || isset($done[(int) $target->fk_plot])) {
+				continue;
+			}
+			$done[(int) $target->fk_plot] = 1;
+			$sql = "SELECT SUM(p.cu_applied) as total FROM ".$prefix."dolitrace_treatment_product as p";
+			$sql .= " INNER JOIN ".$prefix."dolitrace_treatment as t ON t.rowid = p.fk_treatment";
+			$sql .= " WHERE t.status = ".self::STATUS_VALIDATED;
+			$sql .= " AND t.rowid <> ".((int) $this->id).($this->fk_previous > 0 ? " AND t.rowid <> ".((int) $this->fk_previous) : "");
+			$sql .= " AND t.date_start > '".$this->db->idate($from)."' AND t.date_start <= '".$this->db->idate($this->date_start)."'";
+			$sql .= " AND EXISTS (SELECT 1 FROM ".$prefix."dolitrace_treatment_target as g WHERE g.fk_treatment = t.rowid AND g.fk_plot = ".((int) $target->fk_plot).")";
+			$resql = $this->db->query($sql);
+			$obj = $resql ? $this->db->fetch_object($resql) : null;
+			$total = ($obj ? (float) $obj->total : 0) + $copper;
+			if ($total > $limit) {
+				$warnings[] = $langs->transnoentities('WarningTreatmentCopper', $target->location_ref, price(price2num($total, 'MS')), $limit);
+			}
+		}
+		return $warnings;
+	}
+
+	/**
+	 * Label of a code of the organic statuses of doliFarm
+	 *
+	 * @param	string	$code	Code of dolifarm_c_biostatus
+	 * @return	string
+	 */
+	private function bioStatusLabel($code)
+	{
+		global $langs;
+
+		$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, label FROM ".$this->db->prefix()."dolifarm_c_biostatus WHERE code = '".$this->db->escape($code)."'");
+		$row = reset($rows);
+		return ($row ? $langs->transnoentities($row->label) : $code);
+	}
+
+	/**
 	 * Content of the record that the register certifies: header, products and areas, without technical fields and notes
 	 *
 	 * @return	array<string,mixed>		Content with normalized values
@@ -1538,7 +1692,7 @@ class DoliTraceTreatment extends CommonObject
 			}
 		}
 		foreach ($this->targets as $target) {
-			$content['targets'][] = array(
+			$area = array(
 				'target_type' => (int) $target->target_type,
 				'fk_plot' => (int) $target->fk_plot,
 				'fk_building' => (int) $target->fk_building,
@@ -1553,6 +1707,11 @@ class DoliTraceTreatment extends CommonObject
 				'treated_unit' => (string) $target->treated_unit,
 				'seed_batch' => (string) $target->seed_batch,
 			);
+			// Organic status (added for the organic registers): only when filled in, so the fingerprints of the older records do not change
+			if ((string) $target->bio_status !== '') {
+				$area['bio_status'] = (string) $target->bio_status;
+			}
+			$content['targets'][] = $area;
 		}
 		foreach ($this->products as $product) {
 			$line = array(
@@ -1573,7 +1732,8 @@ class DoliTraceTreatment extends CommonObject
 				'batch' => (string) $product->batch,
 			);
 			// Data added for the AGEA field notebook: only when filled in, so the fingerprints of the older records do not change
-			foreach (array('cu_content', 'efficiency', 'dry_matter', 'density') as $key) {
+			// cu_applied: added for the organic registers, same rule
+			foreach (array('cu_content', 'efficiency', 'dry_matter', 'density', 'cu_applied') as $key) {
 				if ($num($product->$key) !== '') {
 					$line[$key] = $num($product->$key);
 				}
@@ -2732,6 +2892,7 @@ class DoliTraceTreatmentProduct extends DoliTraceTreatmentRow
 		'qty_unit' => array('type' => 'varchar(8)', 'label' => 'Unit', 'enabled' => 1, 'position' => 34, 'notnull' => 0, 'visible' => 1),
 		'qty_auto' => array('type' => 'integer', 'label' => 'TreatmentQtyAuto', 'enabled' => 1, 'position' => 35, 'notnull' => 1, 'visible' => 0, 'default' => '1'),
 		'n_applied' => array('type' => 'double(24,8)', 'label' => 'TreatmentNApplied', 'enabled' => 1, 'position' => 35, 'notnull' => 0, 'visible' => 1),
+		'cu_applied' => array('type' => 'double(24,8)', 'label' => 'TreatmentCuApplied', 'enabled' => 1, 'position' => 36, 'notnull' => 0, 'visible' => 1),
 		'batch' => array('type' => 'varchar(128)', 'label' => 'Batch', 'enabled' => 1, 'position' => 40, 'notnull' => 0, 'visible' => 1),
 		'stock_status' => array('type' => 'integer', 'label' => 'TreatmentStockStatus', 'enabled' => 1, 'position' => 50, 'notnull' => 1, 'visible' => 0, 'default' => '0', 'arrayofkeyval' => array('0' => 'TreatmentStockNone', '1' => 'TreatmentStockMoved', '2' => 'TreatmentStockToRegularize', '3' => 'TreatmentStockReversed')),
 		'stock_error' => array('type' => 'varchar(255)', 'label' => 'TreatmentStockError', 'enabled' => 1, 'position' => 53, 'notnull' => 0, 'visible' => 0),
@@ -2850,6 +3011,11 @@ class DoliTraceTreatmentProduct extends DoliTraceTreatmentRow
 	public $n_applied;
 
 	/**
+	 * @var float|string|null	kg of copper metal per hectare
+	 */
+	public $cu_applied;
+
+	/**
 	 * @var ?string
 	 */
 	public $batch;
@@ -2907,6 +3073,7 @@ class DoliTraceTreatmentTarget extends DoliTraceTreatmentRow
 		'fk_cropplan' => array('type' => 'integer', 'label' => 'TreatmentCropPlan', 'enabled' => 1, 'position' => 13, 'notnull' => 0, 'visible' => 1),
 		'location_ref' => array('type' => 'varchar(128)', 'label' => 'TreatmentLocationRef', 'enabled' => 1, 'position' => 14, 'notnull' => 0, 'visible' => 1),
 		'zone_zvn' => array('type' => 'integer', 'label' => 'TreatmentZoneZvn', 'enabled' => 1, 'position' => 15, 'notnull' => 0, 'visible' => 1, 'default' => '0'),
+		'bio_status' => array('type' => 'varchar(16)', 'label' => 'TreatmentBioStatus', 'enabled' => 1, 'position' => 16, 'notnull' => 0, 'visible' => 1),
 		'fk_crop' => array('type' => 'integer', 'label' => 'TreatmentCrop', 'enabled' => 1, 'position' => 20, 'notnull' => 0, 'visible' => 1),
 		'crop_eppo' => array('type' => 'varchar(10)', 'label' => 'TreatmentCropEppo', 'enabled' => 1, 'position' => 21, 'notnull' => 0, 'visible' => 1),
 		'crop_label' => array('type' => 'varchar(255)', 'label' => 'TreatmentCrop', 'enabled' => 1, 'position' => 22, 'notnull' => 0, 'visible' => 1),
@@ -2980,4 +3147,9 @@ class DoliTraceTreatmentTarget extends DoliTraceTreatmentRow
 	 * @var ?string
 	 */
 	public $seed_batch;
+
+	/**
+	 * @var ?string		Organic status of the plot at the date of the record (code of dolifarm_c_biostatus), copied at the validation
+	 */
+	public $bio_status;
 }
