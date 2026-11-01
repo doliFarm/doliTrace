@@ -757,16 +757,401 @@ class DoliTraceBioRegister
 	}
 
 	/**
+	 * Registers of the page and of the annual organic dossier: key => translation key of the title
+	 *
+	 * @return	array<string,string>
+	 */
+	public static function getTabs()
+	{
+		return array(
+			'movements' => 'BioRegisterMovements', 'balance' => 'BioRegisterBalance', 'plots' => 'BioRegisterPlots',
+			'seeds' => 'BioRegisterSeeds', 'inputs' => 'BioRegisterInputs', 'treatments' => 'BioRegisterTreatments',
+			'purchases' => 'BioRegisterPurchases', 'harvests' => 'BioRegisterHarvests', 'sales' => 'BioRegisterSales',
+		);
+	}
+
+	/**
+	 * First and last second of a year
+	 *
+	 * @param	int		$year	Year
+	 * @return	array{0:int,1:int}
+	 */
+	private function yearBounds($year)
+	{
+		return array(dol_mktime(0, 0, 0, 1, 1, (int) $year), dol_mktime(23, 59, 59, 12, 31, (int) $year));
+	}
+
+	/**
+	 * Sowing and planting of the year (operations not canceled): material used, its organic status and the
+	 * derogation of the organic seed database (BDSB) when the material is not organic. The status comes from the
+	 * operation, otherwise from the product.
+	 *
+	 * @param	User	$user		User
+	 * @param	int		$socid		Farm, 0 for all
+	 * @param	int		$year		Year
+	 * @return	array<int,array<string,mixed>>|int	Lines, <0 if KO
+	 */
+	public function getSeeds(User $user, $socid, $year)
+	{
+		dol_include_once('/dolitrace/class/dolitraceoperation.class.php');
+		$prefix = $this->db->prefix();
+		list($start, $end) = $this->yearBounds($year);
+		$labels = $this->getBioStatusLabels();
+		$sql = "SELECT o.rowid, o.ref, o.date_op, o.fk_product, o.batch_input, o.qty_used, o.seed_status, o.bdsb_ref, o.bdsb_date,";
+		$sql .= " cp.fk_plot, pl.ref as plot_ref, c.label as crop_label, p.ref as product_ref, p.label as product_label";
+		$sql .= " FROM ".$prefix."dolitrace_operation as o";
+		$sql .= " INNER JOIN ".$prefix."dolitrace_cropplan as cp ON cp.rowid = o.fk_cropplan";
+		$sql .= " LEFT JOIN ".$prefix."dolifarm_plot as pl ON pl.rowid = cp.fk_plot";
+		$sql .= " LEFT JOIN ".$prefix."dolifarm_crops as c ON c.rowid = cp.fk_crop";
+		$sql .= " LEFT JOIN ".$prefix."product as p ON p.rowid = o.fk_product";
+		$sql .= " WHERE o.entity IN (".getEntity('dolitraceoperation').") AND (o.status IS NULL OR o.status <> 9)";
+		$sql .= " AND o.fk_operation_type IN ('".implode("','", array_map(array($this->db, 'escape'), DoliTraceOperation::$seedingTypes))."')";
+		$sql .= " AND o.date_op BETWEEN '".$this->db->idate($start)."' AND '".$this->db->idate($end)."'";
+		if ($socid > 0) {
+			$sql .= " AND cp.fk_soc = ".((int) $socid);
+		}
+		$sql .= dolifarmSqlSocFilter($user, 'cp.fk_soc');
+		$sql .= " ORDER BY o.date_op, o.rowid";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+		$rows = array();
+		$products = array();
+		while ($obj = $this->db->fetch_object($resql)) {
+			$rows[] = $obj;
+			if ((int) $obj->fk_product > 0) {
+				$products[(int) $obj->fk_product] = (int) $obj->fk_product;
+			}
+		}
+		$this->db->free($resql);
+		$productstatus = $this->getProductStatuses($products);
+		$lines = array();
+		foreach ($rows as $obj) {
+			$date = $this->db->jdate($obj->date_op);
+			$status = (string) $obj->seed_status;
+			if ($status === '' && isset($productstatus[(int) $obj->fk_product])) {
+				$status = $productstatus[(int) $obj->fk_product];
+			}
+			$plotcode = ((int) $obj->fk_plot > 0 ? dolifarmBioStatusAt($this->db, (int) $obj->fk_plot, $date) : '');
+			$lines[] = array(
+				'date' => $date, 'ref' => (string) $obj->ref, 'plot_ref' => (string) $obj->plot_ref, 'crop' => (string) $obj->crop_label,
+				'product_ref' => (string) $obj->product_ref, 'product_label' => (string) $obj->product_label, 'batch' => (string) $obj->batch_input,
+				'qty' => $obj->qty_used !== null ? (float) $obj->qty_used : null, 'bio_status' => $status,
+				'bdsb_ref' => (string) $obj->bdsb_ref, 'bdsb_date' => $obj->bdsb_date ? $this->db->jdate($obj->bdsb_date) : null,
+				'plot_bio' => $labels[$plotcode] ?? $plotcode,
+				// Plot organic or in conversion, material not organic and no derogation
+				'missing_derogation' => (dolifarmBioIsOrganic($plotcode) && $status !== 'BIO' && trim((string) $obj->bdsb_ref) === ''),
+			);
+		}
+		return $lines;
+	}
+
+	/**
+	 * Validated treatments of the year, one line per product, with the plots, whether they were organic or in
+	 * conversion at the date, and the document justifying the plant protection
+	 *
+	 * @param	User	$user		User
+	 * @param	int		$socid		Farm, 0 for all
+	 * @param	int		$year		Year
+	 * @return	array<int,array<string,mixed>>|int	Lines, <0 if KO
+	 */
+	public function getTreatments(User $user, $socid, $year)
+	{
+		$prefix = $this->db->prefix();
+		list($start, $end) = $this->yearBounds($year);
+		$sql = "SELECT t.rowid, t.ref, t.kind, t.date_start, t.justification_type, t.justification_ref, j.label as justification_label,";
+		$sql .= " tp.fk_agrodrug, tp.fk_fertilizer, tp.product_label, tp.reg_number, tp.adversity_label, tp.qty_total, tp.qty_unit";
+		$sql .= " FROM ".$prefix."dolitrace_treatment as t";
+		$sql .= " INNER JOIN ".$prefix."dolitrace_treatment_product as tp ON tp.fk_treatment = t.rowid";
+		$sql .= " LEFT JOIN ".$prefix."dolitrace_c_justification as j ON j.code = t.justification_type";
+		$sql .= " WHERE t.entity IN (".getEntity('dolitracetreatment').") AND t.status = 1";
+		$sql .= " AND t.date_start BETWEEN '".$this->db->idate($start)."' AND '".$this->db->idate($end)."'";
+		if ($socid > 0) {
+			$sql .= " AND t.fk_soc = ".((int) $socid);
+		}
+		$sql .= dolifarmSqlSocFilter($user, 't.fk_soc');
+		$sql .= " ORDER BY t.date_start, t.rowid, tp.rang, tp.rowid";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+		$rows = array();
+		$ids = array();
+		while ($obj = $this->db->fetch_object($resql)) {
+			$rows[] = $obj;
+			$ids[(int) $obj->rowid] = (int) $obj->rowid;
+		}
+		$this->db->free($resql);
+
+		// Plots of the treatments, with the organic status copied at the validation
+		$plots = array();
+		$organic = array();
+		if (count($ids)) {
+			$sql = "SELECT tt.fk_treatment, tt.bio_status, pl.ref as plot_ref FROM ".$prefix."dolitrace_treatment_target as tt";
+			$sql .= " LEFT JOIN ".$prefix."dolifarm_plot as pl ON pl.rowid = tt.fk_plot";
+			$sql .= " WHERE tt.fk_treatment IN (".$this->db->sanitize(implode(',', $ids)).")";
+			$resql = $this->db->query($sql);
+			if ($resql) {
+				while ($obj = $this->db->fetch_object($resql)) {
+					if ((string) $obj->plot_ref !== '') {
+						$plots[(int) $obj->fk_treatment][(string) $obj->plot_ref] = (string) $obj->plot_ref;
+					}
+					if (dolifarmBioIsOrganic((string) $obj->bio_status)) {
+						$organic[(int) $obj->fk_treatment] = true;
+					}
+				}
+				$this->db->free($resql);
+			}
+		}
+		$lines = array();
+		foreach ($rows as $obj) {
+			$id = (int) $obj->rowid;
+			$lines[] = array(
+				'treatment_id' => $id, 'date' => $this->db->jdate($obj->date_start), 'ref' => (string) $obj->ref, 'kind' => (int) $obj->kind,
+				'fk_agrodrug' => (int) $obj->fk_agrodrug, 'fk_fertilizer' => (int) $obj->fk_fertilizer,
+				'product_label' => (string) $obj->product_label, 'reg_number' => (string) $obj->reg_number, 'adversity_label' => (string) $obj->adversity_label,
+				'qty' => $obj->qty_total !== null ? (float) $obj->qty_total : null, 'unit' => (string) $obj->qty_unit,
+				'plots' => implode(', ', $plots[$id] ?? array()), 'on_organic' => !empty($organic[$id]),
+				'justification' => trim((string) $obj->justification_label.' '.(string) $obj->justification_ref),
+			);
+		}
+		return $lines;
+	}
+
+	/**
+	 * Technical inputs used in the year (plant protection products and fertilisers of the validated treatments): number
+	 * of treatments, total quantity, use on organic plots and the check for organic production (Reg. EU 2021/1165)
+	 *
+	 * @param	User	$user		User
+	 * @param	int		$socid		Farm, 0 for all
+	 * @param	int		$year		Year
+	 * @return	array<int,array<string,mixed>>|int	Lines, <0 if KO
+	 */
+	public function getInputs(User $user, $socid, $year)
+	{
+		$treatments = $this->getTreatments($user, $socid, $year);
+		if (!is_array($treatments)) {
+			return -1;
+		}
+		dol_include_once('/dolifarm/lib/dolifarm_organic.lib.php');
+		$inputs = array();
+		foreach ($treatments as $line) {
+			$product = ($line['fk_agrodrug'] > 0 ? 'A'.$line['fk_agrodrug'] : ($line['fk_fertilizer'] > 0 ? 'F'.$line['fk_fertilizer'] : 'L'.$line['product_label']));
+			$key = $product.'|'.$line['unit'];
+			if (!isset($inputs[$key])) {
+				$inputs[$key] = array(
+					'fk_agrodrug' => $line['fk_agrodrug'], 'fk_fertilizer' => $line['fk_fertilizer'],
+					'kind' => ($line['fk_fertilizer'] > 0 ? 2 : 1), 'product_label' => $line['product_label'], 'reg_number' => $line['reg_number'],
+					'treatments' => array(), 'qty' => 0.0, 'unit' => $line['unit'], 'on_organic' => false, 'last_date' => 0,
+					'organic_result' => '', 'organic_confirmed' => false,
+				);
+			}
+			$inputs[$key]['treatments'][$line['treatment_id']] = $line['treatment_id'];
+			$inputs[$key]['qty'] += (float) $line['qty'];
+			$inputs[$key]['on_organic'] = ($inputs[$key]['on_organic'] || $line['on_organic']);
+			$inputs[$key]['last_date'] = max($inputs[$key]['last_date'], (int) $line['date']);
+		}
+		$lines = array();
+		foreach ($inputs as $input) {
+			if ($input['fk_agrodrug'] > 0 && function_exists('dolifarmOrganicAgroDrugCheck')) {
+				$check = dolifarmOrganicAgroDrugCheck($this->db, $input['fk_agrodrug'], $input['last_date']);
+				$input['organic_result'] = $check['result'];
+				$input['organic_confirmed'] = !empty($check['confirmed']);
+			} elseif ($input['fk_fertilizer'] > 0 && function_exists('dolifarmOrganicFertilizerCheck')) {
+				$check = dolifarmOrganicFertilizerCheck($this->db, $input['fk_fertilizer']);
+				$input['organic_result'] = $check['result'];
+			}
+			$input['treatments'] = count($input['treatments']);
+			$lines[] = $input;
+		}
+		usort($lines, function ($a, $b) {
+			return array($a['kind'], $a['product_label']) <=> array($b['kind'], $b['product_label']);
+		});
+		return $lines;
+	}
+
+	/**
+	 * Validated harvests of the year, with plot, crop, lot and organic status
+	 *
+	 * @param	User	$user		User
+	 * @param	int		$socid		Farm, 0 for all
+	 * @param	int		$year		Year
+	 * @return	array<int,array<string,mixed>>|int	Lines, <0 if KO
+	 */
+	public function getHarvests(User $user, $socid, $year)
+	{
+		$prefix = $this->db->prefix();
+		list($start, $end) = $this->yearBounds($year);
+		$sql = "SELECT h.ref, h.date_harvest, h.qty_harvested, h.qty_unit, h.batch_number, h.bio_status,";
+		$sql .= " pl.ref as plot_ref, c.label as crop_label, p.ref as product_ref, p.label as product_label";
+		$sql .= " FROM ".$prefix."dolitrace_harvest as h";
+		$sql .= " INNER JOIN ".$prefix."dolitrace_cropplan as cp ON cp.rowid = h.fk_cropplan";
+		$sql .= " LEFT JOIN ".$prefix."dolifarm_plot as pl ON pl.rowid = cp.fk_plot";
+		$sql .= " LEFT JOIN ".$prefix."dolifarm_crops as c ON c.rowid = cp.fk_crop";
+		$sql .= " LEFT JOIN ".$prefix."product as p ON p.rowid = h.fk_product_out";
+		$sql .= " WHERE h.status = 1 AND h.entity IN (".getEntity('dolitraceharvest').")";
+		$sql .= " AND h.date_harvest BETWEEN '".$this->db->idate($start)."' AND '".$this->db->idate($end)."'";
+		if ($socid > 0) {
+			$sql .= " AND cp.fk_soc = ".((int) $socid);
+		}
+		$sql .= dolifarmSqlSocFilter($user, 'cp.fk_soc');
+		$sql .= " ORDER BY h.date_harvest, h.rowid";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+		$lines = array();
+		while ($obj = $this->db->fetch_object($resql)) {
+			$lines[] = array(
+				'date' => $this->db->jdate($obj->date_harvest), 'ref' => (string) $obj->ref, 'plot_ref' => (string) $obj->plot_ref,
+				'crop' => (string) $obj->crop_label, 'product_ref' => (string) $obj->product_ref, 'product_label' => (string) $obj->product_label,
+				'batch' => (string) $obj->batch_number, 'bio_status' => (string) $obj->bio_status,
+				'qty' => $obj->qty_harvested !== null ? (float) $obj->qty_harvested : null, 'unit' => (string) $obj->qty_unit,
+			);
+		}
+		$this->db->free($resql);
+		return $lines;
+	}
+
+	/**
+	 * Purchases (receptions, supplier orders and invoices) or sales (shipments, invoices, orders) of the year, from the
+	 * stock movements of the warehouses of the farm, with the supplier or the customer and its organic certificate
+	 *
+	 * @param	User	$user		User
+	 * @param	int		$socid		Farm, 0 for all
+	 * @param	int		$year		Year
+	 * @param	string	$origin		RECEPTION or SHIPPING
+	 * @return	array<int,array<string,mixed>>|int	Lines, <0 if KO
+	 */
+	public function getTrades(User $user, $socid, $year, $origin)
+	{
+		list($start, $end) = $this->yearBounds($year);
+		$movements = $this->getMovements($this->getWarehouses($user, $socid), $start, $end);
+		if (!is_array($movements)) {
+			return -1;
+		}
+		$lines = array();
+		foreach ($movements as $line) {
+			if ($line['origin'] == $origin) {
+				$line['qty'] = ($origin == 'RECEPTION' ? $line['qty_in'] : $line['qty_out']);
+				// A return reverses the sign
+				if ($line['qty'] === null) {
+					$line['qty'] = -(float) ($origin == 'RECEPTION' ? $line['qty_out'] : $line['qty_in']);
+				}
+				$lines[] = $line;
+			}
+		}
+		usort($lines, function ($a, $b) {
+			return array($a['date'], $a['document']) <=> array($b['date'], $b['document']);
+		});
+		return $lines;
+	}
+
+	/**
+	 * Lines of a register
+	 *
+	 * @param	string	$tab		Register (see getTabs)
+	 * @param	User	$user		User
+	 * @param	int		$socid		Farm, 0 for all
+	 * @param	int		$year		Year
+	 * @return	array<int,array<string,mixed>>|int	Lines, <0 if KO
+	 */
+	public function getLines($tab, User $user, $socid, $year)
+	{
+		switch ($tab) {
+			case 'balance':
+				return $this->getMassBalance($user, $socid, $year);
+			case 'plots':
+				return $this->getPlotSummary($user, $socid, $year);
+			case 'seeds':
+				return $this->getSeeds($user, $socid, $year);
+			case 'inputs':
+				return $this->getInputs($user, $socid, $year);
+			case 'treatments':
+				return $this->getTreatments($user, $socid, $year);
+			case 'harvests':
+				return $this->getHarvests($user, $socid, $year);
+			case 'purchases':
+				return $this->getTrades($user, $socid, $year, 'RECEPTION');
+			case 'sales':
+				return $this->getTrades($user, $socid, $year, 'SHIPPING');
+		}
+		list($start, $end) = $this->yearBounds($year);
+		return $this->getMovements($this->getWarehouses($user, $socid), $start, $end);
+	}
+
+	/**
+	 * Registers the user can read: movements, purchases and sales need the stock, treatments and inputs the register
+	 * of the treatments, sowing the crop operations
+	 *
+	 * @param	User	$user	User
+	 * @return	string[]		Registers
+	 */
+	public static function getAllowedTabs(User $user)
+	{
+		$tabs = array();
+		$stock = (isModEnabled('stock') && $user->hasRight('stock', 'lire'));
+		foreach (array_keys(self::getTabs()) as $tab) {
+			if (in_array($tab, array('movements', 'purchases', 'sales')) && !$stock) {
+				continue;
+			}
+			if (in_array($tab, array('inputs', 'treatments')) && !$user->hasRight('dolitrace', 'dolitracetreatment', 'read')) {
+				continue;
+			}
+			if ($tab == 'seeds' && !$user->hasRight('dolitrace', 'dolitraceoperation', 'read')) {
+				continue;
+			}
+			$tabs[] = $tab;
+		}
+		return $tabs;
+	}
+
+	/**
+	 * Heading of the farm: name and CUAA, organic certificate with the control body and its end
+	 *
+	 * @param	int			$socid			Farm, 0 for none
+	 * @param	Translate	$outputlangs	Language
+	 * @return	string[]					Lines
+	 */
+	public function getFarmHeader($socid, Translate $outputlangs)
+	{
+		$lines = array();
+		if ($socid <= 0) {
+			return $lines;
+		}
+		$prefix = $this->db->prefix();
+		$resql = $this->db->query("SELECT nom, idprof4 FROM ".$prefix."societe WHERE rowid = ".((int) $socid));
+		$soc = $resql ? $this->db->fetch_object($resql) : null;
+		if (!$soc) {
+			return $lines;
+		}
+		$lines[] = $soc->nom.($soc->idprof4 ? ' - CUAA '.$soc->idprof4 : '');
+		$resql = $this->db->query("SELECT dolifarm_bio_cert, dolifarm_bio_body, dolifarm_bio_cert_end FROM ".$prefix."societe_extrafields WHERE fk_object = ".((int) $socid));
+		$ef = $resql ? $this->db->fetch_object($resql) : null;
+		if ($ef && trim((string) $ef->dolifarm_bio_cert.(string) $ef->dolifarm_bio_body) !== '') {
+			$lines[] = $outputlangs->transnoentities('BioRegisterFarmCertificate', trim((string) $ef->dolifarm_bio_cert), trim((string) $ef->dolifarm_bio_body),
+				$ef->dolifarm_bio_cert_end ? dol_print_date($this->db->jdate($ef->dolifarm_bio_cert_end), 'day', 'tzserver', $outputlangs) : '-');
+		} else {
+			$lines[] = $outputlangs->transnoentities('BioRegisterFarmNoCertificate');
+		}
+		return $lines;
+	}
+
+	/**
 	 * CSV of a register (separator ";", UTF-8 with BOM for spreadsheets)
 	 *
-	 * @param	string		$tab		movements, balance or plots
+	 * @param	string		$tab		Register (see getTabs)
 	 * @param	array<int,array<string,mixed>>	$lines	Lines of the register
 	 * @param	Translate	$outputlangs	Language
 	 * @return	string
 	 */
 	public function toCsv($tab, $lines, Translate $outputlangs)
 	{
-		$outputlangs->loadLangs(array('main', 'products', 'companies', 'productbatch', 'stocks', 'dolitrace@dolitrace', 'dolifarm@dolifarm'));
+		$this->loadLangs($outputlangs);
 		$columns = $this->getColumns($tab);
 		$fh = fopen('php://memory', 'w+');
 		fwrite($fh, "\xEF\xBB\xBF");
@@ -787,23 +1172,28 @@ class DoliTraceBioRegister
 	}
 
 	/**
-	 * PDF of a register, in landscape
+	 * Languages of the registers
 	 *
-	 * @param	string		$tab		movements, balance or plots
-	 * @param	array<int,array<string,mixed>>	$lines	Lines of the register
-	 * @param	array<string,string>	$header	Lines of the heading: farm, period, filters
 	 * @param	Translate	$outputlangs	Language
-	 * @return	string					Content of the PDF
+	 * @return	void
 	 */
-	public function toPdf($tab, $lines, $header, Translate $outputlangs)
+	private function loadLangs(Translate $outputlangs)
+	{
+		$outputlangs->loadLangs(array('main', 'products', 'companies', 'productbatch', 'stocks', 'dolitrace@dolitrace', 'dolifarm@dolifarm'));
+	}
+
+	/**
+	 * New landscape PDF
+	 *
+	 * @param	string		$title			Title
+	 * @param	Translate	$outputlangs	Language
+	 * @return	TCPDF
+	 */
+	private function newPdf($title, Translate $outputlangs)
 	{
 		global $mysoc;
 
 		require_once DOL_DOCUMENT_ROOT.'/core/lib/pdf.lib.php';
-		$outputlangs->loadLangs(array('main', 'products', 'companies', 'productbatch', 'stocks', 'dolitrace@dolitrace', 'dolifarm@dolifarm'));
-		$titles = array('movements' => 'BioRegisterMovements', 'balance' => 'BioRegisterBalance', 'plots' => 'BioRegisterPlots');
-		$title = $outputlangs->transnoentities($titles[$tab] ?? 'BioRegister');
-
 		$format = pdf_getFormat($outputlangs);
 		$pdf = pdf_getInstance(array($format['width'], $format['height']), 'mm', 'L');
 		$pdf->SetCreator('Dolibarr '.DOL_VERSION);
@@ -814,18 +1204,40 @@ class DoliTraceBioRegister
 		$pdf->SetMargins(8, 8, 8);
 		$pdf->SetAutoPageBreak(true, 12);
 		$pdf->SetFont(pdf_getPDFFont($outputlangs), '', 7);
-		$pdf->AddPage();
+		return $pdf;
+	}
 
+	/**
+	 * Heading of a PDF: title, lines, date of generation
+	 *
+	 * @param	string		$title			Title
+	 * @param	string[]	$header			Lines
+	 * @param	Translate	$outputlangs	Language
+	 * @return	string						HTML
+	 */
+	private function headerHtml($title, $header, Translate $outputlangs)
+	{
 		$html = '<h3>'.dol_escape_htmltag($title).'</h3><p>';
 		foreach ($header as $text) {
 			if ((string) $text !== '') {
 				$html .= dol_escape_htmltag($text).'<br>';
 			}
 		}
-		$html .= dol_escape_htmltag($outputlangs->transnoentities('TreatmentPdfGenerated', dol_print_date(dol_now(), 'dayhour', 'tzuser', $outputlangs))).'</p>';
+		return $html.dol_escape_htmltag($outputlangs->transnoentities('TreatmentPdfGenerated', dol_print_date(dol_now(), 'dayhour', 'tzuser', $outputlangs))).'</p>';
+	}
 
+	/**
+	 * Table of a register for the PDF
+	 *
+	 * @param	string		$tab		Register (see getTabs)
+	 * @param	array<int,array<string,mixed>>	$lines	Lines of the register
+	 * @param	Translate	$outputlangs	Language
+	 * @return	string					HTML
+	 */
+	private function tableHtml($tab, $lines, Translate $outputlangs)
+	{
 		$columns = $this->getColumns($tab);
-		$html .= '<table border="0.3" cellpadding="2"><thead><tr style="background-color:#e8e8e8; font-weight:bold;">';
+		$html = '<table border="0.3" cellpadding="2"><thead><tr style="background-color:#e8e8e8; font-weight:bold;">';
 		foreach ($columns as $column) {
 			$html .= '<th width="'.$column[2].'%"'.($column[3] ? ' align="right"' : '').'>'.dol_escape_htmltag($outputlangs->transnoentities($column[1])).'</th>';
 		}
@@ -840,34 +1252,122 @@ class DoliTraceBioRegister
 			}
 			$html .= '</tr>';
 		}
-		$html .= '</tbody></table>';
-		$pdf->writeHTML($html, true, false, true, false, '');
+		return $html.'</tbody></table>';
+	}
+
+	/**
+	 * PDF of a register, in landscape
+	 *
+	 * @param	string		$tab		Register (see getTabs)
+	 * @param	array<int,array<string,mixed>>	$lines	Lines of the register
+	 * @param	string[]	$header		Lines of the heading: farm, period, filters
+	 * @param	Translate	$outputlangs	Language
+	 * @return	string					Content of the PDF
+	 */
+	public function toPdf($tab, $lines, $header, Translate $outputlangs)
+	{
+		$this->loadLangs($outputlangs);
+		$tabs = self::getTabs();
+		$title = $outputlangs->transnoentities($tabs[$tab] ?? 'BioRegister');
+		$pdf = $this->newPdf($title, $outputlangs);
+		$pdf->AddPage();
+		$pdf->writeHTML($this->headerHtml($title, $header, $outputlangs).$this->tableHtml($tab, $lines, $outputlangs), true, false, true, false, '');
+		return $pdf->Output('', 'S');
+	}
+
+	/**
+	 * Annual organic dossier: one PDF with the registers of the year, each one with its title and note, to give to the
+	 * control body
+	 *
+	 * @param	User		$user			User
+	 * @param	int			$socid			Farm, 0 for all
+	 * @param	int			$year			Year
+	 * @param	Translate	$outputlangs	Language
+	 * @return	string|int					Content of the PDF, <0 if KO
+	 */
+	public function toDossierPdf(User $user, $socid, $year, Translate $outputlangs)
+	{
+		$this->loadLangs($outputlangs);
+		$title = $outputlangs->transnoentities('BioDossierTitle', $year);
+		$pdf = $this->newPdf($title, $outputlangs);
+		$pdf->AddPage();
+		$header = $this->getFarmHeader($socid, $outputlangs);
+		$header[] = $outputlangs->transnoentities('BioDossierNote');
+		$pdf->writeHTML($this->headerHtml($title, $header, $outputlangs), true, false, true, false, '');
+		$tabs = self::getTabs();
+		$number = 0;
+		foreach (array('plots', 'seeds', 'inputs', 'purchases', 'treatments', 'harvests', 'sales', 'balance', 'movements') as $tab) {
+			if (!in_array($tab, self::getAllowedTabs($user))) {
+				continue;
+			}
+			$lines = $this->getLines($tab, $user, $socid, $year);
+			if (!is_array($lines)) {
+				return -1;
+			}
+			$number++;
+			$html = '<h4>'.$number.'. '.dol_escape_htmltag($outputlangs->transnoentities($tabs[$tab])).'</h4>';
+			$html .= '<p><i>'.dol_escape_htmltag($outputlangs->transnoentities('BioDossierHelp'.ucfirst($tab))).'</i></p>';
+			$pdf->writeHTML($html.$this->tableHtml($tab, $lines, $outputlangs), true, false, true, false, '');
+		}
 		return $pdf->Output('', 'S');
 	}
 
 	/**
 	 * Columns of a register: key, translation key, width in the PDF (%), numeric
 	 *
-	 * @param	string	$tab	movements, balance or plots
+	 * @param	string	$tab	Register (see getTabs)
 	 * @return	array<int,array{0:string,1:string,2:int,3:bool}>
 	 */
 	public function getColumns($tab)
 	{
-		if ($tab == 'balance') {
-			return array(
-				array('crop', 'BioRegisterCrop', 16, false), array('bio_status', 'BioRegisterStatus', 9, false), array('unit', 'Unit', 5, false),
-				array('estimated', 'BioRegisterEstimated', 9, true), array('harvested', 'BioRegisterHarvested', 9, true),
-				array('yield_percent', 'BioRegisterYieldPercent', 7, true), array('untracked', 'BioRegisterUntracked', 8, true),
-				array('sold', 'BioRegisterSold', 8, true), array('stock', 'BioRegisterStock', 8, true), array('losses', 'BioRegisterLosses', 8, true),
-				array('harvested_previous', 'BioRegisterHarvestedPrevious', 8, true), array('change_percent', 'BioRegisterChangePercent', 8, true),
-			);
-		}
-		if ($tab == 'plots') {
-			return array(
-				array('plot_ref', 'BioRegisterPlot', 10, false), array('plot_label', 'Label', 16, false), array('bio_label', 'BioRegisterPlotStatus', 14, false),
-				array('surface', 'BioRegisterSurface', 8, true), array('cropplan', 'BioRegisterCropPlan', 12, false), array('crop', 'BioRegisterCrop', 14, false),
-				array('estimated', 'BioRegisterEstimated', 9, true), array('harvested', 'BioRegisterHarvested', 9, true), array('unit', 'Unit', 8, false),
-			);
+		switch ($tab) {
+			case 'balance':
+				return array(
+					array('crop', 'BioRegisterCrop', 16, false), array('bio_status', 'BioRegisterStatus', 9, false), array('unit', 'Unit', 5, false),
+					array('estimated', 'BioRegisterEstimated', 9, true), array('harvested', 'BioRegisterHarvested', 9, true),
+					array('yield_percent', 'BioRegisterYieldPercent', 7, true), array('untracked', 'BioRegisterUntracked', 8, true),
+					array('sold', 'BioRegisterSold', 8, true), array('stock', 'BioRegisterStock', 8, true), array('losses', 'BioRegisterLosses', 8, true),
+					array('harvested_previous', 'BioRegisterHarvestedPrevious', 8, true), array('change_percent', 'BioRegisterChangePercent', 8, true),
+				);
+			case 'plots':
+				return array(
+					array('plot_ref', 'BioRegisterPlot', 10, false), array('plot_label', 'Label', 16, false), array('bio_label', 'BioRegisterPlotStatus', 14, false),
+					array('surface', 'BioRegisterSurface', 8, true), array('cropplan', 'BioRegisterCropPlan', 12, false), array('crop', 'BioRegisterCrop', 14, false),
+					array('estimated', 'BioRegisterEstimated', 9, true), array('harvested', 'BioRegisterHarvested', 9, true), array('unit', 'Unit', 8, false),
+				);
+			case 'seeds':
+				return array(
+					array('date', 'Date', 7, false), array('ref', 'Ref', 9, false), array('plot_ref', 'BioRegisterPlot', 9, false),
+					array('plot_bio', 'BioRegisterPlotStatusAtDate', 10, false), array('crop', 'BioRegisterCrop', 10, false), array('product', 'Product', 14, false),
+					array('batch', 'Batch', 7, false), array('qty', 'Qty', 5, true), array('bio_status', 'BioRegisterSeedStatus', 8, false),
+					array('bdsb_ref', 'OperationBdsbRef', 8, false), array('bdsb_date', 'OperationBdsbDate', 6, false), array('check', 'BioRegisterCheck', 7, false),
+				);
+			case 'inputs':
+				return array(
+					array('kind', 'BioRegisterKind', 12, false), array('product_label', 'Product', 24, false), array('reg_number', 'BioRegisterRegNumber', 10, false),
+					array('treatments', 'BioRegisterNbTreatments', 9, true), array('qty', 'Qty', 9, true), array('unit', 'Unit', 6, false),
+					array('on_organic', 'BioRegisterOnOrganic', 12, false), array('organic_result', 'BioRegisterAllowed', 18, false),
+				);
+			case 'treatments':
+				return array(
+					array('date', 'Date', 7, false), array('ref', 'Ref', 10, false), array('kind', 'BioRegisterKind', 10, false),
+					array('product_label', 'Product', 16, false), array('adversity_label', 'BioRegisterAdversity', 13, false), array('qty', 'Qty', 6, true),
+					array('unit', 'Unit', 5, false), array('plots', 'BioRegisterPlot', 12, false), array('on_organic', 'BioRegisterOnOrganic', 8, false),
+					array('justification', 'BioRegisterJustification', 13, false),
+				);
+			case 'harvests':
+				return array(
+					array('date', 'Date', 8, false), array('ref', 'Ref', 11, false), array('plot_ref', 'BioRegisterPlot', 11, false),
+					array('crop', 'BioRegisterCrop', 14, false), array('product', 'Product', 18, false), array('batch', 'Batch', 11, false),
+					array('bio_status', 'BioRegisterStatus', 10, false), array('qty', 'Qty', 9, true), array('unit', 'Unit', 8, false),
+				);
+			case 'purchases':
+			case 'sales':
+				return array(
+					array('date', 'Date', 8, false), array('document', 'BioRegisterDocument', 11, false), array('thirdparty', $tab == 'sales' ? 'Customer' : 'Supplier', 17, false),
+					array('thirdparty_cert', 'BioRegisterCertificate', 15, false), array('product', 'Product', 20, false), array('batch', 'Batch', 11, false),
+					array('bio_status', 'BioRegisterStatus', 9, false), array('qty', 'Qty', 9, true),
+				);
 		}
 		return array(
 			array('date', 'Date', 7, false), array('product', 'Product', 15, false), array('batch', 'Batch', 9, false),
@@ -878,7 +1378,7 @@ class DoliTraceBioRegister
 	}
 
 	/**
-	 * Value of a cell, for the page, the CSV (raw numbers, ISO dates) and the PDF
+	 * Value of a cell, for the page, the CSV (raw numbers, ISO dates, codes) and the PDF
 	 *
 	 * @param	string		$key			Column
 	 * @param	array<string,mixed>	$line	Line
@@ -891,17 +1391,36 @@ class DoliTraceBioRegister
 		$statuses = array('BIO' => 'SeedStatusBio', 'INCONV' => 'SeedStatusInConversion', 'NONBIO' => 'SeedStatusNonBio');
 		switch ($key) {
 			case 'date':
-				return $line['date'] ? dol_print_date($line['date'], $raw ? '%Y-%m-%d' : 'day', 'tzserver', $outputlangs) : '';
+			case 'bdsb_date':
+				return !empty($line[$key]) ? dol_print_date($line[$key], $raw ? '%Y-%m-%d' : 'day', 'tzserver', $outputlangs) : '';
 			case 'product':
 				return trim($line['product_ref'].' - '.$line['product_label'], ' -');
+			case 'crop':
+				// Crop labels of doliFarm are translation keys
+				return (string) $line['crop'] === '' ? '' : $outputlangs->transnoentities((string) $line['crop']);
 			case 'bio_status':
 				return $line['bio_status'] === '' ? '' : ($raw ? $line['bio_status'] : $outputlangs->transnoentities($statuses[$line['bio_status']] ?? $line['bio_status']));
 			case 'origin':
 				return $raw ? $line['origin'] : $outputlangs->transnoentities('BioRegisterOrigin'.ucfirst(strtolower($line['origin'])));
 			case 'thirdparty_cert':
 				return trim($line['thirdparty_cert'].($line['thirdparty_body'] !== '' ? ' ('.$line['thirdparty_body'].')' : ''));
+			case 'kind':
+				return $raw ? (string) $line['kind'] : $outputlangs->transnoentities((int) $line['kind'] == 2 ? 'TreatmentKindFertilization' : 'TreatmentKindPlantProtection');
+			case 'on_organic':
+				return $raw ? ($line['on_organic'] ? '1' : '0') : ($line['on_organic'] ? $outputlangs->transnoentities('Yes') : $outputlangs->transnoentities('No'));
+			case 'organic_result':
+				if ($line['organic_result'] === '') {
+					return '';
+				}
+				$map = array('yes' => 'OrganicResultYes', 'no' => 'OrganicResultNo', 'verify' => 'OrganicResultVerify');
+				$text = ($raw ? $line['organic_result'] : $outputlangs->transnoentities($map[$line['organic_result']] ?? $line['organic_result']));
+				return $text.($line['organic_confirmed'] ? ($raw ? ';confirmed' : ' ('.$outputlangs->transnoentities('BioRegisterConfirmed').')') : '');
+			case 'check':
+				return !empty($line['missing_derogation']) ? ($raw ? 'MISSING_DEROGATION' : $outputlangs->transnoentities('BioRegisterMissingDerogation')) : '';
 			case 'qty_in':
 			case 'qty_out':
+			case 'qty':
+			case 'treatments':
 			case 'balance':
 			case 'estimated':
 			case 'harvested':

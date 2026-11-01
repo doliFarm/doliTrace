@@ -67,9 +67,6 @@ $langs->loadLangs(array("dolitrace@dolitrace", "dolifarm@dolifarm", "productbatc
 
 $action = GETPOST('action', 'aZ09');
 $tab = GETPOST('tab', 'aZ09');
-if (!in_array($tab, array('movements', 'balance', 'plots'))) {
-	$tab = 'movements';
-}
 $socid = GETPOSTINT('socid');
 $warehouseid = GETPOSTINT('warehouseid');
 $productid = GETPOSTINT('productid');
@@ -98,22 +95,35 @@ if (!isModEnabled('dolitrace') || !$user->hasRight('dolitrace', 'dolitraceharves
 if ($socid > 0 && !dolifarmUserCanSeeSoc($user, $socid)) {
 	accessforbidden();
 }
-$canstock = (isModEnabled('stock') && $user->hasRight('stock', 'lire'));
-if ($tab == 'movements' && !$canstock) {
-	$tab = 'balance';
+$allowed = DoliTraceBioRegister::getAllowedTabs($user);
+if (!in_array($tab, $allowed)) {
+	$tab = reset($allowed);
 }
 
 $register = new DoliTraceBioRegister($db);
 
-// Lines of the tab
+// Annual organic dossier: all the registers of the year in one PDF
+if ($action == 'dossier') {
+	$content = $register->toDossierPdf($user, $socid, $year, $langs);
+	if (is_string($content)) {
+		$filename = 'fascicolo_bio'.($socid > 0 ? '_'.$socid : '').'_'.$year.'.pdf';
+		dol_syslog('Export of the organic dossier '.$filename, LOG_INFO);
+		top_httphead('application/pdf');
+		header('Content-Disposition: attachment; filename="'.dol_sanitizeFileName($filename).'"');
+		header('Content-Length: '.strlen($content));
+		print $content;
+		exit;
+	}
+	setEventMessages($register->error, null, 'errors');
+}
+
+// Lines of the tab: the stock register by period and filters, the others by year
 $lines = array();
 if ($tab == 'movements') {
 	$warehouses = $register->getWarehouses($user, $socid, $warehouseid);
 	$lines = $register->getMovements($warehouses, $datefrom, $dateto, $biostatus, $productid);
-} elseif ($tab == 'balance') {
-	$lines = $register->getMassBalance($user, $socid, $year);
 } else {
-	$lines = $register->getPlotSummary($user, $socid, $year);
+	$lines = $register->getLines($tab, $user, $socid, $year);
 }
 if (!is_array($lines)) {
 	setEventMessages($register->error, null, 'errors');
@@ -121,13 +131,7 @@ if (!is_array($lines)) {
 }
 
 // Heading of the exports: farm, period, filters
-$header = array();
-if ($socid > 0) {
-	$soc = new Societe($db);
-	if ($soc->fetch($socid) > 0) {
-		$header[] = $soc->name.($soc->idprof4 ? ' - CUAA '.$soc->idprof4 : '');
-	}
-}
+$header = $register->getFarmHeader($socid, $langs);
 if ($tab == 'movements') {
 	$header[] = $langs->transnoentities('Period').': '.dol_print_date($datefrom, 'day').' - '.dol_print_date($dateto, 'day');
 	if ($warehouseid > 0) {
@@ -142,12 +146,15 @@ if ($tab == 'movements') {
 	$header[] = $langs->transnoentities('BioRegisterMovementsNote');
 } else {
 	$header[] = $langs->transnoentities('Year').': '.$year;
-	$header[] = $langs->transnoentities($tab == 'balance' ? 'BioRegisterBalanceNote' : 'BioRegisterPlotsNote');
+	$header[] = $langs->transnoentities('BioDossierHelp'.ucfirst($tab));
 }
 
 // Exports, read only
 if (in_array($action, array('csv', 'pdf'))) {
-	$base = array('movements' => 'registro_carico_scarico', 'balance' => 'bilancio_massa', 'plots' => 'riepilogo_appezzamenti');
+	$base = array(
+		'movements' => 'registro_carico_scarico', 'balance' => 'bilancio_massa', 'plots' => 'riepilogo_appezzamenti', 'seeds' => 'sementi_deroghe',
+		'inputs' => 'mezzi_tecnici', 'treatments' => 'trattamenti_bio', 'purchases' => 'acquisti', 'harvests' => 'raccolte', 'sales' => 'vendite',
+	);
 	$filename = $base[$tab].($socid > 0 ? '_'.$socid : '').'_'.($tab == 'movements' ? dol_print_date($datefrom, '%Y-%m-%d').'_'.dol_print_date($dateto, '%Y-%m-%d') : $year).'.'.$action;
 	if ($action == 'csv') {
 		$content = $register->toCsv($tab, $lines, $langs);
@@ -176,8 +183,8 @@ llxHeader('', $title, '', '', 0, 0, '', '', '', 'mod-dolitrace page-bioregister'
 $params = array('socid' => $socid, 'year' => $year);
 $head = array();
 $h = 0;
-foreach (array('movements' => 'BioRegisterMovements', 'balance' => 'BioRegisterBalance', 'plots' => 'BioRegisterPlots') as $key => $label) {
-	if ($key == 'movements' && !$canstock) {
+foreach (DoliTraceBioRegister::getTabs() as $key => $label) {
+	if (!in_array($key, $allowed)) {
 		continue;
 	}
 	$head[$h][0] = $_SERVER['PHP_SELF'].'?'.http_build_query(array_merge($params, array('tab' => $key)));
@@ -191,7 +198,8 @@ print dol_get_fiche_head($head, $tab, '', -1);
 // Filters
 print '<form method="GET" action="'.$_SERVER['PHP_SELF'].'">';
 print '<input type="hidden" name="tab" value="'.$tab.'">';
-print '<span class="opacitymedium">'.$langs->trans($tab == 'movements' ? 'BioRegisterMovementsHelp' : ($tab == 'balance' ? 'BioRegisterBalanceHelp' : 'BioRegisterPlotsHelp')).'</span><br><br>';
+$helps = array('movements' => 'BioRegisterMovementsHelp', 'balance' => 'BioRegisterBalanceHelp', 'plots' => 'BioRegisterPlotsHelp');
+print '<span class="opacitymedium">'.$langs->trans($helps[$tab] ?? 'BioDossierHelp'.ucfirst($tab)).'</span><br><br>';
 print '<table class="border centpercent tableforfield">';
 print '<tr><td class="titlefieldcreate">'.$langs->trans('TreatmentFarm').'</td><td>';
 print $form->select_company($socid, 'socid', '', $langs->trans('All'), 0, 0, array(), 0, 'minwidth300');
@@ -225,6 +233,7 @@ unset($query['action']);
 print '<div class="tabsAction">';
 print '<a class="butAction" href="'.$_SERVER['PHP_SELF'].'?'.dol_escape_htmltag(http_build_query(array_merge($query, array('action' => 'pdf')))).'">'.$langs->trans('BioRegisterExportPdf').'</a>';
 print '<a class="butAction" href="'.$_SERVER['PHP_SELF'].'?'.dol_escape_htmltag(http_build_query(array_merge($query, array('action' => 'csv')))).'">'.$langs->trans('BioRegisterExportCsv').'</a>';
+print '<a class="butAction" href="'.$_SERVER['PHP_SELF'].'?'.dol_escape_htmltag(http_build_query(array('tab' => $tab, 'socid' => $socid, 'year' => $tab == 'movements' ? (int) dol_print_date($dateto, '%Y') : $year, 'action' => 'dossier', 'token' => newToken()))).'" title="'.dol_escape_htmltag($langs->trans('BioDossierButtonHelp')).'">'.$langs->trans('BioDossierButton').'</a>';
 print '</div>';
 
 // Register
@@ -243,8 +252,8 @@ foreach ($lines as $line) {
 	print '<tr class="oddeven'.(($line['origin'] ?? '') == 'OPENING' ? ' opacitymedium' : '').'">';
 	foreach ($columns as $column) {
 		$value = $register->formatValue($column[0], $line, $langs, false);
-		if ($column[0] == 'losses' && (float) $line['losses'] < 0) {
-			$value = '<span class="warning" title="'.dol_escape_htmltag($langs->trans('BioRegisterNegativeLosses')).'">'.dol_escape_htmltag($value).'</span>';
+		if (($column[0] == 'losses' && (float) $line['losses'] < 0) || ($column[0] == 'check' && $value !== '') || ($column[0] == 'organic_result' && in_array($line['organic_result'], array('no', 'verify')) && $line['on_organic'])) {
+			$value = '<span class="warning" title="'.dol_escape_htmltag($langs->trans($column[0] == 'losses' ? 'BioRegisterNegativeLosses' : 'BioRegisterCheckHelp')).'">'.dol_escape_htmltag($value).'</span>';
 		} else {
 			$value = dol_escape_htmltag($value);
 		}
