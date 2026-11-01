@@ -95,6 +95,13 @@ $item->fieldAttr['type'] = 'number';
 $item->fieldAttr['min'] = '0';
 $item->helpText = $langs->transnoentities('DOLITRACE_ZVN_N_LIVESTOCK_LIMITHelp');
 
+// Register of treatments: applications in a row with the same group of the mode of action (FRAC, IRAC, HRAC), 0 = no warning
+$item = $formSetup->newItem('DOLITRACE_MOA_MAX_CONSECUTIVE');
+$item->defaultFieldValue = '2';
+$item->fieldAttr['type'] = 'number';
+$item->fieldAttr['min'] = '0';
+$item->helpText = $langs->transnoentities('DOLITRACE_MOA_MAX_CONSECUTIVEHelp');
+
 // The objects of doliTrace have no numbering or document models to choose: no other section
 
 

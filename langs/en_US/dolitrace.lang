@@ -139,6 +139,10 @@ TreatmentEfficiency = Nitrogen efficiency
 TreatmentDryMatter = Dry matter (%)
 TreatmentDensity = Density (kg/l)
 WarningTreatmentNoDensity = %s: liquid fertilizer without density, the nitrogen applied is not computed. Enter the density on the fertilizer card
+WarningTreatmentMaxApplications = %s on %s: this is application no. %s of the crop plan, the label allows at most %s
+WarningTreatmentMoaConsecutive = Group %s on %s: this would be application no. %s in a row with the same mode of action (maximum %s). Alternate the modes of action to avoid resistance
+DOLITRACE_MOA_MAX_CONSECUTIVE = Applications in a row with the same FRAC/IRAC/HRAC group
+DOLITRACE_MOA_MAX_CONSECUTIVEHelp = Maximum number of consecutive applications on the same crop plan with products of the same mode of action group, beyond which the register warns. Multi-site fungicides (FRAC M) and groups not classified are left out. The label always prevails. 0 = no warning
 TreatmentNPK = N-P-K content (%)
 TreatmentNApplied = Nitrogen applied (kg/ha)
 TreatmentNAppliedShort = N %s kg/ha

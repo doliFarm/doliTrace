@@ -204,6 +204,10 @@ TreatmentEfficiency = Efficienza dell'azoto
 TreatmentDryMatter = Sostanza secca (%)
 TreatmentDensity = Densità (kg/l)
 WarningTreatmentNoDensity = %s: fertilizzante liquido senza densità, l'azoto distribuito non è calcolato. Indicare la densità nella scheda del fertilizzante
+WarningTreatmentMaxApplications = %s su %s: questo è il trattamento n. %s del piano colturale, l'etichetta ne ammette al massimo %s
+WarningTreatmentMoaConsecutive = Gruppo %s su %s: sarebbe il %s° trattamento di fila con lo stesso modo d'azione (massimo %s). Alternare i modi d'azione per evitare resistenze
+DOLITRACE_MOA_MAX_CONSECUTIVE = Trattamenti di fila con lo stesso gruppo FRAC/IRAC/HRAC
+DOLITRACE_MOA_MAX_CONSECUTIVEHelp = Numero massimo di trattamenti consecutivi sullo stesso piano colturale con prodotti dello stesso gruppo del modo d'azione, oltre il quale il registro avvisa. Esclusi i fungicidi multisito (FRAC M) e i gruppi non classificati. Prevale sempre l'etichetta. 0 = nessun avviso
 TreatmentNPK = Titolo N-P-K (%)
 TreatmentNApplied = Azoto distribuito (kg/ha)
 TreatmentNAppliedShort = N %s kg/ha

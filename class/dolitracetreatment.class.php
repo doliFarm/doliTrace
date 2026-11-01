@@ -1226,6 +1226,11 @@ class DoliTraceTreatment extends CommonObject
 			}
 		}
 
+		// Resistance management: maximum of applications of the label and groups of the mode of action in a row
+		if ($this->kind == self::KIND_PLANTPROTECTION) {
+			$warnings = array_merge($warnings, $this->getResistanceWarnings());
+		}
+
 		// Nitrogen of livestock origin in vulnerable zones: kg N/ha of the calendar year on each plot, this record included
 		$limit = getDolGlobalInt('DOLITRACE_ZVN_N_LIVESTOCK_LIMIT', 170);
 		if ($this->kind == self::KIND_FERTILIZATION && $livestockn > 0 && $limit > 0) {
@@ -1251,6 +1256,114 @@ class DoliTraceTreatment extends CommonObject
 			}
 		}
 
+		return $warnings;
+	}
+
+	/**
+	 * Warnings of resistance management on each crop plan of the record, compared with the other validated records
+	 * of plant protection on the same crop plan
+	 *
+	 * - more applications of a product than the maximum of its label (field of the plant protection product);
+	 * - the same group of the mode of action (FRAC, IRAC, HRAC) in more applications in a row than the setup allows
+	 *   (DOLITRACE_MOA_MAX_CONSECUTIVE, default 2, 0 = no check). Multi-site fungicides and groups not classified are left out.
+	 *
+	 * The groups are read from the cards of the products, not from the records.
+	 *
+	 * @return	string[]	Warnings
+	 */
+	public function getResistanceWarnings()
+	{
+		global $langs;
+
+		$langs->loadLangs(array('dolitrace@dolitrace', 'dolifarm@dolifarm'));
+		$warnings = array();
+		$agrodrugids = array();
+		foreach ($this->products as $product) {
+			if ($product->fk_agrodrug > 0) {
+				$agrodrugids[(int) $product->fk_agrodrug] = (int) $product->fk_agrodrug;
+			}
+		}
+		$cropplans = array();
+		foreach ($this->targets as $target) {
+			if ($target->fk_cropplan > 0 && !isset($cropplans[(int) $target->fk_cropplan])) {
+				$cropplans[(int) $target->fk_cropplan] = (string) $target->location_ref;
+			}
+		}
+		if (empty($agrodrugids) || empty($cropplans) || empty($this->date_start)) {
+			return $warnings;
+		}
+		dol_include_once('/dolifarm/class/dolifarmagrodrug.class.php');
+		$prefix = $this->db->prefix();
+		$agrodrugs = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, label, max_applications, moa_codes FROM ".$prefix."dolifarm_agrodrug WHERE rowid IN (".$this->db->sanitize(implode(',', $agrodrugids)).")");
+		$groups = array();
+		foreach ($agrodrugs as $agrodrug) {
+			foreach (DoliFarmAgroDrug::moaGroups($agrodrug->moa_codes) as $key => $group) {
+				if (!DoliFarmAgroDrug::moaLowRisk($key)) {
+					$groups[$key] = $group;
+				}
+			}
+		}
+		$maxconsecutive = getDolGlobalInt('DOLITRACE_MOA_MAX_CONSECUTIVE', 2);
+
+		foreach ($cropplans as $cropplanid => $location) {
+			// Other validated records of plant protection on the crop plan (the version replaced by this draft left out)
+			$sql = "SELECT t.rowid, t.date_start FROM ".$prefix."dolitrace_treatment as t";
+			$sql .= " WHERE t.status = ".self::STATUS_VALIDATED." AND t.kind = ".self::KIND_PLANTPROTECTION;
+			$sql .= " AND t.rowid <> ".((int) $this->id).($this->fk_previous > 0 ? " AND t.rowid <> ".((int) $this->fk_previous) : "");
+			$sql .= " AND EXISTS (SELECT 1 FROM ".$prefix."dolitrace_treatment_target as g WHERE g.fk_treatment = t.rowid AND g.fk_cropplan = ".((int) $cropplanid).")";
+			$sql .= " ORDER BY t.date_start DESC, t.rowid DESC";
+			$records = dolitraceTreatmentFetchRows($this->db, $sql);
+			if (empty($records)) {
+				continue;
+			}
+			$usedproducts = array();
+			$usedgroups = array();
+			$sql = "SELECT p.rowid, p.fk_treatment, p.fk_agrodrug, a.moa_codes FROM ".$prefix."dolitrace_treatment_product as p";
+			$sql .= " LEFT JOIN ".$prefix."dolifarm_agrodrug as a ON a.rowid = p.fk_agrodrug";
+			$sql .= " WHERE p.fk_treatment IN (".$this->db->sanitize(implode(',', array_keys($records))).") AND p.fk_agrodrug > 0";
+			foreach (dolitraceTreatmentFetchRows($this->db, $sql) as $line) {
+				$usedproducts[(int) $line->fk_agrodrug][(int) $line->fk_treatment] = 1;
+				foreach (array_keys(DoliFarmAgroDrug::moaGroups($line->moa_codes)) as $key) {
+					$usedgroups[(int) $line->fk_treatment][$key] = 1;
+				}
+			}
+
+			// Maximum of applications of the label, this record included
+			foreach ($agrodrugs as $agrodrug) {
+				$count = 1 + (isset($usedproducts[(int) $agrodrug->rowid]) ? count($usedproducts[(int) $agrodrug->rowid]) : 0);
+				if ($agrodrug->max_applications > 0 && $count > (int) $agrodrug->max_applications) {
+					$warnings[] = $langs->transnoentities('WarningTreatmentMaxApplications', $agrodrug->label, $location, $count, (int) $agrodrug->max_applications);
+				}
+			}
+
+			// Same group in the last applications before this one
+			if ($maxconsecutive > 0 && count($groups)) {
+				$before = array();
+				foreach ($records as $record) {
+					if ($this->db->jdate($record->date_start) < $this->date_start) {
+						$before[] = (int) $record->rowid;
+					}
+					if (count($before) >= $maxconsecutive) {
+						break;
+					}
+				}
+				if (count($before) < $maxconsecutive) {
+					continue;
+				}
+				foreach ($groups as $key => $group) {
+					$repeated = true;
+					foreach ($before as $recordid) {
+						if (empty($usedgroups[$recordid][$key])) {
+							$repeated = false;
+							break;
+						}
+					}
+					if ($repeated) {
+						$warnings[] = $langs->transnoentities('WarningTreatmentMoaConsecutive', $group, $location, $maxconsecutive + 1, $maxconsecutive);
+					}
+				}
+			}
+		}
 		return $warnings;
 	}
 
