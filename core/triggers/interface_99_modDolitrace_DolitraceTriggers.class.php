@@ -540,20 +540,41 @@ class InterfaceDolitraceTriggers extends DolibarrTriggers
 				return -1;
 			}
 
-			// Lot of the harvest, otherwise the production lot of its crop plan (saved on the harvest for traceability)
+			// Organic status of the product from the plot at the date of the harvest; a sub-warehouse dedicated
+			// to this status is used when there is one (separation of organic and non organic products)
+			$biostatus = (method_exists($object, 'computeBioStatus') ? $object->computeBioStatus() : '');
+			$sql = "UPDATE ".$this->db->prefix()."dolitrace_harvest SET bio_status = ".($biostatus === '' ? 'NULL' : "'".$this->db->escape($biostatus)."'")." WHERE rowid = ".((int) $object->id);
+			if (!$this->db->query($sql)) {
+				$this->error = $this->db->lasterror();
+				return -1;
+			}
+			$object->bio_status = ($biostatus === '' ? null : $biostatus);
+			if ($biostatus !== '' && function_exists('dolifarmBioWarehouseFor')) {
+				$warehouse_id = dolifarmBioWarehouseFor($this->db, $warehouse_id, $biostatus);
+			}
+
+			// Lot of the harvest, otherwise the production lot of its crop plan, with the suffix of the organic
+			// status (-BIO, -INCONV) so that organic and non organic products are never in the same lot.
+			// Saved on the harvest for traceability.
 			$batch_number = (string) $object->batch_number;
 			if ($batch_number === '' && $object->fk_cropplan > 0) {
 				$sql = "SELECT batch_output FROM ".$this->db->prefix()."dolitrace_cropplan WHERE rowid = ".((int) $object->fk_cropplan);
 				$resql = $this->db->query($sql);
 				if ($resql && ($obj = $this->db->fetch_object($resql)) && !empty($obj->batch_output)) {
-					$batch_number = $obj->batch_output;
-					$sql = "UPDATE ".$this->db->prefix()."dolitrace_harvest SET batch_number = '".$this->db->escape($batch_number)."' WHERE rowid = ".((int) $object->id);
-					if (!$this->db->query($sql)) {
-						$this->error = $this->db->lasterror();
-						return -1;
-					}
-					$object->batch_number = $batch_number;
+					$batch_number = (string) $obj->batch_output;
 				}
+			}
+			$suffix = (function_exists('dolifarmBioLotSuffix') ? dolifarmBioLotSuffix($biostatus) : '');
+			if ($batch_number !== '' && $suffix !== '' && !str_ends_with($batch_number, $suffix)) {
+				$batch_number = dol_trunc($batch_number, 128 - strlen($suffix), 'right', 'UTF-8', 1).$suffix;
+			}
+			if ($batch_number !== (string) $object->batch_number) {
+				$sql = "UPDATE ".$this->db->prefix()."dolitrace_harvest SET batch_number = '".$this->db->escape($batch_number)."' WHERE rowid = ".((int) $object->id);
+				if (!$this->db->query($sql)) {
+					$this->error = $this->db->lasterror();
+					return -1;
+				}
+				$object->batch_number = $batch_number;
 			}
 
 			$label = $langs->trans('HarvestStockReceived', $object->ref);
@@ -576,6 +597,12 @@ class InterfaceDolitraceTriggers extends DolibarrTriggers
 			return -1;
 		}
 		dol_syslog("Trigger '".$this->name."': harvest ".$object->id." ".($instock ? 'received in' : 'taken out of')." warehouse ".$warehouse_id." lot ".$batch_number);
+		if ($instock && method_exists($object, 'getBioWarnings')) {
+			$warnings = $object->getBioWarnings($warehouse_id);
+			if (count($warnings)) {
+				setEventMessages('', $warnings, 'warnings');
+			}
+		}
 
 		return 1;
 	}

@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS llx_dolitrace_harvest (
     
     -- Tracciabilità
     batch_number    VARCHAR(128),
+    bio_status      VARCHAR(16),            -- BIO, INCONV, NONBIO: organic status of the product, fixed at the validation
     cost_material   DECIMAL(24,8) DEFAULT 0,
     cost_manpower   DECIMAL(24,8) DEFAULT 0,
     cost_energy     DECIMAL(24,8) DEFAULT 0,

@@ -434,6 +434,14 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
     print '<div class="clearboth"></div>';
 
+    // Separation of organic and non organic products in the warehouse of the harvest
+    if ($object->status == $object::STATUS_VALIDATED) {
+        $biowarnings = $object->getBioWarnings();
+        if (count($biowarnings)) {
+            print '<div class="warning">'.implode('<br>', array_map('dol_escape_htmltag', $biowarnings)).'</div>';
+        }
+    }
+
     print dol_get_fiche_end();
 
     /*

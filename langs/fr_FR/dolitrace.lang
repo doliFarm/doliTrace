@@ -363,3 +363,7 @@ WarningOperationSeedNoDerogation = Matériel non bio sur la parcelle %s en conve
 WarningTreatmentRevoked = %s : produit retiré depuis le %s dans la base du ministère de la Santé (vérifier dans le décret les délais d'écoulement des stocks)
 WarningTreatmentSuspended = %s : autorisation suspendue dans la base du ministère de la Santé
 WarningTreatmentOrganicVerify = %s : usage bio à vérifier (%s). Après vérification, le confirmer sur la fiche du produit
+HarvestBioStatus = Statut bio du produit
+HarvestBioStatusHelp = Fixé à la validation d'après le statut de la parcelle à la date de la récolte : bio, en conversion (au moins 12 mois de conversion avant la récolte) ou non bio. Le lot reçoit le suffixe -BIO ou -INCONV
+WarningHarvestWarehouseStatus = L'entrepôt %s est dédié aux produits « %s », mais le produit récolté est « %s » : créer un sous-entrepôt dédié à ce statut ou déplacer le lot
+WarningHarvestMixedLots = Dans l'entrepôt %s, avec le produit « %s », il y a des lots du même produit avec un autre statut : %s. Les garder séparés et identifiables

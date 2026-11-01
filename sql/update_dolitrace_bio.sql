@@ -30,3 +30,6 @@ ALTER TABLE llx_dolitrace_treatment ADD COLUMN justification_ref varchar(255);
 ALTER TABLE llx_dolitrace_operation ADD COLUMN seed_status varchar(16);
 ALTER TABLE llx_dolitrace_operation ADD COLUMN bdsb_ref varchar(64);
 ALTER TABLE llx_dolitrace_operation ADD COLUMN bdsb_date date;
+
+-- Harvests: organic status of the harvested product (BIO, INCONV, NONBIO) from the status of the plot at the date, fixed at the validation
+ALTER TABLE llx_dolitrace_harvest ADD COLUMN bio_status varchar(16);

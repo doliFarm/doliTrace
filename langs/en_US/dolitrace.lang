@@ -387,3 +387,7 @@ WarningOperationSeedNoDerogation = Non organic material on plot %s in conversion
 WarningTreatmentRevoked = %s: product revoked from %s in the database of the Ministry of Health (check in the decree the time allowed to use up the stocks)
 WarningTreatmentSuspended = %s: authorisation suspended in the database of the Ministry of Health
 WarningTreatmentOrganicVerify = %s: organic use to verify (%s). After the check, confirm it on the card of the product
+HarvestBioStatus = Organic status of the product
+HarvestBioStatusHelp = Set at the validation from the status of the plot at the date of the harvest: organic, in conversion (at least 12 months of conversion before the harvest) or non organic. The lot gets the suffix -BIO or -INCONV
+WarningHarvestWarehouseStatus = The warehouse %s is dedicated to "%s" products, but the harvested product is "%s": create a sub-warehouse dedicated to this status or move the lot
+WarningHarvestMixedLots = In the warehouse %s, together with the "%s" product, there are lots of the same product with another status: %s. Keep them separate and identifiable
