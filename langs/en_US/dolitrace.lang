@@ -347,3 +347,8 @@ Lastmaindoc = Last document
 WarningTreatmentUseCrop = %s: the crop %s is not among the authorised uses of the product
 WarningTreatmentUseAdversity = %s: the pest %s is not among the authorised uses of the product on %s
 WarningTreatmentUseDose = %s on %s: the dose %s is outside the range of the label (%s)
+# Home page of Dolibarr
+DashboardFieldRegister = Field register
+DashboardTreatmentsDraft = Draft records (late: more than 30 days after the end of the operation)
+DashboardTreatmentsDraftShort = Draft records
+DashboardHarvestsDraft = Draft harvests

@@ -323,3 +323,8 @@ Lastmaindoc = Dernier document
 WarningTreatmentUseCrop = %s : la culture %s ne figure pas parmi les usages autorisés du produit
 WarningTreatmentUseAdversity = %s : le ravageur ou la maladie %s ne figure pas parmi les usages autorisés du produit sur %s
 WarningTreatmentUseDose = %s sur %s : la dose %s est en dehors de l'intervalle de l'étiquette (%s)
+# Accueil de Dolibarr
+DashboardFieldRegister = Registre de culture
+DashboardTreatmentsDraft = Enregistrements en brouillon (en retard : plus de 30 jours après la fin de l'opération)
+DashboardTreatmentsDraftShort = Enregistrements en brouillon
+DashboardHarvestsDraft = Récoltes en brouillon

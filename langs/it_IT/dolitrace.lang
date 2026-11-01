@@ -358,3 +358,8 @@ ErrorTreatmentApplicationMethodKind = La modalità di applicazione non è dello 
 WarningTreatmentUseCrop = %s: la coltura %s non è tra gli impieghi autorizzati del prodotto
 WarningTreatmentUseAdversity = %s: l'avversità %s non è tra gli impieghi autorizzati del prodotto su %s
 WarningTreatmentUseDose = %s su %s: la dose %s è fuori dall'intervallo dell'etichetta (%s)
+# Home di Dolibarr
+DashboardFieldRegister = Quaderno di campagna
+DashboardTreatmentsDraft = Registrazioni in bozza (in ritardo: oltre 30 giorni dalla fine dell'operazione)
+DashboardTreatmentsDraftShort = Registrazioni in bozza
+DashboardHarvestsDraft = Raccolte in bozza
