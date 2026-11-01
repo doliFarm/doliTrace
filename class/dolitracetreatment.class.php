@@ -333,6 +333,11 @@ class DoliTraceTreatment extends CommonObject
 	public $fk_previous;
 
 	/**
+	 * @var array<string,array{result:string,reasons:string[]}>	Checks for organic production of the agrodrugs, by agrodrug and date
+	 */
+	private $organicChecks = array();
+
+	/**
 	 * @var int
 	 */
 	public $late;
@@ -1599,11 +1604,25 @@ class DoliTraceTreatment extends CommonObject
 
 		// Products not allowed on areas in conversion or organic at the date
 		$byproduct = array();
+		$whyproduct = array();
 		foreach ($this->getOrganicBreaches() as $breach) {
 			$byproduct[$breach['product']][] = $breach['location'].' ('.$breach['status_label'].')';
+			$whyproduct[$breach['product']] = (empty($breach['reasons']) ? array() : $breach['reasons']);
 		}
 		foreach ($byproduct as $label => $areas) {
-			$warnings[] = $langs->transnoentities('WarningTreatmentNotOrganic', $label, implode(', ', array_unique($areas)));
+			$warnings[] = $langs->transnoentities('WarningTreatmentNotOrganic', $label, implode(', ', array_unique($areas))).(count($whyproduct[$label]) ? ' - '.implode('; ', $whyproduct[$label]) : '');
+		}
+		// Products that need a check by hand (conditions of annex I, uses of the label not recorded, not in the catalogue)
+		if (count($this->getOrganicAreas())) {
+			foreach ($this->products as $product) {
+				if (!($product->fk_agrodrug > 0)) {
+					continue;
+				}
+				$check = $this->organicCheck((int) $product->fk_agrodrug);
+				if ($check !== null && $check['result'] == 'verify') {
+					$warnings[] = $langs->transnoentities('WarningTreatmentOrganicVerify', $product->product_label, implode('; ', $check['reasons']));
+				}
+			}
 		}
 
 		// Copper over 7 years on each plot
@@ -1686,9 +1705,11 @@ class DoliTraceTreatment extends CommonObject
 		}
 		foreach ($this->products as $product) {
 			$allowed = true;
+			$reasons = array();
 			if ($product->fk_agrodrug > 0) {
-				$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, organic_allowed FROM ".$prefix."dolifarm_agrodrug WHERE rowid = ".((int) $product->fk_agrodrug));
-				$allowed = (isset($rows[$product->fk_agrodrug]) && !empty($rows[$product->fk_agrodrug]->organic_allowed));
+				$check = $this->organicCheck((int) $product->fk_agrodrug);
+				$allowed = ($check === null || $check['result'] != 'no');
+				$reasons = ($check === null ? array() : $check['reasons']);
 			} elseif ($product->fk_fertilizer > 0) {
 				$rows = dolitraceTreatmentFetchRows($this->db, "SELECT rowid, organic FROM ".$prefix."dolifarm_fertilizer WHERE rowid = ".((int) $product->fk_fertilizer));
 				$allowed = (isset($rows[$product->fk_fertilizer]) && !empty($rows[$product->fk_fertilizer]->organic));
@@ -1698,10 +1719,30 @@ class DoliTraceTreatment extends CommonObject
 			}
 			foreach ($areas as $area) {
 				$area['product'] = (string) $product->product_label;
+				$area['reasons'] = $reasons;
 				$breaches[] = $area;
 			}
 		}
 		return $breaches;
+	}
+
+	/**
+	 * Check of an agrodrug for organic production at the date of the record (substances of annex I, authorisation,
+	 * uses of the label), done by doliFarm
+	 *
+	 * @param	int		$agrodrugid		Id of the agrodrug
+	 * @return	array{result:string,reasons:string[]}|null		Null when doliFarm has no check (older version)
+	 */
+	private function organicCheck($agrodrugid)
+	{
+		if (!dol_include_once('/dolifarm/lib/dolifarm_organic.lib.php') || !function_exists('dolifarmOrganicAgroDrugCheck')) {
+			return null;
+		}
+		$key = $agrodrugid.'_'.dol_print_date($this->date_start, '%Y%m%d', 'tzserver');
+		if (!isset($this->organicChecks[$key])) {
+			$this->organicChecks[$key] = dolifarmOrganicAgroDrugCheck($this->db, $agrodrugid, $this->date_start);
+		}
+		return $this->organicChecks[$key];
 	}
 
 	/**
