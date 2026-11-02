@@ -95,8 +95,7 @@ if (($action == 'create' || $action == 'add') && $forced_cropplan_id > 0) {
     $res_cp = $tmp_cropplan->fetch($forced_cropplan_id);
     
     if ($res_cp > 0) {
-        // A. Passaporto Digitale (UUID)
-        $object->uuid = $tmp_cropplan->uuid;
+        // The UUID of the harvest is its own, made by create()
         
         // B. Mapping Prodotto (Il cuore della tua richiesta)
         // Prendiamo fk_output_product dal Piano e lo mettiamo in fk_product_out della Raccolta
@@ -255,11 +254,6 @@ if ($action == 'create') {
         unset($object->fields['fk_product_out']);
     }
 
-    // 4. UUID (Ereditato e Nascosto)
-    if (!empty($object->uuid)) {
-        print '<input type="hidden" name="uuid" value="'.$object->uuid.'">';
-        unset($object->fields['uuid']);
-    }
 
     // ------------------------------------------------------------------------
     // GENERAZIONE CAMPI STANDARD RIMANENTI
@@ -391,42 +385,25 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
     print '</table>';
     print '</div>';
     
-    // Box Destra: Dettagli Tecnici (UUID)
+    // Traceability: UUID, short code and QR code of the harvest (address of the traceability page)
     print '<div class="fichehalfright">';
-    
-    // Visualizzazione UUID
     if (!empty($object->uuid)) {
-
-		// 1. Contenuto del QR
-        $qr_content = dol_buildpath('/dolitrace/dolitracecropplan_card.php', 2) . '?id=' . $object->id;
-        
+        dol_include_once('/dolitrace/class/dolitracetrace.class.php');
+        $tracelink = dol_buildpath('/dolitrace/dolitrace_trace.php', 2).'?uuid='.urlencode($object->uuid);
+        print '<div class="underbanner clearboth"></div>';
+        print '<table class="border centpercent tableforfield" id="dolitrace-harvest-trace">';
+        print '<tr><td class="titlefield">'.$langs->trans('TraceUuid').'</td><td class="wordbreak"><span class="fa fa-fingerprint opacitymedium paddingright"></span>'.dol_escape_htmltag($object->uuid).'</td></tr>';
+        print '<tr><td>'.$langs->trans('TraceShortCode').'</td><td><strong>'.dol_escape_htmltag(DoliTraceTrace::shortCode($object->uuid)).'</strong></td></tr>';
+        print '<tr><td>'.$langs->trans('TraceQrCode').'</td><td>';
         require_once DOL_DOCUMENT_ROOT.'/includes/tecnickcom/tcpdf/tcpdf_barcodes_2d.php';
-        // 3. GENERAZIONE DEL CODICE
-        $qr_image_data = '';
-        if (class_exists('TCPDF2DBarcode')) {
-            // Generazione Immagine in Base64
-            $barcodeobj = new TCPDF2DBarcode($qr_content, 'QRCODE,H');
-            $pngData = $barcodeobj->getBarcodePngData(3, 3, array(0,0,0)); // W=4, H=4
-            $qr_image_data = 'data:image/png;base64,' . base64_encode($pngData);
+        $barcodeobj = new TCPDF2DBarcode($tracelink, 'QRCODE,M');
+        $pngdata = $barcodeobj->getBarcodePngData(3, 3, array(0, 0, 0));
+        if ($pngdata) {
+            print '<img src="data:image/png;base64,'.base64_encode($pngdata).'" alt="QR" title="'.dol_escape_htmltag($langs->trans('TraceQrCodeHelp')).'" style="border: 1px solid #eee; padding: 4px; background: white;">';
         }
-
-        print '<div class="box-flex-container">';
-        print '<div style="margin: 10px 0; font-family:monospace; color:#666;">';
-        print '<span class="fa fa-fingerprint"></span> <b>Digital Passport UUID:</b><br>';
-        print $object->uuid;
-        print '</div></div>';
-		// Immagine QR Code
-        print '<div style="margin: 10px auto;">';
-        if ($qr_image_data) {
-            print '<img src="' . $qr_image_data . '" alt="QR Code" style="border: 1px solid #eee; padding: 5px; background: white;">';
-        } else {
-            // Messaggio di debug utile se fallisce ancora
-            print '<div class="error" style="font-size:0.8em; color:red;">';
-            print 'Errore: Libreria Barcode non trovata.<br>Percorsi controllati:<br>';
-            foreach($tcpdf_paths as $p) print basename(dirname($p)).'/'.basename($p)."<br>";
-            print '</div>';
-        }
-
+        print '<br><a href="'.dol_escape_htmltag($tracelink).'"><span class="fa fa-route paddingright"></span>'.$langs->trans('TraceTitle').'</a>';
+        print '</td></tr>';
+        print '</table>';
     }
 
     print '</div>'; // End halfright

@@ -144,7 +144,8 @@ class mod_dolitraceharvest_advanced extends ModeleNumRefDoliTraceHarvest
 			return 0;
 		}
 
-		$date = $object->date_creation;
+		// Objects whose creation date is in "datec" have no date_creation: the date of today
+		$date = (empty($object->date_creation) ? dol_now() : $object->date_creation);
 
 		$numFinal = get_next_value($db, $mask, 'dolitrace_harvest', 'ref', '', '', $date);
 

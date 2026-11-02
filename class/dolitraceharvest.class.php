@@ -131,7 +131,7 @@ class DoliTraceHarvest extends CommonObject
     public $fields = array(
         "rowid" => array("type" => "int", "label" => "TechnicalID", "enabled" => "1", 'position' => 10, 'notnull' => 1, "visible" => "0",),
         "ref" => array("type" => "varchar(128)", "label" => "Ref", "enabled" => "1", 'position' => 15, 'notnull' => 0, "visible" => "1", "csslist" => "tdoverflowmax150", "showoncombobox" => "-2",),
-        "uuid" => array("type" => "varchar(36)", "label" => "Uuid", "enabled" => "1", 'position' => 20, 'notnull' => 0, "visible" => "-1",),
+        "uuid" => array("type" => "varchar(36)", "label" => "TraceUuid", "enabled" => "1", 'position' => 20, 'notnull' => 0, "visible" => "0", "noteditable" => 1,),
         "label" => array("type" => "varchar(255)", "label" => "Label", "enabled" => "1", 'position' => 25, 'notnull' => 0, "visible" => "1", "alwayseditable" => "1", "css" => "minwidth300", "cssview" => "wordbreak", "csslist" => "tdoverflowmax150",),
         
         "fk_cropplan" => array("type" => "integer:DoliTraceCropplan:custom/dolitrace/class/dolitracecropplan.class.php", "label" => "HarvestCropPlan", "enabled" => "1", 'position' => 30, 'notnull' => 1, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
@@ -299,6 +299,9 @@ class DoliTraceHarvest extends CommonObject
         if ($this->status === null || $this->status === '') {
             $this->status = self::STATUS_DRAFT;
         }
+        // Each harvest has its own random UUID, the identifier of its traceability (never the one of the crop plan)
+        dol_include_once('/dolitrace/class/dolitracetrace.class.php');
+        $this->uuid = DoliTraceTrace::newUuid();
 
         $result = $this->createCommon($user, $notrigger);
 
@@ -344,6 +347,8 @@ class DoliTraceHarvest extends CommonObject
         unset($object->id);
         unset($object->fk_user_creat);
         unset($object->import_key);
+        dol_include_once('/dolitrace/class/dolitracetrace.class.php');
+        $object->uuid = DoliTraceTrace::newUuid();
 
         // Clear fields
         if (property_exists($object, 'ref')) {

@@ -515,6 +515,21 @@ class modDolitrace extends DolibarrModules
 			'target' => '',
 			'user' => 2,
 		);
+		// Traceability of a harvested product: search by UUID, short code or lot, history upstream and downstream
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitraceharvest',
+			'type' => 'left',
+			'titre' => 'TraceTitle',
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitrace_trace',
+			'url' => '/dolitrace/dolitrace_trace.php',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "read")',
+			'target' => '',
+			'user' => 2,
+		);
 		/*
 		$this->menu[$r++] = array(
 			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitraceharvest',
@@ -844,8 +859,41 @@ class modDolitrace extends DolibarrModules
 			}
 		}
 		$this->initProductionWarehouse();
+		$this->initHarvestUuids();
 
 		return $this->_init($sql, $options);
+	}
+
+	/**
+	 *	Give its own UUID to the harvests without one, or with the UUID of their crop plan (copied by the versions
+	 *	before 1.3.0): the UUID identifies the harvest in the traceability
+	 *
+	 *	@return	int		Number of harvests updated, <0 if KO
+	 */
+	public function initHarvestUuids()
+	{
+		dol_include_once('/dolitrace/class/dolitracetrace.class.php');
+		$prefix = $this->db->prefix();
+		$sql = "SELECT h.rowid FROM ".$prefix."dolitrace_harvest as h";
+		$sql .= " LEFT JOIN ".$prefix."dolitrace_cropplan as cp ON cp.rowid = h.fk_cropplan";
+		$sql .= " WHERE h.uuid IS NULL OR h.uuid = '' OR h.uuid = cp.uuid";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
+			return -1;
+		}
+		$ids = array();
+		while ($obj = $this->db->fetch_object($resql)) {
+			$ids[] = (int) $obj->rowid;
+		}
+		$this->db->free($resql);
+		foreach ($ids as $id) {
+			$this->db->query("UPDATE ".$prefix."dolitrace_harvest SET uuid = '".$this->db->escape(DoliTraceTrace::newUuid())."' WHERE rowid = ".((int) $id));
+		}
+		if (count($ids)) {
+			dol_syslog(__METHOD__.' '.count($ids).' harvests with a new UUID', LOG_INFO);
+		}
+		return count($ids);
 	}
 
 	/**
