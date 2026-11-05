@@ -721,9 +721,10 @@ class modDolitrace extends DolibarrModules
 		);
 		// Traceability of a harvested product: search by UUID, short code or lot, history upstream and downstream
 		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitrace_bio',
+			'fk_menu' => 'fk_mainmenu=dolitrace',
 			'type' => 'left',
 			'titre' => 'TraceTitle',
+			'prefix' => img_picto('', 'fa-route', 'class="paddingright pictofixedwidth valignmiddle"'),
 			'mainmenu' => 'dolitrace',
 			'leftmenu' => 'dolitrace_trace',
 			'url' => '/dolitrace/dolitrace_trace.php',
