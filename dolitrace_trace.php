@@ -233,7 +233,7 @@ if ($history) {
 		foreach ($history['operations'] as $line) {
 			print '<tr class="oddeven"><td class="nowraponall">'.$day($line['date']).'</td>';
 			print '<td><a href="'.dol_buildpath('/dolitrace/dolitraceoperation_card.php', 1).'?id='.$line['id'].'">'.dol_escape_htmltag($line['ref']).'</a></td>';
-			print '<td>'.($line['seeding'] ? '<span class="fa fa-seedling paddingright"></span>' : '').dol_escape_htmltag($langs->trans($line['type'])).'</td><td>'.dol_escape_htmltag($line['label']).'</td>';
+			print '<td>'.($line['seeding'] ? '<span class="fa fa-seedling paddingright"></span>' : '').dol_escape_htmltag($line['type_label']).'</td><td>'.dol_escape_htmltag($line['label']).'</td>';
 			print '<td>'.dol_escape_htmltag($line['product']).'</td><td>'.dol_escape_htmltag($line['batch']).'</td><td class="right nowraponall">'.$qty($line['qty']).'</td>';
 			print '<td>'.($line['seed_status'] !== '' ? $langs->trans($statuslabels[$line['seed_status']] ?? $line['seed_status']) : '').($line['bdsb_ref'] !== '' ? ' <span class="opacitymedium">'.dol_escape_htmltag($line['bdsb_ref']).'</span>' : '').'</td></tr>';
 		}

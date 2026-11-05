@@ -334,9 +334,16 @@ class DoliTraceTrace
 			return $lines;
 		}
 		$seeding = class_exists('DoliTraceOperation') ? DoliTraceOperation::$seedingTypes : array();
+		// Labels of the types, as in the card of the operation (dictionary of doliFarm)
+		$types = array();
+		if (class_exists('DoliTraceOperation')) {
+			$operation = new DoliTraceOperation($this->db);
+			$types = (array) ($operation->fields['fk_operation_type']['arrayofkeyval'] ?? array());
+		}
 		while ($obj = $this->db->fetch_object($resql)) {
 			$lines[] = array(
 				'id' => (int) $obj->rowid, 'ref' => (string) $obj->ref, 'date' => $this->db->jdate($obj->date_op), 'type' => (string) $obj->fk_operation_type,
+				'type_label' => (string) ($types[(string) $obj->fk_operation_type] ?? $obj->fk_operation_type),
 				'seeding' => in_array((string) $obj->fk_operation_type, $seeding), 'label' => (string) $obj->label,
 				'product' => trim($obj->product_ref.' - '.$obj->product_label, ' -'), 'batch' => (string) $obj->batch_input,
 				'qty' => $obj->qty_used !== null ? (float) $obj->qty_used : null, 'seed_status' => (string) $obj->seed_status, 'bdsb_ref' => (string) $obj->bdsb_ref,
@@ -640,7 +647,7 @@ class DoliTraceTrace
 		if (isset($history['operations'])) {
 			$rows = array();
 			foreach ($history['operations'] as $line) {
-				$rows[] = array($day($line['date']), $line['ref'], $outputlangs->transnoentities($line['type']), $line['product'], $line['batch'], $line['seed_status'].($line['bdsb_ref'] !== '' ? ' '.$line['bdsb_ref'] : ''));
+				$rows[] = array($day($line['date']), $line['ref'], $line['type_label'], $line['product'], $line['batch'], $line['seed_status'].($line['bdsb_ref'] !== '' ? ' '.$line['bdsb_ref'] : ''));
 			}
 			$html .= '<h3>'.$esc($outputlangs->transnoentities('TraceSectionOperations')).'</h3>';
 			$html .= $table(array(array('Date', 12), array('Ref', 16), array('Type', 20), array('Product', 26), array('Batch', 14), array('BioRegisterStatus', 12)), $rows);
