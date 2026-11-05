@@ -148,6 +148,14 @@ if (!$permissiontoread) {
 }
 dolitraceCheckAccess($user, $object);
 
+// Registers frozen by a closed inspection of the organic control body: read only
+dol_include_once('/dolitrace/lib/dolitrace_inspection.lib.php');
+$frozenby = dolitraceFrozenBy($object);
+if ($frozenby) {
+	$permissiontoadd = 0;
+	$permissiontodelete = 0;
+}
+
 $error = 0;
 
 
@@ -295,6 +303,9 @@ if (($id || $ref) && $action == 'edit') {
     $morehtmlref = '<div class="refidno">';
     $morehtmlref .= '</div>';
     dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref);
+    if (!empty($frozenby)) {
+        print dolitraceFrozenBanner($frozenby);
+    }
 
     print '<form method="POST" action="'.dolBuildUrl($_SERVER["PHP_SELF"]).'">';
     print '<input type="hidden" name="token" value="'.newToken().'">';
@@ -370,6 +381,9 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
 
     dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref);
+    if (!empty($frozenby)) {
+        print dolitraceFrozenBanner($frozenby);
+    }
 
 
     print '<div class="fichecenter">';

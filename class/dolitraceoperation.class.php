@@ -25,6 +25,7 @@
 
 // Put here all includes required by your class file
 require_once DOL_DOCUMENT_ROOT.'/core/class/commonobject.class.php';
+dol_include_once('/dolitrace/lib/dolitrace_inspection.lib.php');
 //require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 //require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 
@@ -392,6 +393,10 @@ class DoliTraceOperation extends CommonObject
 	 */
 	public function create(User $user, $notrigger = 0)
 	{
+		// Registers frozen by a closed inspection of the organic control body
+		if (dolitraceFrozenCheck($this) < 0) {
+			return -1;
+		}
 		global $conf;
 
 		// createCommon() does not fill the entity
@@ -635,6 +640,10 @@ class DoliTraceOperation extends CommonObject
 	 */
 	public function update(User $user, $notrigger = 0)
 	{
+		// Registers frozen by a closed inspection of the organic control body
+		if (dolitraceFrozenCheck($this) < 0) {
+			return -1;
+		}
 		if ($this->checkData() < 0) {
 			return -1;
 		}
@@ -790,6 +799,10 @@ class DoliTraceOperation extends CommonObject
 	 */
 	public function delete(User $user, $notrigger = 0)
 	{
+		// Registers frozen by a closed inspection of the organic control body
+		if (dolitraceFrozenCheck($this) < 0) {
+			return -1;
+		}
 		return $this->deleteCommon($user, $notrigger);
 		//return $this->deleteCommon($user, $notrigger, 1);
 	}
@@ -822,6 +835,10 @@ class DoliTraceOperation extends CommonObject
 	 */
 	public function validate($user, $notrigger = 0)
 	{
+		// Registers frozen by a closed inspection of the organic control body
+		if (dolitraceFrozenCheck($this) < 0) {
+			return -1;
+		}
 		global $conf;
 
 		require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
@@ -958,6 +975,10 @@ class DoliTraceOperation extends CommonObject
 	 */
 	public function setDraft($user, $notrigger = 0)
 	{
+		// Registers frozen by a closed inspection of the organic control body
+		if (dolitraceFrozenCheck($this) < 0) {
+			return -1;
+		}
 		// Protection
 		if ($this->status <= self::STATUS_DRAFT) {
 			return 0;
@@ -982,6 +1003,10 @@ class DoliTraceOperation extends CommonObject
 	 */
 	public function cancel($user, $notrigger = 0)
 	{
+		// Registers frozen by a closed inspection of the organic control body
+		if (dolitraceFrozenCheck($this) < 0) {
+			return -1;
+		}
 		// Protection
 		if ($this->status != self::STATUS_VALIDATED) {
 			return 0;
@@ -1006,6 +1031,10 @@ class DoliTraceOperation extends CommonObject
 	 */
 	public function reopen($user, $notrigger = 0)
 	{
+		// Registers frozen by a closed inspection of the organic control body
+		if (dolitraceFrozenCheck($this) < 0) {
+			return -1;
+		}
 		// Protection
 		if ($this->status == self::STATUS_VALIDATED) {
 			return 0;

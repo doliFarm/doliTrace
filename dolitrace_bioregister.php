@@ -102,11 +102,57 @@ if (!in_array($tab, $allowed)) {
 
 $register = new DoliTraceBioRegister($db);
 
+// Read only copy of the registers made at the closure of an inspection of the control body
+$inspection = null;
+$snapshot = null;
+$closure = 0;
+$snapshotyears = array();
+if (GETPOSTINT('inspection') > 0) {
+	dol_include_once('/dolitrace/class/dolitracebioinspection.class.php');
+	$inspection = new DoliTraceBioInspection($db);
+	if (!$user->hasRight('dolitrace', 'dolitracebioinspection', 'read') || $inspection->fetch(GETPOSTINT('inspection')) <= 0) {
+		accessforbidden();
+	}
+	dolifarmCheckSocAccess($user, $inspection);
+	$copies = $inspection->getSnapshots();
+	$closure = GETPOSTINT('closure');
+	if (!isset($copies[$closure])) {
+		$closure = (count($copies) ? max(array_keys($copies)) : 0);
+	}
+	if (!$closure) {
+		accessforbidden($langs->trans('BioInspectionNoCopy'), 0);
+	}
+	$snapshotyears = array_keys($copies[$closure]);
+	if (!isset($copies[$closure][$year])) {
+		$year = max($snapshotyears);
+	}
+	$socid = (int) $inspection->fk_soc;
+	$allowed = array_values(array_intersect($allowed, array_keys($copies[$closure][$year])));
+	if (!count($allowed)) {
+		accessforbidden();
+	}
+	if (!in_array($tab, $allowed)) {
+		$tab = reset($allowed);
+	}
+	$snapshot = $inspection->getSnapshot($closure, $tab, $year);
+}
+
 // Annual organic dossier: all the registers of the year in one PDF
 if ($action == 'dossier') {
-	$content = $register->toDossierPdf($user, $socid, $year, $langs);
+	if ($inspection) {
+		$linesbytab = array();
+		foreach ($allowed as $key) {
+			$copy = $inspection->getSnapshot($closure, $key, $year);
+			if ($copy) {
+				$linesbytab[$key] = $copy['lines'];
+			}
+		}
+		$content = $register->snapshotDossierPdf($year, $snapshot ? $snapshot['header'] : array(), $linesbytab, $langs);
+	} else {
+		$content = $register->toDossierPdf($user, $socid, $year, $langs);
+	}
 	if (is_string($content)) {
-		$filename = 'fascicolo_bio'.($socid > 0 ? '_'.$socid : '').'_'.$year.'.pdf';
+		$filename = 'fascicolo_bio'.($socid > 0 ? '_'.$socid : '').'_'.$year.($inspection ? '_'.$inspection->ref.'_'.$closure : '').'.pdf';
 		dol_syslog('Export of the organic dossier '.$filename, LOG_INFO);
 		top_httphead('application/pdf');
 		header('Content-Disposition: attachment; filename="'.dol_sanitizeFileName($filename).'"');
@@ -119,7 +165,9 @@ if ($action == 'dossier') {
 
 // Lines of the tab: the stock register by period and filters, the others by year
 $lines = array();
-if ($tab == 'movements') {
+if ($snapshot) {
+	$lines = $snapshot['lines'];
+} elseif ($tab == 'movements') {
 	$warehouses = $register->getWarehouses($user, $socid, $warehouseid);
 	$lines = $register->getMovements($warehouses, $datefrom, $dateto, $biostatus, $productid);
 } else {
@@ -132,7 +180,11 @@ if (!is_array($lines)) {
 
 // Heading of the exports: farm, period, filters
 $header = $register->getFarmHeader($socid, $langs);
-if ($tab == 'movements') {
+if ($snapshot) {
+	$header = $snapshot['header'];
+	$header[] = $langs->transnoentities('Year').': '.$year;
+	$header[] = $langs->transnoentities('BioDossierHelp'.ucfirst($tab));
+} elseif ($tab == 'movements') {
 	$header[] = $langs->transnoentities('Period').': '.dol_print_date($datefrom, 'day').' - '.dol_print_date($dateto, 'day');
 	if ($warehouseid > 0) {
 		$wh = new Entrepot($db);
@@ -155,7 +207,7 @@ if (in_array($action, array('csv', 'pdf'))) {
 		'movements' => 'registro_carico_scarico', 'balance' => 'bilancio_massa', 'plots' => 'riepilogo_appezzamenti', 'seeds' => 'sementi_deroghe',
 		'inputs' => 'mezzi_tecnici', 'treatments' => 'trattamenti_bio', 'purchases' => 'acquisti', 'harvests' => 'raccolte', 'sales' => 'vendite',
 	);
-	$filename = $base[$tab].($socid > 0 ? '_'.$socid : '').'_'.($tab == 'movements' ? dol_print_date($datefrom, '%Y-%m-%d').'_'.dol_print_date($dateto, '%Y-%m-%d') : $year).'.'.$action;
+	$filename = $base[$tab].($socid > 0 ? '_'.$socid : '').'_'.($tab == 'movements' && !$snapshot ? dol_print_date($datefrom, '%Y-%m-%d').'_'.dol_print_date($dateto, '%Y-%m-%d') : $year).($inspection ? '_'.$inspection->ref.'_'.$closure : '').'.'.$action;
 	if ($action == 'csv') {
 		$content = $register->toCsv($tab, $lines, $langs);
 		$mime = 'text/csv';
@@ -181,6 +233,9 @@ $title = $langs->trans('BioRegister');
 llxHeader('', $title, '', '', 0, 0, '', '', '', 'mod-dolitrace page-bioregister');
 
 $params = array('socid' => $socid, 'year' => $year);
+if ($inspection) {
+	$params = array('inspection' => $inspection->id, 'closure' => $closure, 'year' => $year);
+}
 $head = array();
 $h = 0;
 foreach (DoliTraceBioRegister::getTabs() as $key => $label) {
@@ -195,6 +250,26 @@ foreach (DoliTraceBioRegister::getTabs() as $key => $label) {
 print load_fiche_titre($title, '', 'fa-leaf');
 print dol_get_fiche_head($head, $tab, '', -1);
 
+// Copy of an inspection: no filters, the years of the copy
+if ($inspection) {
+	print '<div class="info"><span class="fa fa-lock paddingright"></span>'.$langs->trans('BioInspectionCopyBanner', $closure, $inspection->getNomUrl(1), dol_print_date($inspection->date_inspection, 'day'));
+	if ($snapshot && !$snapshot['hash_ok']) {
+		print '<br><span class="error">'.$langs->trans('BioInspectionCopyHashKo').'</span>';
+	}
+	print '</div>';
+	print '<div class="marginbottomonly">'.$langs->trans('Year').': ';
+	foreach ($snapshotyears as $y) {
+		print ($y == $year ? '<strong>'.$y.'</strong>' : '<a href="'.$_SERVER['PHP_SELF'].'?'.dol_escape_htmltag(http_build_query(array_merge($params, array('tab' => $tab, 'year' => $y)))).'">'.$y.'</a>').' ';
+	}
+	print '</div>';
+} else {
+	if ($socid > 0) {
+		dol_include_once('/dolitrace/lib/dolitrace_inspection.lib.php');
+		$frozen = dolitraceFrozenInspection($db, $socid);
+		if ($frozen) {
+			print '<div class="info"><span class="fa fa-lock paddingright"></span>'.$langs->trans('BioRegisterFrozenInfo', dol_print_date($frozen->day, 'day'), '<a href="'.dol_buildpath('/dolitrace/dolitracebioinspection_card.php', 1).'?id='.$frozen->id.'">'.dol_escape_htmltag($frozen->ref).'</a>').'</div>';
+		}
+	}
 // Filters
 print '<form method="GET" action="'.$_SERVER['PHP_SELF'].'">';
 print '<input type="hidden" name="tab" value="'.$tab.'">';
@@ -226,6 +301,7 @@ if ($tab == 'movements') {
 print '</table>';
 print '<div class="center"><input type="submit" class="button" value="'.dol_escape_htmltag($langs->trans('Refresh')).'"></div>';
 print '</form>';
+}
 
 // Exports with the same filters
 $query = array_merge($_GET, array('tab' => $tab, 'socid' => $socid, 'year' => $year, 'token' => newToken()));
@@ -233,7 +309,7 @@ unset($query['action']);
 print '<div class="tabsAction">';
 print '<a class="butAction" href="'.$_SERVER['PHP_SELF'].'?'.dol_escape_htmltag(http_build_query(array_merge($query, array('action' => 'pdf')))).'">'.$langs->trans('BioRegisterExportPdf').'</a>';
 print '<a class="butAction" href="'.$_SERVER['PHP_SELF'].'?'.dol_escape_htmltag(http_build_query(array_merge($query, array('action' => 'csv')))).'">'.$langs->trans('BioRegisterExportCsv').'</a>';
-print '<a class="butAction" href="'.$_SERVER['PHP_SELF'].'?'.dol_escape_htmltag(http_build_query(array('tab' => $tab, 'socid' => $socid, 'year' => $tab == 'movements' ? (int) dol_print_date($dateto, '%Y') : $year, 'action' => 'dossier', 'token' => newToken()))).'" title="'.dol_escape_htmltag($langs->trans('BioDossierButtonHelp')).'">'.$langs->trans('BioDossierButton').'</a>';
+print '<a class="butAction" href="'.$_SERVER['PHP_SELF'].'?'.dol_escape_htmltag(http_build_query(array_merge($inspection ? $params : array(), array('tab' => $tab, 'socid' => $socid, 'year' => $tab == 'movements' && !$inspection ? (int) dol_print_date($dateto, '%Y') : $year, 'action' => 'dossier', 'token' => newToken())))).'" title="'.dol_escape_htmltag($langs->trans('BioDossierButtonHelp')).'">'.$langs->trans('BioDossierButton').'</a>';
 print '</div>';
 
 // Register

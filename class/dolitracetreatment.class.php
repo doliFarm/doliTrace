@@ -25,6 +25,7 @@
 
 // Put here all includes required by your class file
 require_once DOL_DOCUMENT_ROOT.'/core/class/commonobject.class.php';
+dol_include_once('/dolitrace/lib/dolitrace_inspection.lib.php');
 dol_include_once('/dolitrace/lib/dolitrace_treatment.lib.php');
 //require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 //require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
@@ -465,6 +466,10 @@ class DoliTraceTreatment extends CommonObject
 		if ($this->setFromCropPlan() < 0) {
 			return -1;
 		}
+		// Registers frozen by a closed inspection of the organic control body
+		if (dolitraceFrozenCheck($this) < 0) {
+			return -1;
+		}
 		$this->db->begin();
 		$result = $this->createCommon($user, $notrigger);
 		if ($result > 0 && $this->addLog($user, 'CREATE') < 0) {
@@ -811,6 +816,10 @@ class DoliTraceTreatment extends CommonObject
 	 */
 	public function update(User $user, $notrigger = 0)
 	{
+		// Registers frozen by a closed inspection of the organic control body
+		if (dolitraceFrozenCheck($this) < 0) {
+			return -1;
+		}
 		if ($this->status != self::STATUS_DRAFT) {
 			$this->error = 'ErrorTreatmentValidatedLocked';
 			return -1;
@@ -834,6 +843,10 @@ class DoliTraceTreatment extends CommonObject
 	 */
 	public function delete(User $user, $notrigger = 0)
 	{
+		// Registers frozen by a closed inspection of the organic control body
+		if (dolitraceFrozenCheck($this) < 0) {
+			return -1;
+		}
 		if ($this->status != self::STATUS_DRAFT) {
 			$this->error = 'ErrorTreatmentOnlyDraftDeleted';
 			return -1;
@@ -852,6 +865,10 @@ class DoliTraceTreatment extends CommonObject
 	 */
 	public function validate($user, $notrigger = 0)
 	{
+		// Registers frozen by a closed inspection of the organic control body
+		if (dolitraceFrozenCheck($this) < 0) {
+			return -1;
+		}
 		global $conf;
 
 		require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
@@ -3073,6 +3090,11 @@ abstract class DoliTraceTreatmentRow extends CommonObjectLine
 		$obj = $resql ? $this->db->fetch_object($resql) : null;
 		if (!$obj || (int) $obj->status != DoliTraceTreatment::STATUS_DRAFT) {
 			$this->error = 'ErrorTreatmentValidatedLocked';
+			return false;
+		}
+		$parent = new DoliTraceTreatment($this->db);
+		if ($parent->fetch((int) $this->fk_treatment) > 0 && dolitraceFrozenCheck($parent) < 0) {
+			$this->error = $parent->error;
 			return false;
 		}
 		return true;

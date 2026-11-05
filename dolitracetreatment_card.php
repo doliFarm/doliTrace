@@ -149,6 +149,14 @@ $permissiontoread = $user->hasRight('dolitrace', 'dolitracetreatment', 'read');
 $permissiontoadd = $user->hasRight('dolitrace', 'dolitracetreatment', 'write'); // Used by the include of actions_addupdatedelete.inc.php
 $permissiontovalidate = $user->hasRight('dolitrace', 'dolitracetreatment', 'validate');
 $permissiontodelete = $user->hasRight('dolitrace', 'dolitracetreatment', 'delete') && isset($object->status) && $object->status == $object::STATUS_DRAFT;
+
+// Registers frozen by a closed inspection of the organic control body: read only
+dol_include_once('/dolitrace/lib/dolitrace_inspection.lib.php');
+$frozenby = dolitraceFrozenBy($object);
+if ($frozenby) {
+	$permissiontoadd = 0;
+	$permissiontodelete = 0;
+}
 $permissionnote = $permissiontoadd; // Used by the include of actions_setnotes.inc.php
 $permissiondellink = $permissiontoadd; // Used by the include of actions_dellink.inc.php
 $isdraft = (empty($object->id) || $object->status == $object::STATUS_DRAFT);
@@ -724,6 +732,9 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		$morehtmlstatus = dolGetBadge($langs->trans('TreatmentLate'), '', 'warning', '', '', array('attr' => array('title' => $langs->trans('TreatmentLateHelp')))).' ';
 	}
 	dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref, '', 0, '', $morehtmlstatus);
+	if (!empty($frozenby)) {
+		print dolitraceFrozenBanner($frozenby);
+	}
 
 	print '<div class="fichecenter">';
 	print '<div class="fichehalfleft">';

@@ -132,6 +132,14 @@ if (!isModEnabled($object->module)) accessforbidden("Module ".$object->module." 
 if (!$permissiontoread) accessforbidden();
 dolitraceCheckAccess($user, $object);
 
+// Registers frozen by a closed inspection of the organic control body: read only
+dol_include_once('/dolitrace/lib/dolitrace_inspection.lib.php');
+$frozenby = dolitraceFrozenBy($object);
+if ($frozenby) {
+	$permissiontoadd = 0;
+	$permissiontodelete = 0;
+}
+
 $error = 0;
 
 
@@ -373,6 +381,9 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
     $morehtmlref = '<div class="refidno"></div>';
 
     dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref);
+    if (!empty($frozenby)) {
+        print dolitraceFrozenBanner($frozenby);
+    }
 
     print '<div class="fichecenter">';
     print '<div class="fichehalfleft">';

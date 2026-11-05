@@ -394,6 +394,22 @@ class modDolitrace extends DolibarrModules
 		$this->rights[$r][5] = 'validate';
 		$r++;
 
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', (4 * 10) + 0 + 1);
+		$this->rights[$r][1] = 'Read the inspections of the organic control body';
+		$this->rights[$r][4] = 'dolitracebioinspection';
+		$this->rights[$r][5] = 'read';
+		$r++;
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', (4 * 10) + 1 + 1);
+		$this->rights[$r][1] = 'Create, update and close the inspections (closing freezes the registers up to the date of the inspection)';
+		$this->rights[$r][4] = 'dolitracebioinspection';
+		$this->rights[$r][5] = 'write';
+		$r++;
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', (4 * 10) + 2 + 1);
+		$this->rights[$r][1] = 'Reopen a closed inspection (unfreeze the registers), with a reason';
+		$this->rights[$r][4] = 'dolitracebioinspection';
+		$this->rights[$r][5] = 'reopen';
+		$r++;
+
 		/* END MODULEBUILDER PERMISSIONS */
 
 
@@ -512,6 +528,21 @@ class modDolitrace extends DolibarrModules
 			'position' => 1000 + $r,
 			'enabled' => 'isModEnabled("dolitrace")',
 			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "read")',
+			'target' => '',
+			'user' => 2,
+		);
+		// Inspections of the organic control body: closing one freezes the registers of the farm up to its date
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitraceharvest',
+			'type' => 'left',
+			'titre' => 'BioInspections',
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitrace_bioinspection',
+			'url' => '/dolitrace/dolitracebioinspection_list.php',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitracebioinspection", "read")',
 			'target' => '',
 			'user' => 2,
 		);
