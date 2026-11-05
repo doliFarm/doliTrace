@@ -558,3 +558,4 @@ BioInspectionCopyHashKo = L'empreinte de la copie ne correspond pas : la copie a
 BioRegisterFrozenInfo = Registres figés jusqu'au %s par le contrôle %s : les données jusqu'à cette date sont en lecture seule ; la copie enregistrée est dans la fiche du contrôle.
 ErrorDolitraceFrozen = Données du %s figées par le contrôle %s du %s : lecture seule. Pour un traitement validé utiliser la correction ; sinon un utilisateur autorisé doit rouvrir le contrôle.
 DolitraceFrozenBanner = Lecture seule : figé par le contrôle %s du %s.
+DolitraceMenuOrganic = Biologique

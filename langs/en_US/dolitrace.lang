@@ -582,3 +582,4 @@ BioInspectionCopyHashKo = The fingerprint of the copy does not match: the copy w
 BioRegisterFrozenInfo = Registers frozen up to %s by the inspection %s: the data up to that date are read only; the saved copy is in the card of the inspection.
 ErrorDolitraceFrozen = Data of %s frozen by the inspection %s of %s: read only. For a validated treatment use the correction; otherwise an authorized user must reopen the inspection.
 DolitraceFrozenBanner = Read only: frozen by the inspection %s of %s.
+DolitraceMenuOrganic = Organic

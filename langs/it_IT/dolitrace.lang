@@ -593,3 +593,4 @@ BioInspectionCopyHashKo = L'impronta della copia non corrisponde: la copia è st
 BioRegisterFrozenInfo = Registri congelati fino al %s dall'ispezione %s: i dati fino a quella data sono in sola lettura; la copia salvata è nella scheda dell'ispezione.
 ErrorDolitraceFrozen = Dati del %s congelati dall'ispezione %s del %s: sola lettura. Per un trattamento convalidato usare la correzione; altrimenti un utente autorizzato deve riaprire l'ispezione.
 DolitraceFrozenBanner = Sola lettura: congelato dall'ispezione %s del %s.
+DolitraceMenuOrganic = Biologico

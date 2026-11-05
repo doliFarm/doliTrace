@@ -516,36 +516,6 @@ class modDolitrace extends DolibarrModules
 			'user' => 2,
 			'object' => 'DoliTraceHarvest'
 		);
-		// Registers of organic production: stock in and out, mass balance, summary by plot (read only)
-		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitraceharvest',
-			'type' => 'left',
-			'titre' => 'BioRegister',
-			'mainmenu' => 'dolitrace',
-			'leftmenu' => 'dolitrace_bioregister',
-			'url' => '/dolitrace/dolitrace_bioregister.php',
-			'langs' => 'dolitrace@dolitrace',
-			'position' => 1000 + $r,
-			'enabled' => 'isModEnabled("dolitrace")',
-			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "read")',
-			'target' => '',
-			'user' => 2,
-		);
-		// Inspections of the organic control body: closing one freezes the registers of the farm up to its date
-		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitraceharvest',
-			'type' => 'left',
-			'titre' => 'BioInspections',
-			'mainmenu' => 'dolitrace',
-			'leftmenu' => 'dolitrace_bioinspection',
-			'url' => '/dolitrace/dolitracebioinspection_list.php',
-			'langs' => 'dolitrace@dolitrace',
-			'position' => 1000 + $r,
-			'enabled' => 'isModEnabled("dolitrace")',
-			'perms' => '$user->hasRight("dolitrace", "dolitracebioinspection", "read")',
-			'target' => '',
-			'user' => 2,
-		);
 		// Traceability of a harvested product: search by UUID, short code or lot, history upstream and downstream
 		$this->menu[$r++] = array(
 			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitraceharvest',
@@ -703,6 +673,66 @@ class modDolitrace extends DolibarrModules
 			'target' => '',
 			'user' => 2,
 			'object' => 'DoliTraceTreatment'
+		);
+		// Section "Organic": registers of organic production (all the data of the farm, not only the harvests) and inspections of the control body
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace',
+			'type' => 'left',
+			'titre' => 'DolitraceMenuOrganic',
+			'prefix' => img_picto('', 'fa-leaf', 'class="paddingright pictofixedwidth valignmiddle"'),
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitrace_bio',
+			'url' => '/dolitrace/dolitrace_bioregister.php',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "read") || $user->hasRight("dolitrace", "dolitracebioinspection", "read")',
+			'target' => '',
+			'user' => 2,
+		);
+		// Registers of organic production: stock in and out, mass balance, summary by plot, seeds, inputs, treatments, purchases, harvests, sales (read only)
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitrace_bio',
+			'type' => 'left',
+			'titre' => 'BioRegister',
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitrace_bioregister',
+			'url' => '/dolitrace/dolitrace_bioregister.php',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "read")',
+			'target' => '',
+			'user' => 2,
+		);
+		// Inspections of the organic control body: closing one freezes the registers of the farm up to its date
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitrace_bio',
+			'type' => 'left',
+			'titre' => 'BioInspections',
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitrace_bioinspection',
+			'url' => '/dolitrace/dolitracebioinspection_list.php',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitracebioinspection", "read")',
+			'target' => '',
+			'user' => 2,
+		);
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitrace_bio',
+			'type' => 'left',
+			'titre' => 'NewBioInspection',
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitrace_bioinspection_new',
+			'url' => '/dolitrace/dolitracebioinspection_card.php?action=create',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitracebioinspection", "write")',
+			'target' => '',
+			'user' => 2,
 		);
 		/* END MODULEBUILDER LEFTMENU DOLITRACETREATMENT */
 		/* BEGIN MODULEBUILDER LEFTMENU MYOBJECT */
