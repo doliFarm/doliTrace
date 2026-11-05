@@ -70,7 +70,7 @@ $year = GETPOSTINT('year');
 $sql = "SELECT t.rowid, t.ref, t.fk_soc, t.date_inspection, t.fk_soc_body, t.inspection_type, t.outcome, t.report_ref, t.status, t.date_close";
 $sql .= " FROM ".$db->prefix()."dolitrace_bioinspection as t";
 $sql .= " WHERE t.entity IN (".getEntity('dolitracebioinspection').")";
-$sql .= dolifarmSqlSocFilter($user, 't.fk_soc');
+$sql .= dolifarmSqlSocFilter($user, 't.fk_soc', true, true);	// Farms and processors are inspected
 if ($socid > 0) {
 	$sql .= " AND t.fk_soc = ".((int) $socid);
 }

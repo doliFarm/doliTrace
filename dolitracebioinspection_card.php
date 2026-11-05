@@ -111,6 +111,20 @@ if ($action == 'create' && GETPOSTINT('fk_soc') > 0 && !GETPOSTISSET('fk_soc_bod
 	$resql = $db->query($sql);
 	if ($resql && ($obj = $db->fetch_object($resql))) {
 		$_GET['fk_soc_body'] = (int) $obj->fk_soc_bio_body;
+	} elseif (dol_include_once('/dolifarm/lib/dolifarm_biobody.lib.php') && function_exists('dolifarmBioBodyThirdparties')) {
+		// No dossier (a processor): the body of the certificate of the third party, as third party or from the official list
+		$sql = "SELECT dolifarm_bio_body FROM ".$db->prefix()."societe_extrafields WHERE fk_object = ".GETPOSTINT('fk_soc');
+		$resql = $db->query($sql);
+		$code = ($resql && ($obj = $db->fetch_object($resql))) ? (string) $obj->dolifarm_bio_body : '';
+		if ($code !== '') {
+			$_GET['fk_soc_body'] = 'dict:'.$code;
+			foreach (dolifarmBioBodyThirdparties($db) as $bodyid => $body) {
+				if ($body['code'] === $code) {
+					$_GET['fk_soc_body'] = $bodyid;
+					break;
+				}
+			}
+		}
 	}
 }
 
