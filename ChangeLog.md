@@ -10,6 +10,7 @@ Tracciabilità delle raccolte, trattamenti dal piano di produzione, ispezioni bi
 
 ### Piano di produzione
 - Azienda scelta solo tra le aziende gestite, fissa in modalità azienda singola.
+- Filtri azienda di export, import, registri bio e ispezioni: solo le aziende gestite, fissa in modalità azienda singola.
 - Tab "Registro trattamenti" con creazione e import dal piano; un piano per registrazione; tab "Storia" con PDF e CSV.
 - Tab "Costi": preventivo (operazioni previste con costi standard per ettaro) e consuntivo (operazioni, trattamenti con prodotti al prezzo medio ponderato, raccolte), scostamento, costo per ettaro e per unità raccolta; totali del piano aggiornati automaticamente.
 - Operazioni: superficie e costi calcolati da costi standard e prezzo medio dei prodotti se vuoti, pulsante "Ricalcola costi".

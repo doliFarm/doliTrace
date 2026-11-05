@@ -64,7 +64,8 @@ $langs->loadLangs(array("dolitrace@dolitrace", "companies", "other"));
 if (!isModEnabled('dolitrace') || !$user->hasRight('dolitrace', 'dolitracebioinspection', 'read')) {
 	accessforbidden();
 }
-$socid = GETPOSTINT('socid');
+dol_include_once('/dolifarm/lib/dolifarm_farm.lib.php');
+$socid = dolifarmForcedSocid(GETPOSTINT('socid'));
 $year = GETPOSTINT('year');
 
 $sql = "SELECT t.rowid, t.ref, t.fk_soc, t.date_inspection, t.fk_soc_body, t.inspection_type, t.outcome, t.report_ref, t.status, t.date_close";
@@ -93,7 +94,7 @@ print load_fiche_titre($title, $button, 'fa-clipboard-check');
 print '<div class="opacitymedium marginbottomonly">'.$langs->trans('BioInspectionHelp').'</div>';
 
 print '<form method="GET" action="'.$_SERVER['PHP_SELF'].'">';
-print '<div class="divsearchfield">'.$langs->trans('TreatmentFarm').' '.$form->select_company($socid, 'socid', '', 1, 0, 0, array(), 0, 'minwidth200').'</div>';
+print '<div class="divsearchfield">'.$langs->trans('TreatmentFarm').' '.dolifarmFarmSelectHtml($form, $socid, 'socid', 1, true, 'minwidth200').'</div>';
 print '<div class="divsearchfield">'.$langs->trans('Year').' <input type="number" name="year" class="width75" min="1900" max="2999" value="'.($year > 0 ? $year : '').'"></div>';
 print '<div class="divsearchfield"><input type="submit" class="button small" value="'.dol_escape_htmltag($langs->trans('Search')).'"></div>';
 print '</form><br>';

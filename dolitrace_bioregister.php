@@ -80,9 +80,7 @@ if ($year < 1900 || $year > 2999) {
 }
 $datefrom = dol_mktime(0, 0, 0, GETPOSTINT('datefrommonth'), GETPOSTINT('datefromday'), GETPOSTINT('datefromyear'));
 $dateto = dol_mktime(23, 59, 59, GETPOSTINT('datetomonth'), GETPOSTINT('datetoday'), GETPOSTINT('datetoyear'));
-if (!GETPOSTISSET('socid')) {
-	$socid = dolifarmSingleFarmSocid();
-}
+$socid = dolifarmForcedSocid($socid);
 if (!GETPOSTISSET('datefromyear')) {
 	$datefrom = dol_get_first_day($year, 1);
 	$dateto = dol_get_last_day($year, 12);
@@ -277,7 +275,7 @@ $helps = array('movements' => 'BioRegisterMovementsHelp', 'balance' => 'BioRegis
 print '<span class="opacitymedium">'.$langs->trans($helps[$tab] ?? 'BioDossierHelp'.ucfirst($tab)).'</span><br><br>';
 print '<table class="border centpercent tableforfield">';
 print '<tr><td class="titlefieldcreate">'.$langs->trans('TreatmentFarm').'</td><td>';
-print $form->select_company($socid, 'socid', '', $langs->trans('All'), 0, 0, array(), 0, 'minwidth300');
+print dolifarmFarmSelectHtml($form, $socid, 'socid', $langs->trans('All'));
 print '</td></tr>';
 if ($tab == 'movements') {
 	print '<tr><td>'.$langs->trans('Period').'</td><td>';

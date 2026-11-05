@@ -73,9 +73,7 @@ $format = GETPOST('format', 'aZ09');
 $withcanceled = GETPOSTINT('withcanceled');
 $datefrom = dol_mktime(0, 0, 0, GETPOSTINT('datefrommonth'), GETPOSTINT('datefromday'), GETPOSTINT('datefromyear'));
 $dateto = dol_mktime(23, 59, 59, GETPOSTINT('datetomonth'), GETPOSTINT('datetoday'), GETPOSTINT('datetoyear'));
-if (!GETPOSTISSET('socid')) {
-	$socid = dolifarmSingleFarmSocid();
-}
+$socid = dolifarmForcedSocid($socid);
 if (!GETPOSTISSET('datefromyear')) {
 	$datefrom = dol_get_first_day((int) dol_print_date(dol_now(), '%Y'), 1);
 	$dateto = dol_get_last_day((int) dol_print_date(dol_now(), '%Y'), 12);
@@ -176,7 +174,7 @@ print '<input type="hidden" name="action" value="export">';
 print '<span class="opacitymedium">'.$langs->trans('TreatmentExportHelp').'</span><br><br>';
 print '<table class="border centpercent tableforfield">';
 print '<tr><td class="titlefieldcreate">'.$langs->trans('TreatmentFarm').'</td><td>';
-print $form->select_company($socid, 'socid', '', $langs->trans('All'), 0, 0, array(), 0, 'minwidth300');
+print dolifarmFarmSelectHtml($form, $socid, 'socid', $langs->trans('All'));
 print '</td></tr>';
 print '<tr><td>'.$langs->trans('Period').'</td><td>';
 print $form->selectDate($datefrom, 'datefrom', 0, 0, 1, '', 1, 0).' - '.$form->selectDate($dateto, 'dateto', 0, 0, 1, '', 1, 0);
