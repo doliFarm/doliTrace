@@ -266,7 +266,7 @@ print '<div class="box-header" style="border-bottom: 2px solid #0073aa; padding-
 print '<h3 style="margin: 0; color: #222;"><i class="fa fa-calendar-check-o" style="padding-right: 8px; color: #0073aa;"></i>' . $langs->trans("DoliTraceCropplans") . '</h3>';
 print '</div>';
 print '<div class="box-content">';
-print '<p style="color: #666; font-size: 0.9em; margin-bottom: 15px;">' . $langs->trans("Panoramica delle pianificazioni colturali attive.") . '</p>';
+print '<p style="color: #666; font-size: 0.9em; margin-bottom: 15px;">' . $langs->trans('DoliTraceIndexCropPlansHelp') . '</p>';
 
 // Tabella dimostrativa con dati consolidati
 print '<table class="noborder centpercent">';
