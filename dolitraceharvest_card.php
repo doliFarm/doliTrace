@@ -164,7 +164,31 @@ if (empty($reshook)) {
         }
     }
 
-    $triggermodname = $object->TRIGGER_PREFIX.'_MODIFY'; 
+    $triggermodname = $object->TRIGGER_PREFIX.'_MODIFY';
+
+    // Lot of the harvest: a new lot (code proposed, not used yet for the product) or an open lot of other harvests
+    if (in_array($action, array('add', 'update')) && $permissiontoadd && GETPOSTISSET('lot_mode')) {
+        $lotexisting = (GETPOST('lot_mode', 'aZ09') == 'existing');
+        $lotcode = trim(GETPOST($lotexisting ? 'batch_existing' : 'batch_number', 'alphanohtml'));
+        if ($lotcode == '-1') {
+            $lotcode = '';
+        }
+        if (GETPOSTINT('fk_product_out') > 0) {
+            $object->fk_product_out = GETPOSTINT('fk_product_out');
+        }
+        $loterror = '';
+        if ($lotexisting && $lotcode === '') {
+            $loterror = $langs->trans('ErrorFieldRequired', $langs->transnoentitiesnoconv('HarvestLotExisting'));
+        } elseif (!$lotexisting && $lotcode !== '' && $object->isLotUsed($lotcode)) {
+            $loterror = $langs->trans('ErrorHarvestLotUsed', $lotcode);
+        }
+        if ($loterror !== '') {
+            setEventMessages($loterror, null, 'errors');
+            $action = ($action == 'add' ? 'create' : 'edit');
+        } else {
+            $_POST['batch_number'] = $lotcode;
+        }
+    }
 
     include DOL_DOCUMENT_ROOT.'/core/actions_addupdatedelete.inc.php';
     include DOL_DOCUMENT_ROOT.'/core/actions_dellink.inc.php';
@@ -266,7 +290,11 @@ if ($action == 'create') {
     // ------------------------------------------------------------------------
     // GENERAZIONE CAMPI STANDARD RIMANENTI
     // ------------------------------------------------------------------------
-    
+
+    // Lot: new (code proposed) or an open lot of other harvests of the product
+    print dolitraceHarvestLotRow($form, $object);
+    unset($object->fields['batch_number']);
+
     include DOL_DOCUMENT_ROOT.'/core/tpl/commonfields_add.tpl.php';
     include DOL_DOCUMENT_ROOT.'/core/tpl/extrafields_add.tpl.php';
 
@@ -329,6 +357,10 @@ if (($id || $ref) && $action == 'edit') {
     }
 
     unset($object->fields['uuid']);
+
+    // Lot: new (code proposed) or an open lot of other harvests of the product
+    print dolitraceHarvestLotRow($form, $object);
+    unset($object->fields['batch_number']);
 
     include DOL_DOCUMENT_ROOT.'/core/tpl/commonfields_edit.tpl.php';
     include DOL_DOCUMENT_ROOT.'/core/tpl/extrafields_edit.tpl.php';

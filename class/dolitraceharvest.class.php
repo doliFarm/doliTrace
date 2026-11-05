@@ -143,7 +143,7 @@ class DoliTraceHarvest extends CommonObject
         
         "qty_harvested" => array("type" => "double(24,8)", "label" => "HarvestQty", "enabled" => "1", 'position' => 45, 'notnull' => 0, "visible" => "-1",),
         "qty_unit" => array("type" => "varchar(30)", "label" => "HarvestUnit", "enabled" => "1", 'position' => 50, 'notnull' => 0, "visible" => "-1",),
-        "batch_number" => array("type" => "varchar(128)", "label" => "HarvestBatch", "enabled" => "1", 'position' => 55, 'notnull' => 0, "visible" => "-1",),
+        "batch_number" => array("type" => "varchar(128)", "label" => "HarvestBatch", "enabled" => "1", 'position' => 55, 'notnull' => 0, "visible" => "-1", "help" => "HarvestBatchHelp",),
         // Organic status of the harvested product, set at the validation from the status of the plot at the date
         "bio_status" => array("type" => "varchar(16)", "label" => "HarvestBioStatus", "enabled" => "1", 'position' => 56, 'notnull' => 0, "visible" => "5", "arrayofkeyval" => array('BIO' => 'SeedStatusBio', 'INCONV' => 'SeedStatusInConversion', 'NONBIO' => 'SeedStatusNonBio'), "help" => "HarvestBioStatusHelp",),
         
@@ -615,6 +615,12 @@ class DoliTraceHarvest extends CommonObject
         $now = dol_now();
 
         $this->db->begin();
+
+        // Lot: proposed when empty, refused with products of another organic status
+        if ($this->prepareLotForValidation() < 0) {
+            $this->db->rollback();
+            return -1;
+        }
 
         // Define new ref
         if (preg_match('/^[\(]?PROV/i', $this->ref) || empty($this->ref)) { // empty should not happened, but when it occurs, the test save life
@@ -1325,6 +1331,237 @@ class DoliTraceHarvest extends CommonObject
             }
         }
         return $warnings;
+    }
+
+    /**
+     * Lot code without the suffix of the organic status (-BIO, -INCONV)
+     *
+     * @param  string $batch Lot
+     * @return string        Lot without suffix
+     */
+    public static function lotBase($batch)
+    {
+        $batch = (string) $batch;
+        foreach (array('-INCONV', '-BIO') as $suffix) {
+            if (str_ends_with($batch, $suffix)) {
+                return substr($batch, 0, -strlen($suffix));
+            }
+        }
+        return $batch;
+    }
+
+    /**
+     * Organic status given by the suffix of a lot code
+     *
+     * @param  string $batch Lot
+     * @return string        BIO, INCONV, '' without suffix
+     */
+    public static function lotSuffixStatus($batch)
+    {
+        $batch = (string) $batch;
+        return (str_ends_with($batch, '-BIO') ? 'BIO' : (str_ends_with($batch, '-INCONV') ? 'INCONV' : ''));
+    }
+
+    /**
+     * Whether a lot code (with or without the organic suffix) is already used by another harvest of the same product
+     * or is a lot of the product in the stock
+     *
+     * @param  string $batch Lot
+     * @return bool          True when used
+     */
+    public function isLotUsed($batch)
+    {
+        $batch = trim((string) $batch);
+        if ($batch === '') {
+            return false;
+        }
+        $base = self::lotBase($batch);
+        $codes = "'".$this->db->escape($base)."', '".$this->db->escape($base.'-BIO')."', '".$this->db->escape($base.'-INCONV')."'";
+        $productid = (int) $this->fk_product_out;
+        $sql = "SELECT COUNT(*) as nb FROM ".$this->db->prefix()."dolitrace_harvest WHERE batch_number IN (".$codes.")";
+        $sql .= " AND (status IS NULL OR status <> ".self::STATUS_CANCELED.")";
+        if ($this->id > 0) {
+            $sql .= " AND rowid <> ".((int) $this->id);
+        }
+        if ($productid > 0) {
+            $sql .= " AND fk_product_out = ".$productid;
+        }
+        $resql = $this->db->query($sql);
+        if ($resql && ($obj = $this->db->fetch_object($resql)) && $obj->nb > 0) {
+            return true;
+        }
+        if ($productid > 0 && isModEnabled('productbatch')) {
+            $sql = "SELECT COUNT(*) as nb FROM ".$this->db->prefix()."product_lot WHERE fk_product = ".$productid." AND batch IN (".$codes.")";
+            $sql .= " AND entity IN (".getEntity('product_lot').")";
+            $resql = $this->db->query($sql);
+            if ($resql && ($obj = $this->db->fetch_object($resql)) && $obj->nb > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether the stock of the harvested product is kept by lot in Dolibarr (modules Stock and Lots, product with
+     * lot management): otherwise the lot stays on the harvest and does not go on stock, delivery notes and invoices
+     *
+     * @return bool
+     */
+    public function isProductByLot()
+    {
+        if (!($this->fk_product_out > 0) || !isModEnabled('stock') || !isModEnabled('productbatch')) {
+            return false;
+        }
+        $resql = $this->db->query("SELECT tobatch FROM ".$this->db->prefix()."product WHERE rowid = ".((int) $this->fk_product_out));
+        return ($resql && ($obj = $this->db->fetch_object($resql)) && $obj->tobatch > 0);
+    }
+
+    /**
+     * Code proposed for a new lot: the production lot of the crop plan when not used yet, otherwise the production lot
+     * (or the reference of the crop plan) followed by a progressive number (-01, -02, ...)
+     *
+     * @return string Lot
+     */
+    public function proposeLot()
+    {
+        $base = '';
+        $exact = false;
+        if ($this->fk_cropplan > 0) {
+            $resql = $this->db->query("SELECT ref, batch_output FROM ".$this->db->prefix()."dolitrace_cropplan WHERE rowid = ".((int) $this->fk_cropplan));
+            if ($resql && ($obj = $this->db->fetch_object($resql))) {
+                if (trim((string) $obj->batch_output) !== '') {
+                    $base = self::lotBase(trim((string) $obj->batch_output));
+                    $exact = true;
+                } elseif (!preg_match('/^[\(]?PROV/i', (string) $obj->ref)) {
+                    $base = (string) $obj->ref;
+                }
+            }
+        }
+        if ($base === '') {
+            $base = 'LOT'.dol_print_date(dol_now(), '%y%m%d');
+            $exact = false;
+        }
+        $base = dol_trunc($base, 110, 'right', 'UTF-8', 1);
+        if ($exact && !$this->isLotUsed($base)) {
+            return $base;
+        }
+        for ($i = ($exact ? 2 : 1); $i < 1000; $i++) {
+            $code = $base.'-'.sprintf('%02d', $i);
+            if (!$this->isLotUsed($code)) {
+                return $code;
+            }
+        }
+        return $base.'-'.dol_now();
+    }
+
+    /**
+     * Lots of the harvested product that this harvest can join: lots of the other harvests of the product that are
+     * still open (a draft harvest, or a quantity in stock; all of them when the stock of the product is not kept by lot)
+     *
+     * @return array<string,array{batch:string,harvests:int,qty:float,unit:string,date:int|string,bio_status:string,stock:?float}>
+     */
+    public function getOpenLots()
+    {
+        $lots = array();
+        $productid = (int) $this->fk_product_out;
+        if ($productid <= 0) {
+            return $lots;
+        }
+        $prefix = $this->db->prefix();
+        $sql = "SELECT batch_number, COUNT(*) as nb, SUM(qty_harvested) as qty, MAX(qty_unit) as unit, MAX(date_harvest) as datemax,";
+        $sql .= " MAX(bio_status) as bio_status, SUM(CASE WHEN status = ".self::STATUS_DRAFT." THEN 1 ELSE 0 END) as drafts";
+        $sql .= " FROM ".$prefix."dolitrace_harvest";
+        $sql .= " WHERE fk_product_out = ".$productid." AND batch_number IS NOT NULL AND batch_number <> ''";
+        $sql .= " AND (status IS NULL OR status <> ".self::STATUS_CANCELED.")";
+        if ($this->id > 0) {
+            $sql .= " AND rowid <> ".((int) $this->id);
+        }
+        $sql .= " GROUP BY batch_number ORDER BY MAX(date_harvest) DESC";
+        $resql = $this->db->query($sql);
+        if (!$resql) {
+            return $lots;
+        }
+        $rows = array();
+        while ($obj = $this->db->fetch_object($resql)) {
+            $rows[] = $obj;
+        }
+        $this->db->free($resql);
+        $bylot = $this->isProductByLot();
+        foreach ($rows as $obj) {
+            $stock = null;
+            if ($bylot) {
+                $sql = "SELECT SUM(pb.qty) as qty FROM ".$prefix."product_batch as pb";
+                $sql .= " INNER JOIN ".$prefix."product_stock as ps ON ps.rowid = pb.fk_product_stock";
+                $sql .= " WHERE ps.fk_product = ".$productid." AND pb.batch = '".$this->db->escape($obj->batch_number)."'";
+                $resstock = $this->db->query($sql);
+                $stock = ($resstock && ($objstock = $this->db->fetch_object($resstock))) ? (float) $objstock->qty : 0.0;
+            }
+            if ($stock !== null && $obj->drafts == 0 && !($stock > 0)) {
+                continue;
+            }
+            $status = self::lotSuffixStatus($obj->batch_number);
+            $lots[(string) $obj->batch_number] = array(
+                'batch' => (string) $obj->batch_number,
+                'harvests' => (int) $obj->nb,
+                'qty' => (float) $obj->qty,
+                'unit' => (string) $obj->unit,
+                'date' => $this->db->jdate($obj->datemax),
+                'bio_status' => ($status !== '' ? $status : (string) $obj->bio_status),
+                'stock' => $stock,
+            );
+            if (count($lots) >= 50) {
+                break;
+            }
+        }
+        return $lots;
+    }
+
+    /**
+     * Lot at the validation: a lot is proposed when empty (a harvest never goes into stock without lot); a lot with
+     * products of another organic status is refused (Reg. EU 2018/848: organic, in conversion and non organic products
+     * kept separate)
+     *
+     * @return int <0 if KO, >0 if OK
+     */
+    public function prepareLotForValidation()
+    {
+        global $langs;
+
+        $langs->loadLangs(array('dolitrace@dolitrace'));
+        if (trim((string) $this->batch_number) === '') {
+            $this->batch_number = $this->proposeLot();
+            $sql = "UPDATE ".$this->db->prefix().$this->table_element." SET batch_number = '".$this->db->escape($this->batch_number)."' WHERE rowid = ".((int) $this->id);
+            if (!$this->db->query($sql)) {
+                $this->error = $this->db->lasterror();
+                return -1;
+            }
+        }
+        $status = $this->computeBioStatus();
+        if ($status === '') {
+            return 1;
+        }
+        $names = array('BIO' => $langs->transnoentities('SeedStatusBio'), 'INCONV' => $langs->transnoentities('SeedStatusInConversion'), 'NONBIO' => $langs->transnoentities('SeedStatusNonBio'));
+        $batch = (string) $this->batch_number;
+        $given = self::lotSuffixStatus($batch);
+        if ($given !== '' && $given != $status) {
+            $this->error = $langs->trans('ErrorHarvestLotSuffixStatus', $batch, $names[$given] ?? $given, $names[$status] ?? $status);
+            return -1;
+        }
+        // Other validated harvests of the same lot (with or without suffix) with another status
+        $base = self::lotBase($batch);
+        $sql = "SELECT ref, bio_status FROM ".$this->db->prefix().$this->table_element;
+        $sql .= " WHERE batch_number IN ('".$this->db->escape($base)."', '".$this->db->escape($base.'-BIO')."', '".$this->db->escape($base.'-INCONV')."')";
+        $sql .= " AND status = ".self::STATUS_VALIDATED." AND rowid <> ".((int) $this->id);
+        $sql .= " AND bio_status IS NOT NULL AND bio_status <> '' AND bio_status <> '".$this->db->escape($status)."'";
+        if ($this->fk_product_out > 0) {
+            $sql .= " AND fk_product_out = ".((int) $this->fk_product_out);
+        }
+        $resql = $this->db->query($sql.$this->db->plimit(1));
+        if ($resql && ($obj = $this->db->fetch_object($resql))) {
+            $this->error = $langs->trans('ErrorHarvestLotOtherStatus', $base, $names[$obj->bio_status] ?? $obj->bio_status, $obj->ref, $names[$status] ?? $status);
+            return -1;
+        }
+        return 1;
     }
 
     /**

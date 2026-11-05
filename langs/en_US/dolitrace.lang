@@ -583,3 +583,15 @@ BioRegisterFrozenInfo = Registers frozen up to %s by the inspection %s: the data
 ErrorDolitraceFrozen = Data of %s frozen by the inspection %s of %s: read only. For a validated treatment use the correction; otherwise an authorized user must reopen the inspection.
 DolitraceFrozenBanner = Read only: frozen by the inspection %s of %s.
 DolitraceMenuOrganic = Organic
+HarvestBatchHelp = Lot = code of the stock and of the label (delivery notes, invoices, recall); it can group several harvests of the same product made in practically the same conditions. Traceability code = identity of the single harvest, used by the QR. At the validation the lot gets the suffix -BIO or -INCONV; without lot one is proposed.
+HarvestLotNew = New lot
+HarvestLotExisting = Add to an existing lot
+HarvestLotNoOpen = No other open lot for this product (in stock or with draft harvests)
+HarvestLotNoProduct = Once the harvested product is chosen, its open lots can be chosen too
+HarvestLotHarvests = %s harvests
+HarvestLotLast = last on %s
+HarvestLotStock = in stock %s
+ErrorHarvestLotUsed = The lot %s already exists for this product: to add the harvest choose it in "Add to an existing lot", otherwise use another code
+ErrorHarvestLotOtherStatus = The lot %s has %s product (harvest %s): a %s harvest goes in another lot (Reg. EU 2018/848, separation of products)
+HarvestLotNotByLot = The harvested product is not managed by lot in Dolibarr (Lots module and option of the product): the lot stays on the harvest but does not go to stock, delivery notes and invoices
+ErrorHarvestLotSuffixStatus = The lot %s is a lot of %s product: a %s harvest goes in another lot (Reg. EU 2018/848, separation of products)

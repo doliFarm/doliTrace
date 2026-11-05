@@ -594,3 +594,15 @@ BioRegisterFrozenInfo = Registri congelati fino al %s dall'ispezione %s: i dati 
 ErrorDolitraceFrozen = Dati del %s congelati dall'ispezione %s del %s: sola lettura. Per un trattamento convalidato usare la correzione; altrimenti un utente autorizzato deve riaprire l'ispezione.
 DolitraceFrozenBanner = Sola lettura: congelato dall'ispezione %s del %s.
 DolitraceMenuOrganic = Biologico
+HarvestBatchHelp = Lotto = codice di magazzino e di etichetta (DDT, fatture, richiamo); può raccogliere più raccolte dello stesso prodotto fatte in condizioni praticamente uguali. Codice di tracciabilità = identità della singola raccolta, usato dal QR. Alla convalida il lotto prende il suffisso -BIO o -INCONV; senza lotto se ne propone uno.
+HarvestLotNew = Nuovo lotto
+HarvestLotExisting = Aggiungi a un lotto esistente
+HarvestLotNoOpen = Nessun altro lotto aperto per questo prodotto (in magazzino o con raccolte in bozza)
+HarvestLotNoProduct = Scelto il prodotto raccolto, si potranno scegliere anche i suoi lotti aperti
+HarvestLotHarvests = %s raccolte
+HarvestLotLast = ultima il %s
+HarvestLotStock = in magazzino %s
+ErrorHarvestLotUsed = Il lotto %s esiste già per questo prodotto: per aggiungere la raccolta sceglierlo in "Aggiungi a un lotto esistente", altrimenti usare un altro codice
+ErrorHarvestLotOtherStatus = Il lotto %s contiene prodotto %s (raccolta %s): una raccolta %s va in un altro lotto (Reg. UE 2018/848, separazione dei prodotti)
+HarvestLotNotByLot = Il prodotto raccolto non è gestito a lotti in Dolibarr (modulo Lotti e opzione del prodotto): il lotto resta nella raccolta ma non passa a magazzino, DDT e fatture
+ErrorHarvestLotSuffixStatus = Il lotto %s è un lotto di prodotto %s: una raccolta %s va in un altro lotto (Reg. UE 2018/848, separazione dei prodotti)

@@ -109,3 +109,70 @@ function dolitraceharvestPrepareHead($object)
 
 	return $head;
 }
+
+/**
+ * Row of the create and edit forms of a harvest for its lot: a new lot (code proposed) or a lot of the other harvests
+ * of the same product that is still open
+ *
+ * @param	Form				$form	Form
+ * @param	DoliTraceHarvest	$object	Harvest
+ * @return	string						HTML
+ */
+function dolitraceHarvestLotRow($form, $object)
+{
+	global $langs;
+
+	$langs->loadLangs(array('dolitrace@dolitrace'));
+	$lots = $object->getOpenLots();
+	$posted = GETPOSTISSET('lot_mode');
+	$current = (string) $object->batch_number;
+	if ($posted) {
+		$mode = (GETPOST('lot_mode', 'aZ09') == 'existing' ? 'existing' : 'new');
+		$newcode = GETPOST('batch_number', 'alphanohtml');
+		$existing = GETPOST('batch_existing', 'alphanohtml');
+	} else {
+		$mode = (($current !== '' && isset($lots[$current])) ? 'existing' : 'new');
+		$newcode = (($current !== '' && !isset($lots[$current])) ? $current : $object->proposeLot());
+		$existing = ($mode == 'existing' ? $current : '');
+	}
+	$names = array('BIO' => $langs->trans('SeedStatusBio'), 'INCONV' => $langs->trans('SeedStatusInConversion'), 'NONBIO' => $langs->trans('SeedStatusNonBio'));
+
+	$out = '<tr><td class="titlefieldcreate">'.$form->textwithpicto($langs->trans('HarvestBatch'), $langs->trans('HarvestBatchHelp')).'</td><td>';
+	$out .= '<div class="nowraponall"><label><input type="radio" name="lot_mode" id="lot_mode_new" value="new"'.($mode == 'new' ? ' checked' : '').'> '.$langs->trans('HarvestLotNew').'</label> ';
+	$out .= '<input type="text" name="batch_number" id="batch_number" class="minwidth200" maxlength="120" value="'.dol_escape_htmltag($newcode).'"></div>';
+	if (count($lots)) {
+		$options = array();
+		foreach ($lots as $lot) {
+			$text = $lot['batch'].' - '.$langs->trans('HarvestLotHarvests', $lot['harvests']);
+			if ($lot['qty'] > 0) {
+				$text .= ', '.price($lot['qty'], 0, $langs, 0, -1, -1).($lot['unit'] !== '' ? ' '.$lot['unit'] : '');
+			}
+			if ($lot['date']) {
+				$text .= ', '.$langs->trans('HarvestLotLast', dol_print_date($lot['date'], 'day'));
+			}
+			if ($lot['stock'] !== null) {
+				$text .= ', '.$langs->trans('HarvestLotStock', price($lot['stock'], 0, $langs, 0, -1, -1));
+			}
+			if ($lot['bio_status'] !== '') {
+				$text .= ' - '.($names[$lot['bio_status']] ?? $lot['bio_status']);
+			}
+			$options[$lot['batch']] = $text;
+		}
+		$out .= '<div class="margintoponlyshort nowraponall"><label><input type="radio" name="lot_mode" id="lot_mode_existing" value="existing"'.($mode == 'existing' ? ' checked' : '').'> '.$langs->trans('HarvestLotExisting').'</label> ';
+		$out .= $form->selectarray('batch_existing', $options, $existing, 1, 0, 0, '', 0, 0, 0, '', 'minwidth300 maxwidth500');
+		$out .= '</div>';
+		$out .= '<script>
+		$(document).ready(function() {
+			$("#batch_existing").on("change", function() { if ($(this).val() && $(this).val() != "-1") { $("#lot_mode_existing").prop("checked", true); } });
+			$("#batch_number").on("focus input", function() { $("#lot_mode_new").prop("checked", true); });
+		});
+		</script>';
+	} else {
+		$out .= '<div class="opacitymedium small margintoponlyshort">'.$langs->trans($object->fk_product_out > 0 ? 'HarvestLotNoOpen' : 'HarvestLotNoProduct').'</div>';
+	}
+	if ($object->fk_product_out > 0 && !$object->isProductByLot()) {
+		$out .= '<div class="warning margintoponlyshort">'.$langs->trans('HarvestLotNotByLot').'</div>';
+	}
+	$out .= '</td></tr>';
+	return $out;
+}
