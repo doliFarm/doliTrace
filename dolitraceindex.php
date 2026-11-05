@@ -153,7 +153,13 @@ function dolitraceIndexBoxEnd(string $url, string $label): void
 	print '</div>';
 }
 
-$sqlsoc = ($socid > 0 ? " AND cp.fk_soc = ".((int) $socid) : "");
+dol_include_once('/dolifarm/lib/dolifarm_access.lib.php');
+dol_include_once('/dolifarm/lib/dolifarm_farm.lib.php');
+// Only the managed farms the user can see
+$sqlsoc = dolifarmSqlSocFilter($user, 'cp.fk_soc').($socid > 0 ? " AND cp.fk_soc = ".((int) $socid) : "");
+if (count(dolifarmManagedFarmIds()) == 0) {
+	print '<div class="marginbottomonly">'.dolifarmNoManagedFarmWarning().'</div>';
+}
 
 print '<div class="div-table-responsive-no-minify">';
 print '<div class="grid-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px;">';

@@ -69,7 +69,7 @@ dol_include_once('/dolifarm/lib/dolifarm_farm.lib.php');
 $langs->loadLangs(array("dolitrace@dolitrace", "other"));
 
 $action = GETPOST('action', 'aZ09');
-$socid = GETPOSTISSET('socid') ? GETPOSTINT('socid') : dolifarmSingleFarmSocid();
+$socid = dolifarmForcedSocid(GETPOSTINT('socid'));
 // Import started from a crop plan: records on surfaces of that crop plan only, farm of the crop plan
 $cropplanid = GETPOSTINT('fk_cropplan');
 $cropplan = null;
@@ -177,7 +177,7 @@ if ($cropplan) {
 	print img_picto('', 'fa-clipboard-list', 'class="pictofixedwidth"').'<a href="'.dol_buildpath('/dolitrace/dolitracecropplan_treatments.php', 1).'?id='.((int) $cropplan->rowid).'">'.dol_escape_htmltag($cropplan->ref).'</a>';
 	print ' <span class="opacitymedium">'.dol_escape_htmltag($cropplan->plot_ref.' - '.$cropplan->plot_label.' / '.$langs->trans($cropplan->crop_label)).'</span>';
 } else {
-	print $form->select_company($socid, 'socid', '', 1, 0, 0, array(), 0, 'minwidth300');
+	print dolifarmFarmSelectHtml($form, $socid, 'socid', 1);
 }
 print '</td></tr>';
 print '<tr><td class="fieldrequired">'.$langs->trans('File').'</td><td><input type="file" name="importfile" accept=".csv,text/csv"></td></tr>';
