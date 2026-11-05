@@ -25,6 +25,7 @@
 
 // Put here all includes required by your class file
 require_once DOL_DOCUMENT_ROOT.'/core/class/commonobject.class.php';
+dol_include_once('/dolitrace/lib/dolitrace_inspection.lib.php');
 //require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 //require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 
@@ -181,9 +182,12 @@ class DoliTraceOperation extends CommonObject
 		"irrigated_area" => array("type" => "double(24,8)", "label" => "IrrigatedArea", "enabled" => "1", 'position' => 91, 'notnull' => 0, "visible" => "-1", "help" => "IrrigatedAreaHelp", "isameasure" => 1,),
 		"fertigation" => array("type" => "boolean", "label" => "Fertigation", "enabled" => "1", 'position' => 92, 'notnull' => 0, "visible" => "-1", "default" => "0", "help" => "FertigationHelp",),
 		"fk_treatment" => array("type" => "integer:DoliTraceTreatment:dolitrace/class/dolitracetreatment.class.php:0:(t.kind:=:2)", "label" => "FertigationRecord", "enabled" => "1", 'position' => 93, 'notnull' => 0, "visible" => "-1", "help" => "FertigationRecordHelp", "css" => "maxwidth300",),
-		"cost_material" => array("type" => "decimal(24,8)", "label" => "Costmaterial", "enabled" => "1", 'position' => 95, 'notnull' => 0, "visible" => "-1",),
-		"cost_manpower" => array("type" => "decimal(24,8)", "label" => "Costmanpower", "enabled" => "1", 'position' => 100, 'notnull' => 0, "visible" => "-1",),
-		"cost_energy" => array("type" => "decimal(24,8)", "label" => "Costenergy", "enabled" => "1", 'position' => 105, 'notnull' => 0, "visible" => "-1",),
+		// Costs: computed from the standard costs per hectare of doliFarm and the area when left empty
+		"area_ha" => array("type" => "double(24,8)", "label" => "OperationAreaHa", "enabled" => "1", 'position' => 94, 'notnull' => 0, "visible" => "-1", "help" => "OperationAreaHaHelp", "isameasure" => 1,),
+		"cost_material" => array("type" => "price", "label" => "Costmaterial", "enabled" => "1", 'position' => 95, 'notnull' => 0, "visible" => "-1", "help" => "OperationCostMaterialHelp",),
+		"cost_manpower" => array("type" => "price", "label" => "Costmanpower", "enabled" => "1", 'position' => 100, 'notnull' => 0, "visible" => "-1", "help" => "OperationCostAutoHelp",),
+		"cost_energy" => array("type" => "price", "label" => "Costenergy", "enabled" => "1", 'position' => 105, 'notnull' => 0, "visible" => "-1", "help" => "OperationCostAutoHelp",),
+		"cost_service" => array("type" => "price", "label" => "Costservice", "enabled" => "1", 'position' => 106, 'notnull' => 0, "visible" => "-1", "help" => "OperationCostAutoHelp",),
 		"status" => array("type" => "int", "label" => "Status", "enabled" => "1", 'position' => 500, 'notnull' => 0, "visible" => "5",),
 		"fk_user_operator" => array("type" => "integer:User:user/class/user.class.php", "label" => "Fkuseroperator", "picto" => "user", "enabled" => "1", 'position' => 115, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx", "csslist" => "tdoverflowmax150",),
 		"note_private" => array("type" => "text", "label" => "NotePrivate", "enabled" => "1", 'position' => 120, 'notnull' => 0, "visible" => "0", "cssview" => "wordbreak",),
@@ -242,6 +246,14 @@ class DoliTraceOperation extends CommonObject
 	public $cost_material;
 	public $cost_manpower;
 	public $cost_energy;
+	/**
+	 * @var float|string|null Cost of the services of third parties (contractors)
+	 */
+	public $cost_service;
+	/**
+	 * @var float|string|null Area worked, in hectares
+	 */
+	public $area_ha;
 	public $status;
 	public $fk_user_operator;
 	public $note_private;
@@ -392,6 +404,10 @@ class DoliTraceOperation extends CommonObject
 	 */
 	public function create(User $user, $notrigger = 0)
 	{
+		// Registers frozen by a closed inspection of the organic control body
+		if (dolitraceFrozenCheck($this) < 0) {
+			return -1;
+		}
 		global $conf;
 
 		// createCommon() does not fill the entity
@@ -401,6 +417,7 @@ class DoliTraceOperation extends CommonObject
 		if ($this->checkData() < 0) {
 			return -1;
 		}
+		$this->fillCosts();
 		$result = $this->createCommon($user, $notrigger);
 
 		// uncomment lines below if you want to validate object after creation
@@ -635,10 +652,87 @@ class DoliTraceOperation extends CommonObject
 	 */
 	public function update(User $user, $notrigger = 0)
 	{
+		// Registers frozen by a closed inspection of the organic control body
+		if (dolitraceFrozenCheck($this) < 0) {
+			return -1;
+		}
 		if ($this->checkData() < 0) {
 			return -1;
 		}
+		$this->fillCosts();
 		return $this->updateCommon($user, $notrigger);
+	}
+
+	/**
+	 * Area and costs from the crop plan and the standard costs per hectare of doliFarm
+	 *
+	 * The area is the one of the plot of the crop plan (area irrigated for irrigations) when empty. Labour, machines
+	 * and services are the standard cost per hectare of the type of operation times the area; the material is the
+	 * quantity used times the average price of the product. Only empty values are filled, unless $force: a value
+	 * written by the user is kept.
+	 *
+	 * @param	bool	$force	Compute again all the costs (and the area when it was not written)
+	 * @return	int				1 if something was computed, 0 otherwise
+	 */
+	public function fillCosts($force = false)
+	{
+		$isempty = static function ($value) {
+			return ($value === null || $value === '');
+		};
+		$changed = 0;
+		dol_include_once('/dolitrace/lib/dolitrace_treatment.lib.php');
+		$cropplan = dolitraceTreatmentCropPlan($this->db, (int) $this->fk_cropplan);
+		if ($isempty($this->area_ha)) {
+			$area = null;
+			if ($this->fk_operation_type == self::TYPE_IRRIGATION && (float) $this->irrigated_area > 0) {
+				$area = (float) $this->irrigated_area;
+			} elseif ($cropplan) {
+				$area = ((float) $cropplan->size_conducted > 0 ? (float) $cropplan->size_conducted : ((float) $cropplan->size_total > 0 ? (float) $cropplan->size_total : null));
+			}
+			if ($area !== null) {
+				$this->area_ha = $area;
+				$changed = 1;
+			}
+		}
+		if (!dol_include_once('/dolifarm/lib/dolifarm_costs.lib.php') || !function_exists('dolifarmStandardCost')) {
+			return $changed;
+		}
+		$area = (float) $this->area_ha;
+		$date = $this->date_op;
+		if ($date !== null && $date !== '' && !is_numeric($date)) {
+			$date = dol_stringtotime($date);
+		}
+		$rate = ($area > 0 ? dolifarmStandardCost($this->db, (string) $this->fk_operation_type, ($cropplan ? (int) $cropplan->fk_soc : 0), (empty($date) ? null : (int) $date)) : null);
+		if ($rate) {
+			foreach (array('cost_manpower' => 'manpower', 'cost_energy' => 'machine', 'cost_service' => 'service') as $field => $item) {
+				if ($force || $isempty($this->$field)) {
+					$this->$field = price2num($rate[$item] * $area, 'MT');
+					$changed = 1;
+				}
+			}
+			if ($isempty($this->duration_min) && $rate['duration'] > 0) {
+				$this->duration_min = (int) round($rate['duration'] * $area);
+				$changed = 1;
+			}
+		}
+		if (($force || $isempty($this->cost_material)) && $this->fk_product > 0 && (float) $this->qty_used > 0) {
+			$unitcost = dolifarmProductUnitCost($this->db, (int) $this->fk_product);
+			if ($unitcost !== null) {
+				$this->cost_material = price2num($unitcost * (float) $this->qty_used, 'MT');
+				$changed = 1;
+			}
+		}
+		return $changed;
+	}
+
+	/**
+	 * Total cost of the operation
+	 *
+	 * @return	float
+	 */
+	public function getTotalCost()
+	{
+		return (float) $this->cost_material + (float) $this->cost_manpower + (float) $this->cost_energy + (float) $this->cost_service;
 	}
 
 	/**
@@ -790,6 +884,10 @@ class DoliTraceOperation extends CommonObject
 	 */
 	public function delete(User $user, $notrigger = 0)
 	{
+		// Registers frozen by a closed inspection of the organic control body
+		if (dolitraceFrozenCheck($this) < 0) {
+			return -1;
+		}
 		return $this->deleteCommon($user, $notrigger);
 		//return $this->deleteCommon($user, $notrigger, 1);
 	}
@@ -822,6 +920,10 @@ class DoliTraceOperation extends CommonObject
 	 */
 	public function validate($user, $notrigger = 0)
 	{
+		// Registers frozen by a closed inspection of the organic control body
+		if (dolitraceFrozenCheck($this) < 0) {
+			return -1;
+		}
 		global $conf;
 
 		require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
@@ -958,6 +1060,10 @@ class DoliTraceOperation extends CommonObject
 	 */
 	public function setDraft($user, $notrigger = 0)
 	{
+		// Registers frozen by a closed inspection of the organic control body
+		if (dolitraceFrozenCheck($this) < 0) {
+			return -1;
+		}
 		// Protection
 		if ($this->status <= self::STATUS_DRAFT) {
 			return 0;
@@ -982,6 +1088,10 @@ class DoliTraceOperation extends CommonObject
 	 */
 	public function cancel($user, $notrigger = 0)
 	{
+		// Registers frozen by a closed inspection of the organic control body
+		if (dolitraceFrozenCheck($this) < 0) {
+			return -1;
+		}
 		// Protection
 		if ($this->status != self::STATUS_VALIDATED) {
 			return 0;
@@ -1006,6 +1116,10 @@ class DoliTraceOperation extends CommonObject
 	 */
 	public function reopen($user, $notrigger = 0)
 	{
+		// Registers frozen by a closed inspection of the organic control body
+		if (dolitraceFrozenCheck($this) < 0) {
+			return -1;
+		}
 		// Protection
 		if ($this->status == self::STATUS_VALIDATED) {
 			return 0;

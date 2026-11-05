@@ -45,6 +45,8 @@ CREATE TABLE IF NOT EXISTS llx_dolitrace_operation(
 	cost_material decimal(24,8), 
 	cost_manpower decimal(24,8), 
 	cost_energy decimal(24,8), 
+	cost_service decimal(24,8), 
+	area_ha double(24,8), 
 	status int, 
 	fk_user_operator integer, 
 	note_private text, 

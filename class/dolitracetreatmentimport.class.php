@@ -71,6 +71,16 @@ class DoliTraceTreatmentImport
 	private $imported = array();
 
 	/**
+	 * @var int		Crop plan of the import started from a crop plan: all the records are on it, 0 for the whole farm
+	 */
+	public $cropplanid = 0;
+
+	/**
+	 * @var ?User	User of the import (creation of the agrodrugs from the catalogue)
+	 */
+	public $user = null;
+
+	/**
 	 * Constructor
 	 *
 	 * @param	DoliDB	$db		Database handler
@@ -165,10 +175,13 @@ class DoliTraceTreatmentImport
 	 * @param	User	$user		User that imports
 	 * @param	int		$socid		Third party of the farm
 	 * @param	bool	$dryrun		Check only
+	 * @param	int		$cropplanid	Crop plan of the import started from a crop plan (records on surfaces of that crop plan only), 0 for the whole farm
 	 * @return	int					Number of records created (or that would be created), <0 if KO
 	 */
-	public function import(User $user, $socid, $dryrun)
+	public function import(User $user, $socid, $dryrun, $cropplanid = 0)
 	{
+		$this->cropplanid = (int) $cropplanid;
+		$this->user = $user;
 		global $langs;
 
 		$langs->loadLangs(array('dolitrace@dolitrace', 'dolifarm@dolifarm'));
@@ -352,6 +365,14 @@ class DoliTraceTreatmentImport
 
 		$targetrows = array();
 		$cropplans = dolitraceTreatmentCropPlans($this->db, $object);
+		// Import from a crop plan: only records on surfaces of that crop plan
+		if ($this->cropplanid > 0) {
+			if ((int) $object->technical_type != DoliTraceTreatmentTarget::TYPE_PLOT) {
+				$result['errors'][] = $langs->transnoentities('ErrorTreatmentImportCropPlanSurfaces');
+				return null;
+			}
+			$cropplans = (isset($cropplans[$this->cropplanid]) ? array($this->cropplanid => $cropplans[$this->cropplanid]) : array());
+		}
 		$buildings = null;
 		foreach ($targets as $data) {
 			$row = $this->buildTarget($object, $data, $cropplans, $buildings, $result);
@@ -370,12 +391,26 @@ class DoliTraceTreatmentImport
 		if (count($result['errors'])) {
 			return null;
 		}
+		// Surfaces: one crop plan per record
+		$recordcropplans = array();
+		foreach ($targetrows as $row) {
+			if ($row->target_type == DoliTraceTreatmentTarget::TYPE_PLOT) {
+				$recordcropplans[(int) $row->fk_cropplan] = $row->location_ref;
+			}
+		}
+		if (count($recordcropplans) > 1 || count($targetrows) > 1 && count($recordcropplans) == 1) {
+			$result['errors'][] = $langs->transnoentities('ErrorTreatmentImportOneCropPlan', implode(', ', $recordcropplans));
+			return null;
+		}
+		$object->fk_cropplan = (count($recordcropplans) == 1 ? (int) key($recordcropplans) : null);
 		$areakeys = $this->checkDuplicate($object, $targetrows, $result);
 		if (count($result['errors'])) {
 			return null;
 		}
 
 		$object->import_key = $this->import_key;
+		// The areas come from the file
+		$object->context['notargetsync'] = 1;
 		if ($object->create($user) < 0) {
 			$result['errors'][] = $object->error ? $object->error : implode(', ', $object->errors);
 			return null;
@@ -486,6 +521,10 @@ class DoliTraceTreatmentImport
 			foreach ($cropplans as $cropplan) {
 				$refs = array($cropplan->plot_ref, $cropplan->iacs_parcel, $cropplan->cadastral_reference);
 				$byplot = ($data['plot_ref'] !== '' ? $cropplan->plot_ref == $data['plot_ref'] : ($data['location_ref'] !== '' && in_array($data['location_ref'], $refs)));
+				// Import from a crop plan: the plot can be left empty
+				if ($this->cropplanid > 0 && $data['plot_ref'] === '' && $data['location_ref'] === '') {
+					$byplot = true;
+				}
 				if ($byplot && ($data['crop_eppo'] === '' || strtoupper($data['crop_eppo']) == strtoupper((string) $cropplan->eppo_code))) {
 					$found[] = $cropplan;
 				}
@@ -564,6 +603,23 @@ class DoliTraceTreatmentImport
 				if (($data['reg_number'] !== '' && $agrodrug->reg_number == $data['reg_number']) || ($data['reg_number'] === '' && $data['product_ref'] !== '' && $agrodrug->ref == $data['product_ref'])) {
 					$found = $agrodrug;
 					break;
+				}
+			}
+			// Registration number not among the agrodrugs: the authorised product of the catalogue of the Ministry of Health
+			// becomes an agrodrug of the farm (in the check only the transaction is rolled back)
+			if (!$found && $data['reg_number'] !== '' && dol_include_once('/dolifarm/lib/dolifarm_ppp.lib.php')) {
+				$catalogerror = '';
+				$catalogcreated = false;
+				$agrodrugid = dolifarmAgroDrugFromCatalog($this->db, $this->user, $data['reg_number'], $catalogerror, $catalogcreated);
+				if ($agrodrugid > 0) {
+					$agrodrugs = dolitraceTreatmentAgroDrugs($this->db);
+					$found = $agrodrugs[$agrodrugid] ?? null;
+					if ($found && $catalogcreated) {
+						$result['warnings'][] = $prefix.$langs->transnoentities('PppAgroDrugCreatedFrom', $found->label, $found->reg_number);
+					}
+				} elseif ($catalogerror !== '') {
+					$result['errors'][] = $prefix.$catalogerror;
+					return null;
 				}
 			}
 			if (!$found) {

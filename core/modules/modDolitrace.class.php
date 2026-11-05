@@ -79,7 +79,7 @@ class modDolitrace extends DolibarrModules
 		$this->editor_squarred_logo = '';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@dolitrace'
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = '1.2.0';
+		$this->version = '1.3.0';
 		// Url to the file with your last numberversion of this module
 		//$this->url_last_version = 'http://www.example.com/versionmodule.txt';
 
@@ -394,6 +394,22 @@ class modDolitrace extends DolibarrModules
 		$this->rights[$r][5] = 'validate';
 		$r++;
 
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', (4 * 10) + 0 + 1);
+		$this->rights[$r][1] = 'Read the inspections of the organic control body';
+		$this->rights[$r][4] = 'dolitracebioinspection';
+		$this->rights[$r][5] = 'read';
+		$r++;
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', (4 * 10) + 1 + 1);
+		$this->rights[$r][1] = 'Create, update and close the inspections (closing freezes the registers up to the date of the inspection)';
+		$this->rights[$r][4] = 'dolitracebioinspection';
+		$this->rights[$r][5] = 'write';
+		$r++;
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', (4 * 10) + 2 + 1);
+		$this->rights[$r][1] = 'Reopen a closed inspection (unfreeze the registers), with a reason';
+		$this->rights[$r][4] = 'dolitracebioinspection';
+		$this->rights[$r][5] = 'reopen';
+		$r++;
+
 		/* END MODULEBUILDER PERMISSIONS */
 
 
@@ -499,21 +515,6 @@ class modDolitrace extends DolibarrModules
 			'target' => '',
 			'user' => 2,
 			'object' => 'DoliTraceHarvest'
-		);
-		// Registers of organic production: stock in and out, mass balance, summary by plot (read only)
-		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitraceharvest',
-			'type' => 'left',
-			'titre' => 'BioRegister',
-			'mainmenu' => 'dolitrace',
-			'leftmenu' => 'dolitrace_bioregister',
-			'url' => '/dolitrace/dolitrace_bioregister.php',
-			'langs' => 'dolitrace@dolitrace',
-			'position' => 1000 + $r,
-			'enabled' => 'isModEnabled("dolitrace")',
-			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "read")',
-			'target' => '',
-			'user' => 2,
 		);
 		/*
 		$this->menu[$r++] = array(
@@ -657,6 +658,82 @@ class modDolitrace extends DolibarrModules
 			'target' => '',
 			'user' => 2,
 			'object' => 'DoliTraceTreatment'
+		);
+		// Section "Organic": registers of organic production (all the data of the farm, not only the harvests) and inspections of the control body
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace',
+			'type' => 'left',
+			'titre' => 'DolitraceMenuOrganic',
+			'prefix' => img_picto('', 'fa-leaf', 'class="paddingright pictofixedwidth valignmiddle"'),
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitrace_bio',
+			'url' => '/dolitrace/dolitrace_bioregister.php',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "read") || $user->hasRight("dolitrace", "dolitracebioinspection", "read")',
+			'target' => '',
+			'user' => 2,
+		);
+		// Registers of organic production: stock in and out, mass balance, summary by plot, seeds, inputs, treatments, purchases, harvests, sales (read only)
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitrace_bio',
+			'type' => 'left',
+			'titre' => 'BioRegister',
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitrace_bioregister',
+			'url' => '/dolitrace/dolitrace_bioregister.php',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "read")',
+			'target' => '',
+			'user' => 2,
+		);
+		// Inspections of the organic control body: closing one freezes the registers of the farm up to its date
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitrace_bio',
+			'type' => 'left',
+			'titre' => 'BioInspections',
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitrace_bioinspection',
+			'url' => '/dolitrace/dolitracebioinspection_list.php',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitracebioinspection", "read")',
+			'target' => '',
+			'user' => 2,
+		);
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitrace_bio',
+			'type' => 'left',
+			'titre' => 'NewBioInspection',
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitrace_bioinspection_new',
+			'url' => '/dolitrace/dolitracebioinspection_card.php?action=create',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitracebioinspection", "write")',
+			'target' => '',
+			'user' => 2,
+		);
+		// Traceability of a harvested product: search by UUID, short code or lot, history upstream and downstream
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace',
+			'type' => 'left',
+			'titre' => 'TraceTitle',
+			'prefix' => img_picto('', 'fa-route', 'class="paddingright pictofixedwidth valignmiddle"'),
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitrace_trace',
+			'url' => '/dolitrace/dolitrace_trace.php',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "read")',
+			'target' => '',
+			'user' => 2,
 		);
 		/* END MODULEBUILDER LEFTMENU DOLITRACETREATMENT */
 		/* BEGIN MODULEBUILDER LEFTMENU MYOBJECT */
@@ -844,8 +921,41 @@ class modDolitrace extends DolibarrModules
 			}
 		}
 		$this->initProductionWarehouse();
+		$this->initHarvestUuids();
 
 		return $this->_init($sql, $options);
+	}
+
+	/**
+	 *	Give its own UUID to the harvests without one, or with the UUID of their crop plan (copied by the versions
+	 *	before 1.3.0): the UUID identifies the harvest in the traceability
+	 *
+	 *	@return	int		Number of harvests updated, <0 if KO
+	 */
+	public function initHarvestUuids()
+	{
+		dol_include_once('/dolitrace/class/dolitracetrace.class.php');
+		$prefix = $this->db->prefix();
+		$sql = "SELECT h.rowid FROM ".$prefix."dolitrace_harvest as h";
+		$sql .= " LEFT JOIN ".$prefix."dolitrace_cropplan as cp ON cp.rowid = h.fk_cropplan";
+		$sql .= " WHERE h.uuid IS NULL OR h.uuid = '' OR h.uuid = cp.uuid";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
+			return -1;
+		}
+		$ids = array();
+		while ($obj = $this->db->fetch_object($resql)) {
+			$ids[] = (int) $obj->rowid;
+		}
+		$this->db->free($resql);
+		foreach ($ids as $id) {
+			$this->db->query("UPDATE ".$prefix."dolitrace_harvest SET uuid = '".$this->db->escape(DoliTraceTrace::newUuid())."' WHERE rowid = ".((int) $id));
+		}
+		if (count($ids)) {
+			dol_syslog(__METHOD__.' '.count($ids).' harvests with a new UUID', LOG_INFO);
+		}
+		return count($ids);
 	}
 
 	/**

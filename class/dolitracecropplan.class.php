@@ -145,17 +145,18 @@ class DoliTraceCropplan extends CommonObject
 
         // Link to Crop (DoliTrace) - Note: Assuming you will create this class
         "fk_output_product" => array("type" => "integer:Product:product/class/product.class.php","label" => "ProductOut","picto" => "product","enabled" => "1","position" => 38,"notnull" => 0,"visible" => "-2","index" => 1,),
-        "fk_crop" => array("type" => "sellist:dolifarm_crops:label:rowid::status=1","label" => "Crop","enabled" => "1","position" => 40,"notnull" => 1,"visible" => "-1", "css" => "minwidth300",),        
+        "fk_crop" => array("type" => "sellist:dolifarm_crops:label:rowid::status=1","label" => "CropPlanCrop","enabled" => "1","position" => 40,"notnull" => 1,"visible" => "-1", "css" => "minwidth300",),        
         "fk_project" => array("type" => "integer:Project:projet/class/project.class.php", "label" => "Fkproject", "picto" => "project", "enabled" => "1", 'position' => 45, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx", "csslist" => "tdoverflowmax150",),
         "season" => array("type" => "int", "label" => "Season", "enabled" => "1", 'position' => 50, 'notnull' => 1, "visible" => "0",),
         "date_start" => array("type" => "date", "label" => "Datestart", "enabled" => "1", 'position' => 55, 'notnull' => 1, "visible" => "-1",),
         "date_end" => array("type" => "date", "label" => "Dateend", "enabled" => "1", 'position' => 60, 'notnull' => 1, "visible" => "-1",),
         
         "estimated_yield" => array("type" => "double(24,8)", "label" => "Estimatedyield", "enabled" => "1", 'position' => 65, 'notnull' => 0, "visible" => "-1",),
-        "cost_material" => array("type" => "double(24,8)", "label" => "Costmaterial", "enabled" => "1", 'position' => 70, 'notnull' => 0, "visible" => "-1",),
-        "cost_manpower" => array("type" => "double(24,8)", "label" => "Costmanpower", "enabled" => "1", 'position' => 75, 'notnull' => 0, "visible" => "-1",),
-        "cost_energy" => array("type" => "double(24,8)", "label" => "Costenergy", "enabled" => "1", 'position' => 80, 'notnull' => 0, "visible" => "-1",),
-        "actual_cost" => array("type" => "double(24,8)", "label" => "Actualcost", "enabled" => "1", 'position' => 85, 'notnull' => 0, "visible" => "-1",),
+        "cost_material" => array("type" => "double(24,8)", "label" => "Costmaterial", "enabled" => "1", 'position' => 70, 'notnull' => 0, "visible" => "-1", "noteditable" => "1",),
+        "cost_manpower" => array("type" => "double(24,8)", "label" => "Costmanpower", "enabled" => "1", 'position' => 75, 'notnull' => 0, "visible" => "-1", "noteditable" => "1",),
+        "cost_energy" => array("type" => "double(24,8)", "label" => "Costenergy", "enabled" => "1", 'position' => 80, 'notnull' => 0, "visible" => "-1", "noteditable" => "1",),
+        "cost_service" => array("type" => "double(24,8)", "label" => "Costservice", "enabled" => "1", 'position' => 82, 'notnull' => 0, "visible" => "-1", "noteditable" => "1",),
+        "actual_cost" => array("type" => "double(24,8)", "label" => "Actualcost", "enabled" => "1", 'position' => 85, 'notnull' => 0, "visible" => "-1", "noteditable" => "1",),
         
         "status" => array("type" => "int", "label" => "Status", "enabled" => "1", 'position' => 500, 'notnull' => 0, "visible" => "-1",),
         "note_public" => array("type" => "text", "label" => "NotePublic", "enabled" => "1", 'position' => 95, 'notnull' => 0, "visible" => "0", "cssview" => "wordbreak",),
@@ -188,6 +189,10 @@ class DoliTraceCropplan extends CommonObject
     public $cost_material;
     public $cost_manpower;
     public $cost_energy;
+    /**
+     * @var float|string|null Services of third parties (computed)
+     */
+    public $cost_service;
     public $actual_cost;
     public $status;
     public $note_public;
@@ -253,11 +258,6 @@ class DoliTraceCropplan extends CommonObject
 
 		dol_include_once('/dolifarm/lib/dolifarm_icons.lib.php');
 		$this->picto = dolifarm_get_fa_icon('cropplan');
-		// Drop-down lists only with the farms the user can see (doliFarm >= 1.3.1)
-		dol_include_once('/dolifarm/lib/dolifarm_access.lib.php');
-		if (function_exists('dolifarmRestrictLinkFields')) {
-			dolifarmRestrictLinkFields($this, array('fk_dossier', 'fk_plot'));
-		}
 
         if (!getDolGlobalInt('MAIN_SHOW_TECHNICAL_ID') && isset($this->fields['rowid']) && !empty($this->fields['ref'])) {
             $this->fields['rowid']['visible'] = 0;
@@ -283,6 +283,11 @@ class DoliTraceCropplan extends CommonObject
         }
         // Filtriamo le aziende agricole
         $this->fields['fk_soc']['type'] = "integer:Societe:societe/class/societe.class.php:1:$filter_farm";
+		// Drop-down lists only with the farms the user can see, farm only among the managed farms (doliFarm)
+		dol_include_once('/dolifarm/lib/dolifarm_access.lib.php');
+		if (function_exists('dolifarmRestrictLinkFields')) {
+			dolifarmRestrictLinkFields($this, array('fk_dossier', 'fk_plot'));
+		}
       //   $this->fields['fk_plot']['type'] = "integer:DoliFarmPlot:custom/dolifarm/class/dolifarmplot.class.php:1:(fk_soc:=:13)";
 
         // Unset fields that are disabled

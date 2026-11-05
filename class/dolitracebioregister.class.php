@@ -26,12 +26,18 @@
 
 dol_include_once('/dolifarm/lib/dolifarm_access.lib.php');
 dol_include_once('/dolifarm/lib/dolifarm_bio.lib.php');
+dol_include_once('/dolifarm/lib/dolifarm_biobody.lib.php');
 
 /**
  * Registers of organic production
  */
 class DoliTraceBioRegister
 {
+	/**
+	 * Order of the registers in the dossier
+	 */
+	const DOSSIER_ORDER = array('plots', 'seeds', 'inputs', 'purchases', 'treatments', 'harvests', 'sales', 'balance', 'movements');
+
 	/** Origins of the movements: sales (out to customers) */
 	const SALE_TYPES = array('shipping', 'facture', 'commande');
 
@@ -427,7 +433,7 @@ class DoliTraceBioRegister
 					'ref' => (string) $obj->ref,
 					'thirdparty' => $withsoc ? (string) $obj->thirdparty : '',
 					'cert' => $withsoc ? (string) $obj->dolifarm_bio_cert : '',
-					'body' => $withsoc ? (string) $obj->dolifarm_bio_body : '',
+					'body' => $withsoc ? (function_exists('dolifarmBioBodyLabel') ? dolifarmBioBodyLabel($this->db, (string) $obj->dolifarm_bio_body) : (string) $obj->dolifarm_bio_body) : '',
 				);
 			}
 			$this->db->free($resql);
@@ -1133,7 +1139,7 @@ class DoliTraceBioRegister
 		$resql = $this->db->query("SELECT dolifarm_bio_cert, dolifarm_bio_body, dolifarm_bio_cert_end FROM ".$prefix."societe_extrafields WHERE fk_object = ".((int) $socid));
 		$ef = $resql ? $this->db->fetch_object($resql) : null;
 		if ($ef && trim((string) $ef->dolifarm_bio_cert.(string) $ef->dolifarm_bio_body) !== '') {
-			$lines[] = $outputlangs->transnoentities('BioRegisterFarmCertificate', trim((string) $ef->dolifarm_bio_cert), trim((string) $ef->dolifarm_bio_body),
+			$lines[] = $outputlangs->transnoentities('BioRegisterFarmCertificate', trim((string) $ef->dolifarm_bio_cert), trim(function_exists('dolifarmBioBodyLabel') ? dolifarmBioBodyLabel($this->db, (string) $ef->dolifarm_bio_body) : (string) $ef->dolifarm_bio_body),
 				$ef->dolifarm_bio_cert_end ? dol_print_date($this->db->jdate($ef->dolifarm_bio_cert_end), 'day', 'tzserver', $outputlangs) : '-');
 		} else {
 			$lines[] = $outputlangs->transnoentities('BioRegisterFarmNoCertificate');
@@ -1288,15 +1294,10 @@ class DoliTraceBioRegister
 	public function toDossierPdf(User $user, $socid, $year, Translate $outputlangs)
 	{
 		$this->loadLangs($outputlangs);
-		$title = $outputlangs->transnoentities('BioDossierTitle', $year);
-		$pdf = $this->newPdf($title, $outputlangs);
-		$pdf->AddPage();
 		$header = $this->getFarmHeader($socid, $outputlangs);
 		$header[] = $outputlangs->transnoentities('BioDossierNote');
-		$pdf->writeHTML($this->headerHtml($title, $header, $outputlangs), true, false, true, false, '');
-		$tabs = self::getTabs();
-		$number = 0;
-		foreach (array('plots', 'seeds', 'inputs', 'purchases', 'treatments', 'harvests', 'sales', 'balance', 'movements') as $tab) {
+		$linesbytab = array();
+		foreach (self::DOSSIER_ORDER as $tab) {
 			if (!in_array($tab, self::getAllowedTabs($user))) {
 				continue;
 			}
@@ -1304,10 +1305,38 @@ class DoliTraceBioRegister
 			if (!is_array($lines)) {
 				return -1;
 			}
+			$linesbytab[$tab] = $lines;
+		}
+		return $this->snapshotDossierPdf($year, $header, $linesbytab, $outputlangs);
+	}
+
+	/**
+	 * Organic dossier of a year from lines already read: the registers of the dossier, live or copied at the closure
+	 * of an inspection
+	 *
+	 * @param	int			$year			Year
+	 * @param	string[]	$header			Heading
+	 * @param	array<string,array<int,array<string,mixed>>>	$linesbytab	Lines by register
+	 * @param	Translate	$outputlangs	Language
+	 * @return	string						Content of the PDF
+	 */
+	public function snapshotDossierPdf($year, $header, $linesbytab, Translate $outputlangs)
+	{
+		$this->loadLangs($outputlangs);
+		$title = $outputlangs->transnoentities('BioDossierTitle', $year);
+		$pdf = $this->newPdf($title, $outputlangs);
+		$pdf->AddPage();
+		$pdf->writeHTML($this->headerHtml($title, $header, $outputlangs), true, false, true, false, '');
+		$tabs = self::getTabs();
+		$number = 0;
+		foreach (self::DOSSIER_ORDER as $tab) {
+			if (!isset($linesbytab[$tab])) {
+				continue;
+			}
 			$number++;
 			$html = '<h4>'.$number.'. '.dol_escape_htmltag($outputlangs->transnoentities($tabs[$tab])).'</h4>';
 			$html .= '<p><i>'.dol_escape_htmltag($outputlangs->transnoentities('BioDossierHelp'.ucfirst($tab))).'</i></p>';
-			$pdf->writeHTML($html.$this->tableHtml($tab, $lines, $outputlangs), true, false, true, false, '');
+			$pdf->writeHTML($html.$this->tableHtml($tab, $linesbytab[$tab], $outputlangs), true, false, true, false, '');
 		}
 		return $pdf->Output('', 'S');
 	}

@@ -149,6 +149,14 @@ $permissiontoread = $user->hasRight('dolitrace', 'dolitracetreatment', 'read');
 $permissiontoadd = $user->hasRight('dolitrace', 'dolitracetreatment', 'write'); // Used by the include of actions_addupdatedelete.inc.php
 $permissiontovalidate = $user->hasRight('dolitrace', 'dolitracetreatment', 'validate');
 $permissiontodelete = $user->hasRight('dolitrace', 'dolitracetreatment', 'delete') && isset($object->status) && $object->status == $object::STATUS_DRAFT;
+
+// Registers frozen by a closed inspection of the organic control body: read only
+dol_include_once('/dolitrace/lib/dolitrace_inspection.lib.php');
+$frozenby = dolitraceFrozenBy($object);
+if ($frozenby) {
+	$permissiontoadd = 0;
+	$permissiontodelete = 0;
+}
 $permissionnote = $permissiontoadd; // Used by the include of actions_setnotes.inc.php
 $permissiondellink = $permissiontoadd; // Used by the include of actions_dellink.inc.php
 $isdraft = (empty($object->id) || $object->status == $object::STATUS_DRAFT);
@@ -168,6 +176,22 @@ if (!$permissiontoread) {
 }
 dolifarmCheckSocAccess($user, $object);
 dolifarmPrefillFarm($db, $object, $action);
+// Record on surfaces from a crop plan: farm and dossier of the crop plan
+if (in_array($action, array('create', 'add')) && GETPOSTINT('fk_cropplan') > 0) {
+	$cropplanfrom = dolitraceTreatmentCropPlan($db, GETPOSTINT('fk_cropplan'));
+	if ($cropplanfrom && dolifarmUserCanSeeSoc($user, (int) $cropplanfrom->fk_soc)) {
+		if (GETPOSTINT('fk_soc') <= 0) {
+			$_GET['fk_soc'] = (int) $cropplanfrom->fk_soc;
+			$_POST['fk_soc'] = (int) $cropplanfrom->fk_soc;
+		}
+		if ($action == 'create' && !GETPOSTISSET('technical_type')) {
+			$_GET['technical_type'] = DoliTraceTreatmentTarget::TYPE_PLOT;
+		}
+		if ($action == 'create' && GETPOSTINT('fk_dossier') <= 0 && !empty($cropplanfrom->fk_dossier)) {
+			$_GET['fk_dossier'] = (int) $cropplanfrom->fk_dossier;
+		}
+	}
+}
 
 $error = 0;
 
@@ -255,11 +279,22 @@ if (empty($reshook)) {
 			setEventMessages($langs->trans('ErrorTreatmentBbch'), null, 'errors');
 		}
 		if ($target->target_type == DoliTraceTreatmentTarget::TYPE_PLOT) {
+			// One crop plan per record: the area is the plot of the crop plan of the record
 			$cropplans = dolitraceTreatmentCropPlans($db, $object);
-			$cropplan = isset($cropplans[GETPOSTINT('fk_cropplan')]) ? $cropplans[GETPOSTINT('fk_cropplan')] : null;
+			$cropplan = isset($cropplans[GETPOSTINT('fk_cropplan')]) && GETPOSTINT('fk_cropplan') == (int) $object->fk_cropplan ? $cropplans[GETPOSTINT('fk_cropplan')] : null;
+			foreach ($object->targets as $existing) {
+				if ($existing->target_type == DoliTraceTreatmentTarget::TYPE_PLOT) {
+					$error++;
+					$cropplan = null;
+					setEventMessages($langs->trans('ErrorTreatmentOneCropPlan', $existing->location_ref), null, 'errors');
+					break;
+				}
+			}
 			if (!$cropplan) {
-				$error++;
-				setEventMessages($langs->trans('ErrorFieldRequired', $langs->transnoentitiesnoconv('TreatmentCropPlan')), null, 'errors');
+				if (!$error) {
+					$error++;
+					setEventMessages(empty($object->fk_cropplan) ? $langs->trans('ErrorFieldRequired', $langs->transnoentitiesnoconv('TreatmentCropPlan')) : $langs->trans('TreatmentNoCropPlan', dol_print_date($object->date_start, 'day')), null, 'errors');
+				}
 			} else {
 				$target->fk_cropplan = (int) $cropplan->rowid;
 				$target->fk_plot = (int) $cropplan->fk_plot;
@@ -322,8 +357,18 @@ if (empty($reshook)) {
 		$product->fk_treatment = $object->id;
 		$product->rang = count($object->products) + 1;
 		if ($object->kind == $object::KIND_PLANTPROTECTION) {
+			// A product of the catalogue of the Ministry of Health becomes an agrodrug of the farm
+			dol_include_once('/dolifarm/lib/dolifarm_ppp.lib.php');
+			$catalogerror = '';
+			$catalogcreated = false;
+			$agrodrugid = dolifarmAgroDrugResolve($db, $user, GETPOST('fk_agrodrug', 'alphanohtml'), $catalogerror, $catalogcreated);
+			if ($agrodrugid < 0) {
+				setEventMessages($catalogerror, null, 'errors');
+			} elseif ($catalogcreated) {
+				setEventMessages($langs->trans('PppAgroDrugCreated'), null, 'mesgs');
+			}
 			$agrodrugs = dolitraceTreatmentAgroDrugs($db);
-			$agrodrug = isset($agrodrugs[GETPOSTINT('fk_agrodrug')]) ? $agrodrugs[GETPOSTINT('fk_agrodrug')] : null;
+			$agrodrug = isset($agrodrugs[$agrodrugid]) ? $agrodrugs[$agrodrugid] : null;
 			$adversityerror = '';
 			if (GETPOST('adversity_eppo', 'alphanohtml') !== '') {
 				// Search on the whole EPPO database: the code is added to the dictionary when missing
@@ -507,6 +552,17 @@ if ($action == 'create') {
 
 	print $form->buttonsSaveCancel("Create");
 
+	// The crop plan is used only by the records on surfaces
+	print '<script>
+	jQuery(function() {
+		function dolitraceToggleCropPlan() {
+			jQuery("tr.field_fk_cropplan").toggle(jQuery("#technical_type").val() == "1");
+		}
+		jQuery("#technical_type").on("change", dolitraceToggleCropPlan);
+		dolitraceToggleCropPlan();
+	});
+	</script>';
+
 	print '</form>';
 
 	//dol_set_focus('input[name="ref"]');
@@ -542,6 +598,17 @@ if (($id || $ref) && $action == 'edit') {
 	print dol_get_fiche_end();
 
 	print $form->buttonsSaveCancel();
+
+	// The crop plan is used only by the records on surfaces
+	print '<script>
+	jQuery(function() {
+		function dolitraceToggleCropPlan() {
+			jQuery("tr.field_fk_cropplan").toggle(jQuery("#technical_type").val() == "1");
+		}
+		jQuery("#technical_type").on("change", dolitraceToggleCropPlan);
+		dolitraceToggleCropPlan();
+	});
+	</script>';
 
 	print '</form>';
 }
@@ -675,6 +742,9 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		$morehtmlstatus = dolGetBadge($langs->trans('TreatmentLate'), '', 'warning', '', '', array('attr' => array('title' => $langs->trans('TreatmentLateHelp')))).' ';
 	}
 	dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref, '', 0, '', $morehtmlstatus);
+	if (!empty($frozenby)) {
+		print dolitraceFrozenBanner($frozenby);
+	}
 
 	print '<div class="fichecenter">';
 	print '<div class="fichehalfleft">';
@@ -797,19 +867,26 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		print '<tr class="oddeven"><td colspan="7"><span class="opacitymedium">'.$langs->trans('None').'</span></td></tr>';
 	}
 
-	if ($caneditrows) {
+	$hasplottarget = false;
+	foreach ($object->targets as $target) {
+		$hasplottarget = ($hasplottarget || $target->target_type == DoliTraceTreatmentTarget::TYPE_PLOT);
+	}
+	if ($caneditrows && !($targettype == DoliTraceTreatmentTarget::TYPE_PLOT && $hasplottarget)) {
 		print '<tr class="oddeven nohover">';
 		if ($targettype == DoliTraceTreatmentTarget::TYPE_PLOT) {
+			// One crop plan per record: the one of the record, if in progress at the date
 			$cropplans = dolitraceTreatmentCropPlans($db, $object);
 			$options = array();
 			foreach ($cropplans as $cropplan) {
-				$options[$cropplan->rowid] = $cropplan->plot_ref.' - '.$cropplan->plot_label.' / '.$langs->trans($cropplan->crop_label);
+				if ((int) $cropplan->rowid == (int) $object->fk_cropplan) {
+					$options[$cropplan->rowid] = $cropplan->plot_ref.' - '.$cropplan->plot_label.' / '.$langs->trans($cropplan->crop_label);
+				}
 			}
 			print '<td colspan="4">';
 			if (count($options)) {
-				print $form->selectarray('fk_cropplan', $options, GETPOSTINT('fk_cropplan'), 1, 0, 0, '', 0, 0, 0, '', 'minwidth300 maxwidth500', 1);
+				print $form->selectarray('fk_cropplan', $options, (int) $object->fk_cropplan, 0, 0, 0, '', 0, 0, 0, '', 'minwidth300 maxwidth500', 1);
 			} else {
-				print '<span class="opacitymedium">'.$langs->trans('TreatmentNoCropPlan', dol_print_date($object->date_start, 'day')).'</span>';
+				print '<span class="opacitymedium">'.$langs->trans(empty($object->fk_cropplan) ? 'TreatmentChooseCropPlan' : 'TreatmentNoCropPlan', dol_print_date($object->date_start, 'day')).'</span>';
 			}
 			print '</td>';
 			print '<td class="center"><input type="text" name="bbch" class="width50 center" maxlength="3" value="'.dol_escape_htmltag(GETPOST('bbch', 'alphanohtml')).'" placeholder="BBCH"></td>';
@@ -914,11 +991,12 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	if ($caneditrows) {
 		print '<tr class="oddeven nohover">';
 		$options = array();
+		// Organic area in the record: the products allowed in organic production come first
+		$organicuse = (count($object->getOrganicAreas()) > 0);
 		if ($plantprotection) {
-			foreach (dolitraceTreatmentAgroDrugs($db) as $agrodrug) {
-				$options[$agrodrug->rowid] = $agrodrug->label.($agrodrug->reg_number ? ' ('.$agrodrug->reg_number.')' : '');
-			}
-			print '<td colspan="2">'.$form->selectarray('fk_agrodrug', $options, GETPOSTINT('fk_agrodrug'), 1, 0, 0, '', 0, 0, 0, '', 'minwidth200 maxwidth300', 1).'</td>';
+			// Agrodrugs of the farm and, by typing, the authorised products of the catalogue of the Ministry of Health
+			dol_include_once('/dolifarm/lib/dolifarm_ppp.lib.php');
+			print '<td colspan="2">'.dolifarmAgroDrugSelect($db, 'fk_agrodrug', (!empty($agrodrugid) && $agrodrugid > 0 ? (string) $agrodrugid : GETPOST('fk_agrodrug', 'alphanohtml')), true, 'minwidth200 maxwidth300', ($organicuse ? (int) $object->date_start : null)).'</td>';
 			if (dol_include_once('/dolifarm/lib/dolifarm_eppo.lib.php') && function_exists('dolifarmEppoSelect') && dolifarmEppoDataAvailable() && !empty($conf->use_javascript_ajax)) {
 				// Whole EPPO database (pests, diseases, weeds), not only the dictionary
 				print '<td>'.dolifarmEppoSelect($db, 'adversity_eppo', GETPOST('adversity_eppo', 'alphanohtml'), 'pest', 'minwidth200 maxwidth300').'</td>';
@@ -930,10 +1008,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 				print '<td>'.$form->selectarray('fk_adversity', $options, GETPOSTINT('fk_adversity'), 1, 0, 0, '', 0, 0, 0, '', 'minwidth200 maxwidth300', 1).'</td>';
 			}
 		} else {
-			foreach (dolitraceTreatmentFertilizers($db) as $fertilizer) {
-				$options[$fertilizer->rowid] = $fertilizer->label;
-			}
-			print '<td colspan="3">'.$form->selectarray('fk_fertilizer', $options, GETPOSTINT('fk_fertilizer'), 1, 0, 0, '', 0, 0, 0, '', 'minwidth200 maxwidth300', 1).'</td>';
+			print '<td colspan="3">'.dolitraceTreatmentFertilizerSelect($db, 'fk_fertilizer', GETPOSTINT('fk_fertilizer'), $organicuse).'</td>';
 		}
 		$options = array();
 		foreach (dolitraceTreatmentDoseUnits($db, $object->kind, $object->technical_type) as $unit) {

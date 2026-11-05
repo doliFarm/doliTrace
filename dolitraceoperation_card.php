@@ -148,6 +148,14 @@ if (!$permissiontoread) {
 }
 dolitraceCheckAccess($user, $object);
 
+// Registers frozen by a closed inspection of the organic control body: read only
+dol_include_once('/dolitrace/lib/dolitrace_inspection.lib.php');
+$frozenby = dolitraceFrozenBy($object);
+if ($frozenby) {
+	$permissiontoadd = 0;
+	$permissiontodelete = 0;
+}
+
 $error = 0;
 
 
@@ -175,6 +183,18 @@ if (empty($reshook)) {
     }
 
     $triggermodname = $object->TRIGGER_PREFIX.'_MODIFY'; // Name of trigger action code to execute when we modify record. Used in actions_addupdatedelete.inc.php
+
+    // Costs computed again from the standard costs of doliFarm and the average price of the product
+    if ($action == 'recalccosts' && $permissiontoadd && $object->id > 0) {
+        $object->fillCosts(true);
+        if ($object->update($user) > 0) {
+            setEventMessages($langs->trans('OperationCostsRecomputed'), null, 'mesgs');
+        } else {
+            setEventMessages($object->error, $object->errors, 'errors');
+        }
+        header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+        exit;
+    }
 
     // Actions cancel, add, update, update_extras, confirm_validate, confirm_delete, confirm_deleteline, confirm_clone, confirm_close, confirm_setdraft, confirm_reopen
     include DOL_DOCUMENT_ROOT.'/core/actions_addupdatedelete.inc.php';
@@ -295,6 +315,9 @@ if (($id || $ref) && $action == 'edit') {
     $morehtmlref = '<div class="refidno">';
     $morehtmlref .= '</div>';
     dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref);
+    if (!empty($frozenby)) {
+        print dolitraceFrozenBanner($frozenby);
+    }
 
     print '<form method="POST" action="'.dolBuildUrl($_SERVER["PHP_SELF"]).'">';
     print '<input type="hidden" name="token" value="'.newToken().'">';
@@ -370,6 +393,9 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
 
     dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref);
+    if (!empty($frozenby)) {
+        print dolitraceFrozenBanner($frozenby);
+    }
 
 
     print '<div class="fichecenter">';
@@ -475,6 +501,11 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
             // Modify
             print dolGetButtonAction('', $langs->trans('Modify'), 'default', $_SERVER["PHP_SELF"].'?id='.$object->id.'&action=edit&token='.newToken(), '', $permissiontoadd);
+
+            // Costs from the standard costs per hectare
+            if (isModEnabled('dolifarm')) {
+                print dolGetButtonAction($langs->trans('OperationRecomputeCostsHelp'), $langs->trans('OperationRecomputeCosts'), 'default', $_SERVER["PHP_SELF"].'?id='.$object->id.'&action=recalccosts&token='.newToken(), '', $permissiontoadd);
+            }
 
             // Validate
             if ($object->status == $object::STATUS_DRAFT) {

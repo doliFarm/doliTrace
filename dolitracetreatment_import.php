@@ -70,6 +70,16 @@ $langs->loadLangs(array("dolitrace@dolitrace", "other"));
 
 $action = GETPOST('action', 'aZ09');
 $socid = GETPOSTISSET('socid') ? GETPOSTINT('socid') : dolifarmSingleFarmSocid();
+// Import started from a crop plan: records on surfaces of that crop plan only, farm of the crop plan
+$cropplanid = GETPOSTINT('fk_cropplan');
+$cropplan = null;
+if ($cropplanid > 0) {
+	$cropplan = dolitraceTreatmentCropPlan($db, $cropplanid);
+	if (!$cropplan) {
+		accessforbidden();
+	}
+	$socid = (int) $cropplan->fk_soc;
+}
 
 if (!isModEnabled('dolitrace') || !$user->hasRight('dolitrace', 'dolitracetreatment', 'write')) {
 	accessforbidden();
@@ -124,7 +134,7 @@ if (in_array($action, array('check', 'import'))) {
 		setEventMessages($import->error, null, 'errors');
 	}
 	if (!$error) {
-		$nb = $import->import($user, $socid, $action == 'check');
+		$nb = $import->import($user, $socid, $action == 'check', $cropplanid);
 		if ($nb < 0) {
 			setEventMessages($import->error, null, 'errors');
 		} elseif ($action == 'import') {
@@ -150,11 +160,25 @@ print load_fiche_titre($title, '', 'fa-file-import');
 print '<form method="POST" action="'.$_SERVER['PHP_SELF'].'" enctype="multipart/form-data">';
 print '<input type="hidden" name="token" value="'.newToken().'">';
 print '<input type="hidden" name="action" value="check">';
-print '<span class="opacitymedium">'.$langs->trans('TreatmentImportHelp').'</span> ';
+if ($cropplan) {
+	print '<input type="hidden" name="fk_cropplan" value="'.((int) $cropplan->rowid).'">';
+}
+print '<span class="opacitymedium">'.$langs->trans($cropplan ? 'TreatmentImportCropPlanHelp' : 'TreatmentImportHelp').'</span> ';
 print '<a href="'.$_SERVER['PHP_SELF'].'?action=template&token='.newToken().'">'.img_picto('', 'download', 'class="pictofixedwidth"').$langs->trans('TreatmentImportTemplate').'</a><br><br>';
 print '<table class="border centpercent tableforfield">';
 print '<tr><td class="titlefieldcreate fieldrequired">'.$langs->trans('TreatmentFarm').'</td><td>';
-print $form->select_company($socid, 'socid', '', 1, 0, 0, array(), 0, 'minwidth300');
+if ($cropplan) {
+	require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+	$farm = new Societe($db);
+	$farm->fetch($socid);
+	print $farm->getNomUrl(1).'<input type="hidden" name="socid" value="'.((int) $socid).'">';
+	print '</td></tr>';
+	print '<tr><td>'.$langs->trans('TreatmentCropPlan').'</td><td>';
+	print img_picto('', 'fa-clipboard-list', 'class="pictofixedwidth"').'<a href="'.dol_buildpath('/dolitrace/dolitracecropplan_treatments.php', 1).'?id='.((int) $cropplan->rowid).'">'.dol_escape_htmltag($cropplan->ref).'</a>';
+	print ' <span class="opacitymedium">'.dol_escape_htmltag($cropplan->plot_ref.' - '.$cropplan->plot_label.' / '.$langs->trans($cropplan->crop_label)).'</span>';
+} else {
+	print $form->select_company($socid, 'socid', '', 1, 0, 0, array(), 0, 'minwidth300');
+}
 print '</td></tr>';
 print '<tr><td class="fieldrequired">'.$langs->trans('File').'</td><td><input type="file" name="importfile" accept=".csv,text/csv"></td></tr>';
 print '</table>';
@@ -201,6 +225,9 @@ if (count($import->results)) {
 		print '<input type="hidden" name="token" value="'.newToken().'">';
 		print '<input type="hidden" name="action" value="import">';
 		print '<input type="hidden" name="socid" value="'.((int) $socid).'">';
+		if ($cropplan) {
+			print '<input type="hidden" name="fk_cropplan" value="'.((int) $cropplan->rowid).'">';
+		}
 		print '<div class="center">';
 		print '<span class="opacitymedium">'.$langs->trans('TreatmentImportSummary', $nbok, count($import->results)).'</span><br>';
 		if ($nbok) {

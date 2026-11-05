@@ -70,6 +70,11 @@ class InterfaceDolitraceTriggers extends DolibarrTriggers
 			return 0; // If module is not enabled, we do nothing
 		}
 
+		// The costs saved on the production plans follow their operations, records and harvests
+		if (preg_match('/^DOLITRACE_?(OPERATION|HARVEST|TREATMENT)_/', $action)) {
+			$this->syncCropPlanCosts($object);
+		}
+
 		// Put here code you want to execute when a Dolibarr business events occurs.
 		// Data and type of action are stored into $object and $action
 
@@ -484,7 +489,17 @@ class InterfaceDolitraceTriggers extends DolibarrTriggers
 
 		$origintype = $object->element.'@dolitrace';
 		$product_id = (int) $object->fk_product_out;
+		// Quantity in the unit of the product (q to kg, hl to L, ...); units that cannot be converted are refused
 		$quantity = (float) $object->qty_harvested;
+		if ($instock && method_exists($object, 'getStockQuantity')) {
+			$uniterror = '';
+			$quantity = $object->getStockQuantity($uniterror);
+			if ($quantity === null) {
+				$this->error = $uniterror;
+				$this->errors[] = $uniterror;
+				return -1;
+			}
+		}
 
 		// Quantity already in stock for this harvest, with the warehouse and the lot of its last receipt
 		$moved = 0;
@@ -605,5 +620,32 @@ class InterfaceDolitraceTriggers extends DolibarrTriggers
 		}
 
 		return 1;
+	}
+
+	/**
+	 * Save again the actual costs of the production plans of an operation, a harvest or a record
+	 *
+	 * @param	CommonObject	$object		Operation, harvest or treatment record
+	 * @return	void
+	 */
+	private function syncCropPlanCosts($object)
+	{
+		$ids = array();
+		if (!empty($object->fk_cropplan)) {
+			$ids[(int) $object->fk_cropplan] = 1;
+		}
+		if ($object->element == 'dolitracetreatment' && $object->id > 0) {
+			$resql = $this->db->query("SELECT DISTINCT fk_cropplan FROM ".$this->db->prefix()."dolitrace_treatment_target WHERE fk_treatment = ".((int) $object->id)." AND fk_cropplan > 0");
+			while ($resql && ($obj = $this->db->fetch_object($resql))) {
+				$ids[(int) $obj->fk_cropplan] = 1;
+			}
+		}
+		if (empty($ids)) {
+			return;
+		}
+		dol_include_once('/dolitrace/lib/dolitrace_costs.lib.php');
+		foreach (array_keys($ids) as $id) {
+			dolitraceCropPlanSyncCosts($this->db, $id);
+		}
 	}
 }

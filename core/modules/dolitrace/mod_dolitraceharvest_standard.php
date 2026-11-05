@@ -157,7 +157,8 @@ class mod_dolitraceharvest_standard extends ModeleNumRefDoliTraceHarvest
 		}
 
 		//$date=time();
-		$date = $object->date_creation;
+		// Objects whose creation date is in "datec" have no date_creation: the date of today
+		$date = (empty($object->date_creation) ? dol_now() : $object->date_creation);
 		$yymm = dol_print_date($date, "%y%m");
 
 		if ($max >= (pow(10, 4) - 1)) {
