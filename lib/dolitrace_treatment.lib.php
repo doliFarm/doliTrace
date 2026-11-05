@@ -218,6 +218,61 @@ function dolitraceTreatmentFertilizers($db)
 }
 
 /**
+ * Selector of a fertiliser of the farm; for a use on an organic area the products are grouped by the result of the
+ * check for organic production (allowed first, then to verify, then not allowed), all selectable
+ *
+ * @param	DoliDB	$db			Database handler
+ * @param	string	$htmlname	Name of the field
+ * @param	int		$value		Selected fertiliser
+ * @param	bool	$organic	Use on an organic area
+ * @param	string	$morecss	CSS
+ * @return	string				HTML
+ */
+function dolitraceTreatmentFertilizerSelect($db, $htmlname, $value, $organic, $morecss = 'minwidth200 maxwidth300')
+{
+	global $langs;
+
+	$groups = array();
+	$fertilizers = dolitraceTreatmentFertilizers($db);
+	if ($organic && dol_include_once('/dolifarm/lib/dolifarm_organic.lib.php') && function_exists('dolifarmOrganicFertilizerCheck')) {
+		$titles = array('yes' => 'PppGroupOrganicYes', 'verify' => 'PppGroupOrganicVerify', 'no' => 'PppGroupOrganicNo');
+		foreach ($titles as $result => $title) {
+			$groups[$result] = array('label' => $langs->trans($title), 'options' => array());
+		}
+		foreach ($fertilizers as $fertilizer) {
+			$check = dolifarmOrganicFertilizerCheck($db, (int) $fertilizer->rowid);
+			$result = isset($groups[$check['result']]) ? $check['result'] : 'verify';
+			$groups[$result]['options'][$fertilizer->rowid] = $fertilizer->label;
+		}
+	} else {
+		$groups['all'] = array('label' => '', 'options' => array());
+		foreach ($fertilizers as $fertilizer) {
+			$groups['all']['options'][$fertilizer->rowid] = $fertilizer->label;
+		}
+	}
+	$out = '<select class="flat '.dol_escape_htmltag($morecss).'" name="'.dol_escape_htmltag($htmlname).'" id="'.dol_escape_htmltag($htmlname).'">';
+	$out .= '<option value="-1">&nbsp;</option>';
+	foreach ($groups as $group) {
+		if (empty($group['options'])) {
+			continue;
+		}
+		if ($group['label'] !== '') {
+			$out .= '<optgroup label="'.dol_escape_htmltag($group['label']).'">';
+		}
+		foreach ($group['options'] as $id => $label) {
+			$out .= '<option value="'.((int) $id).'"'.((int) $id == (int) $value ? ' selected' : '').'>'.dol_escape_htmltag((string) $label).'</option>';
+		}
+		if ($group['label'] !== '') {
+			$out .= '</optgroup>';
+		}
+	}
+	$out .= '</select>';
+	include_once DOL_DOCUMENT_ROOT.'/core/lib/ajax.lib.php';
+	$out .= ajax_combobox($htmlname);
+	return $out;
+}
+
+/**
  * Adversities of the dictionary
  *
  * @param	DoliDB		$db		Database handler

@@ -991,10 +991,12 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	if ($caneditrows) {
 		print '<tr class="oddeven nohover">';
 		$options = array();
+		// Organic area in the record: the products allowed in organic production come first
+		$organicuse = (count($object->getOrganicAreas()) > 0);
 		if ($plantprotection) {
 			// Agrodrugs of the farm and, by typing, the authorised products of the catalogue of the Ministry of Health
 			dol_include_once('/dolifarm/lib/dolifarm_ppp.lib.php');
-			print '<td colspan="2">'.dolifarmAgroDrugSelect($db, 'fk_agrodrug', (!empty($agrodrugid) && $agrodrugid > 0 ? (string) $agrodrugid : GETPOST('fk_agrodrug', 'alphanohtml')), true, 'minwidth200 maxwidth300').'</td>';
+			print '<td colspan="2">'.dolifarmAgroDrugSelect($db, 'fk_agrodrug', (!empty($agrodrugid) && $agrodrugid > 0 ? (string) $agrodrugid : GETPOST('fk_agrodrug', 'alphanohtml')), true, 'minwidth200 maxwidth300', ($organicuse ? (int) $object->date_start : null)).'</td>';
 			if (dol_include_once('/dolifarm/lib/dolifarm_eppo.lib.php') && function_exists('dolifarmEppoSelect') && dolifarmEppoDataAvailable() && !empty($conf->use_javascript_ajax)) {
 				// Whole EPPO database (pests, diseases, weeds), not only the dictionary
 				print '<td>'.dolifarmEppoSelect($db, 'adversity_eppo', GETPOST('adversity_eppo', 'alphanohtml'), 'pest', 'minwidth200 maxwidth300').'</td>';
@@ -1006,10 +1008,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 				print '<td>'.$form->selectarray('fk_adversity', $options, GETPOSTINT('fk_adversity'), 1, 0, 0, '', 0, 0, 0, '', 'minwidth200 maxwidth300', 1).'</td>';
 			}
 		} else {
-			foreach (dolitraceTreatmentFertilizers($db) as $fertilizer) {
-				$options[$fertilizer->rowid] = $fertilizer->label;
-			}
-			print '<td colspan="3">'.$form->selectarray('fk_fertilizer', $options, GETPOSTINT('fk_fertilizer'), 1, 0, 0, '', 0, 0, 0, '', 'minwidth200 maxwidth300', 1).'</td>';
+			print '<td colspan="3">'.dolitraceTreatmentFertilizerSelect($db, 'fk_fertilizer', GETPOSTINT('fk_fertilizer'), $organicuse).'</td>';
 		}
 		$options = array();
 		foreach (dolitraceTreatmentDoseUnits($db, $object->kind, $object->technical_type) as $unit) {
