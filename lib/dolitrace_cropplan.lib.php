@@ -30,7 +30,7 @@
  */
 function dolitracecropplanPrepareHead($object)
 {
-	global $db, $langs, $conf;
+	global $db, $langs, $conf, $user;
 
 	$langs->load("dolitrace@dolitrace");
 
@@ -61,6 +61,24 @@ function dolitracecropplanPrepareHead($object)
         $h++;
     }
 
+	// Tab: treatment register of the crop plan (plant protection and fertilizations)
+	if ($user->hasRight('dolitrace', 'dolitracetreatment', 'read')) {
+		$nbtreatments = 0;
+		$sql = "SELECT COUNT(DISTINCT t.rowid) as nb FROM ".$db->prefix()."dolitrace_treatment as t";
+		$sql .= " LEFT JOIN ".$db->prefix()."dolitrace_treatment_target as g ON g.fk_treatment = t.rowid AND g.fk_cropplan = ".((int) $object->id);
+		$sql .= " WHERE t.entity IN (".getEntity('dolitracetreatment').") AND (t.fk_cropplan = ".((int) $object->id)." OR g.rowid IS NOT NULL)";
+		$resql = $db->query($sql);
+		if ($resql) {
+			$obj = $db->fetch_object($resql);
+			$nbtreatments = ($obj ? (int) $obj->nb : 0);
+			$db->free($resql);
+		}
+		$head[$h][0] = dol_buildpath('/dolitrace/dolitracecropplan_treatments.php', 1).'?id='.$object->id;
+		$head[$h][1] = $langs->trans('TreatmentRegisterTab').($nbtreatments > 0 ? '<span class="badge marginleftonlyshort">'.$nbtreatments.'</span>' : '');
+		$head[$h][2] = 'treatments';
+		$h++;
+	}
+
 	// Tab: Harvest
     if (isModEnabled('dolitrace')) {
         $head[$h][0] = dol_buildpath('/dolitrace/dolitracecropplan_harvests.php', 1).'?id='.$object->id;
@@ -68,6 +86,12 @@ function dolitracecropplanPrepareHead($object)
         $head[$h][2] = 'harvest';
         $h++;
     }
+
+	// Tab: history of the crop plan (operations, treatments, harvests and lots), the base of the traceability
+	$head[$h][0] = dol_buildpath('/dolitrace/dolitracecropplan_history.php', 1).'?id='.$object->id;
+	$head[$h][1] = $langs->trans('CropPlanHistory');
+	$head[$h][2] = 'history';
+	$h++;
 
 	if ($showtabofpagecontact) {
 		$head[$h][0] = dolBuildUrl(dol_buildpath("/dolitrace/dolitracecropplan_contact.php", 1), ['id' => $object->id]);

@@ -132,6 +132,40 @@ function dolitraceTreatmentFetchRows($db, $sql)
 }
 
 /**
+ * Query of the crop plans with plot and crop, for the areas of the records
+ *
+ * @param	DoliDB		$db		Database handler
+ * @return	string				SQL ending with the WHERE on the entity
+ */
+function dolitraceTreatmentCropPlanSql($db)
+{
+	$sql = "SELECT cp.rowid, cp.ref, cp.fk_soc, cp.fk_dossier, cp.status, cp.date_start, cp.date_end, cp.fk_plot, cp.fk_crop,";
+	$sql .= " p.ref as plot_ref, p.label as plot_label, p.size_conducted, p.size_total,";
+	$sql .= " p.iacs_parcel, p.cadastral_reference, p.zone_zvn, c.label as crop_label, c.eppo_code";
+	$sql .= " FROM ".$db->prefix()."dolitrace_cropplan as cp";
+	$sql .= " INNER JOIN ".$db->prefix()."dolifarm_plot as p ON p.rowid = cp.fk_plot";
+	$sql .= " INNER JOIN ".$db->prefix()."dolifarm_crops as c ON c.rowid = cp.fk_crop";
+	$sql .= " WHERE cp.entity IN (".getEntity('dolitracecropplan').")";
+	return $sql;
+}
+
+/**
+ * One crop plan with plot and crop, whatever its status and period
+ *
+ * @param	DoliDB		$db		Database handler
+ * @param	int			$id		Id of the crop plan
+ * @return	stdClass|null		Crop plan, null if not found
+ */
+function dolitraceTreatmentCropPlan($db, $id)
+{
+	if ((int) $id <= 0) {
+		return null;
+	}
+	$rows = dolitraceTreatmentFetchRows($db, dolitraceTreatmentCropPlanSql($db)." AND cp.rowid = ".((int) $id));
+	return isset($rows[(int) $id]) ? $rows[(int) $id] : null;
+}
+
+/**
  * Crop plans of the farm in progress at the date of the record: they give plot and crop of the areas
  *
  * @param	DoliDB				$db		Database handler
@@ -144,12 +178,7 @@ function dolitraceTreatmentCropPlans($db, $object)
 		return array();
 	}
 	$day = dol_print_date($object->date_start, '%Y-%m-%d');
-	$sql = "SELECT cp.rowid, cp.ref, cp.fk_plot, cp.fk_crop, p.ref as plot_ref, p.label as plot_label, p.size_conducted, p.size_total,";
-	$sql .= " p.iacs_parcel, p.cadastral_reference, p.zone_zvn, c.label as crop_label, c.eppo_code";
-	$sql .= " FROM ".$db->prefix()."dolitrace_cropplan as cp";
-	$sql .= " INNER JOIN ".$db->prefix()."dolifarm_plot as p ON p.rowid = cp.fk_plot";
-	$sql .= " INNER JOIN ".$db->prefix()."dolifarm_crops as c ON c.rowid = cp.fk_crop";
-	$sql .= " WHERE cp.entity IN (".getEntity('dolitracecropplan').")";
+	$sql = dolitraceTreatmentCropPlanSql($db);
 	$sql .= " AND cp.fk_soc = ".((int) $object->fk_soc);
 	$sql .= " AND cp.status IN (1, 2)";
 	$sql .= " AND (cp.date_start IS NULL OR cp.date_start <= '".$db->escape($day)."')";

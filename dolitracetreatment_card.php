@@ -168,6 +168,22 @@ if (!$permissiontoread) {
 }
 dolifarmCheckSocAccess($user, $object);
 dolifarmPrefillFarm($db, $object, $action);
+// Record on surfaces from a crop plan: farm and dossier of the crop plan
+if (in_array($action, array('create', 'add')) && GETPOSTINT('fk_cropplan') > 0) {
+	$cropplanfrom = dolitraceTreatmentCropPlan($db, GETPOSTINT('fk_cropplan'));
+	if ($cropplanfrom && dolifarmUserCanSeeSoc($user, (int) $cropplanfrom->fk_soc)) {
+		if (GETPOSTINT('fk_soc') <= 0) {
+			$_GET['fk_soc'] = (int) $cropplanfrom->fk_soc;
+			$_POST['fk_soc'] = (int) $cropplanfrom->fk_soc;
+		}
+		if ($action == 'create' && !GETPOSTISSET('technical_type')) {
+			$_GET['technical_type'] = DoliTraceTreatmentTarget::TYPE_PLOT;
+		}
+		if ($action == 'create' && GETPOSTINT('fk_dossier') <= 0 && !empty($cropplanfrom->fk_dossier)) {
+			$_GET['fk_dossier'] = (int) $cropplanfrom->fk_dossier;
+		}
+	}
+}
 
 $error = 0;
 
@@ -255,11 +271,22 @@ if (empty($reshook)) {
 			setEventMessages($langs->trans('ErrorTreatmentBbch'), null, 'errors');
 		}
 		if ($target->target_type == DoliTraceTreatmentTarget::TYPE_PLOT) {
+			// One crop plan per record: the area is the plot of the crop plan of the record
 			$cropplans = dolitraceTreatmentCropPlans($db, $object);
-			$cropplan = isset($cropplans[GETPOSTINT('fk_cropplan')]) ? $cropplans[GETPOSTINT('fk_cropplan')] : null;
+			$cropplan = isset($cropplans[GETPOSTINT('fk_cropplan')]) && GETPOSTINT('fk_cropplan') == (int) $object->fk_cropplan ? $cropplans[GETPOSTINT('fk_cropplan')] : null;
+			foreach ($object->targets as $existing) {
+				if ($existing->target_type == DoliTraceTreatmentTarget::TYPE_PLOT) {
+					$error++;
+					$cropplan = null;
+					setEventMessages($langs->trans('ErrorTreatmentOneCropPlan', $existing->location_ref), null, 'errors');
+					break;
+				}
+			}
 			if (!$cropplan) {
-				$error++;
-				setEventMessages($langs->trans('ErrorFieldRequired', $langs->transnoentitiesnoconv('TreatmentCropPlan')), null, 'errors');
+				if (!$error) {
+					$error++;
+					setEventMessages(empty($object->fk_cropplan) ? $langs->trans('ErrorFieldRequired', $langs->transnoentitiesnoconv('TreatmentCropPlan')) : $langs->trans('TreatmentNoCropPlan', dol_print_date($object->date_start, 'day')), null, 'errors');
+				}
 			} else {
 				$target->fk_cropplan = (int) $cropplan->rowid;
 				$target->fk_plot = (int) $cropplan->fk_plot;
@@ -507,6 +534,17 @@ if ($action == 'create') {
 
 	print $form->buttonsSaveCancel("Create");
 
+	// The crop plan is used only by the records on surfaces
+	print '<script>
+	jQuery(function() {
+		function dolitraceToggleCropPlan() {
+			jQuery("tr.field_fk_cropplan").toggle(jQuery("#technical_type").val() == "1");
+		}
+		jQuery("#technical_type").on("change", dolitraceToggleCropPlan);
+		dolitraceToggleCropPlan();
+	});
+	</script>';
+
 	print '</form>';
 
 	//dol_set_focus('input[name="ref"]');
@@ -542,6 +580,17 @@ if (($id || $ref) && $action == 'edit') {
 	print dol_get_fiche_end();
 
 	print $form->buttonsSaveCancel();
+
+	// The crop plan is used only by the records on surfaces
+	print '<script>
+	jQuery(function() {
+		function dolitraceToggleCropPlan() {
+			jQuery("tr.field_fk_cropplan").toggle(jQuery("#technical_type").val() == "1");
+		}
+		jQuery("#technical_type").on("change", dolitraceToggleCropPlan);
+		dolitraceToggleCropPlan();
+	});
+	</script>';
 
 	print '</form>';
 }
@@ -797,19 +846,26 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		print '<tr class="oddeven"><td colspan="7"><span class="opacitymedium">'.$langs->trans('None').'</span></td></tr>';
 	}
 
-	if ($caneditrows) {
+	$hasplottarget = false;
+	foreach ($object->targets as $target) {
+		$hasplottarget = ($hasplottarget || $target->target_type == DoliTraceTreatmentTarget::TYPE_PLOT);
+	}
+	if ($caneditrows && !($targettype == DoliTraceTreatmentTarget::TYPE_PLOT && $hasplottarget)) {
 		print '<tr class="oddeven nohover">';
 		if ($targettype == DoliTraceTreatmentTarget::TYPE_PLOT) {
+			// One crop plan per record: the one of the record, if in progress at the date
 			$cropplans = dolitraceTreatmentCropPlans($db, $object);
 			$options = array();
 			foreach ($cropplans as $cropplan) {
-				$options[$cropplan->rowid] = $cropplan->plot_ref.' - '.$cropplan->plot_label.' / '.$langs->trans($cropplan->crop_label);
+				if ((int) $cropplan->rowid == (int) $object->fk_cropplan) {
+					$options[$cropplan->rowid] = $cropplan->plot_ref.' - '.$cropplan->plot_label.' / '.$langs->trans($cropplan->crop_label);
+				}
 			}
 			print '<td colspan="4">';
 			if (count($options)) {
-				print $form->selectarray('fk_cropplan', $options, GETPOSTINT('fk_cropplan'), 1, 0, 0, '', 0, 0, 0, '', 'minwidth300 maxwidth500', 1);
+				print $form->selectarray('fk_cropplan', $options, (int) $object->fk_cropplan, 0, 0, 0, '', 0, 0, 0, '', 'minwidth300 maxwidth500', 1);
 			} else {
-				print '<span class="opacitymedium">'.$langs->trans('TreatmentNoCropPlan', dol_print_date($object->date_start, 'day')).'</span>';
+				print '<span class="opacitymedium">'.$langs->trans(empty($object->fk_cropplan) ? 'TreatmentChooseCropPlan' : 'TreatmentNoCropPlan', dol_print_date($object->date_start, 'day')).'</span>';
 			}
 			print '</td>';
 			print '<td class="center"><input type="text" name="bbch" class="width50 center" maxlength="3" value="'.dol_escape_htmltag(GETPOST('bbch', 'alphanohtml')).'" placeholder="BBCH"></td>';

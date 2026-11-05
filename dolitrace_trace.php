@@ -202,7 +202,9 @@ if ($history) {
 	print '<tr><td>'.$langs->trans('TraceCadastral').'</td><td>'.dol_escape_htmltag(trim($p['comune'].' '.($p['sheet'] !== '' ? $langs->trans('TraceSheetParcel', $p['sheet'], $p['parcel']) : ''))).'</td></tr>';
 	print '<tr><td>'.$langs->trans('BioRegisterSurface').'</td><td>'.$qty($p['surface'], 'ha').'</td></tr>';
 	print '<tr><td>'.$langs->trans('BioRegisterPlotStatus').'</td><td>'.dol_escape_htmltag($p['bio_label']).'</td></tr>';
-	print '<tr><td>'.$langs->trans('BioRegisterCropPlan').'</td><td><a href="'.dol_buildpath('/dolitrace/dolitracecropplan_card.php', 1).'?id='.$cp['id'].'">'.dol_escape_htmltag(trim($cp['ref'].' - '.$cp['label'], ' -')).'</a></td></tr>';
+	print '<tr><td>'.$langs->trans('BioRegisterCropPlan').'</td><td><a href="'.dol_buildpath('/dolitrace/dolitracecropplan_card.php', 1).'?id='.$cp['id'].'">'.dol_escape_htmltag(trim($cp['ref'].' - '.$cp['label'], ' -')).'</a>';
+	// The traceability follows the whole history of the crop plan
+	print ' &nbsp; <a href="'.dol_buildpath('/dolitrace/dolitracecropplan_history.php', 1).'?id='.$cp['id'].'">'.img_picto('', 'fa-route', 'class="pictofixedwidth"').$langs->trans('CropPlanHistoryOpen').'</a></td></tr>';
 	print '<tr><td>'.$langs->trans('BioRegisterCrop').'</td><td>'.dol_escape_htmltag($cp['crop']).($cp['crop_eppo'] !== '' ? ' <span class="opacitymedium">('.dol_escape_htmltag($cp['crop_eppo']).')</span>' : '').'</td></tr>';
 	print '<tr><td>'.$langs->trans('TraceCropPeriod').'</td><td>'.trim($day($cp['date_start']).' - '.$day($cp['date_end']), ' -').'</td></tr>';
 	print '</table>';

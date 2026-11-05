@@ -150,6 +150,7 @@ class DoliTraceTreatment extends CommonObject
 		'kind' => array('type' => 'integer', 'label' => 'TreatmentKind', 'enabled' => 1, 'position' => 20, 'notnull' => 1, 'visible' => 1, 'default' => '1', 'arrayofkeyval' => array('1' => 'TreatmentKindPlantProtection', '2' => 'TreatmentKindFertilization'), 'css' => 'minwidth200'),
 		'technical_type' => array('type' => 'integer', 'label' => 'TreatmentTechnicalType', 'enabled' => 1, 'position' => 22, 'notnull' => 1, 'visible' => 1, 'default' => '1', 'arrayofkeyval' => array('1' => 'TreatmentTechnicalSurfaces', '2' => 'TreatmentTechnicalClosed', '3' => 'TreatmentTechnicalSeeds'), 'help' => 'TreatmentTechnicalTypeHelp', 'css' => 'minwidth200'),
 		'fk_soc' => array('type' => 'integer:Societe:societe/class/societe.class.php:1:((status:=:1) AND (entity:IN:__SHARED_ENTITIES__))', 'label' => 'TreatmentFarm', 'picto' => 'company', 'enabled' => 1, 'position' => 30, 'notnull' => 1, 'visible' => 1, 'index' => 1, 'css' => 'maxwidth500 widthcentpercentminusxx', 'csslist' => 'tdoverflowmax150'),
+		'fk_cropplan' => array('type' => 'integer:DoliTraceCropplan:dolitrace/class/dolitracecropplan.class.php:0:(t.status:IN:1,2)', 'label' => 'TreatmentCropPlan', 'picto' => 'fa-clipboard-list', 'enabled' => 1, 'position' => 34, 'notnull' => 0, 'visible' => 1, 'index' => 1, 'css' => 'maxwidth500 widthcentpercentminusxx', 'csslist' => 'tdoverflowmax150', 'help' => 'TreatmentCropPlanHelp'),
 		'fk_dossier' => array('type' => 'integer:DoliFarmFarmDossier:dolifarm/class/dolifarmfarmdossier.class.php', 'label' => 'TreatmentDossier', 'enabled' => 1, 'position' => 32, 'notnull' => 0, 'visible' => -1, 'css' => 'maxwidth500 widthcentpercentminusxx', 'csslist' => 'tdoverflowmax150'),
 		'date_start' => array('type' => 'datetime', 'label' => 'TreatmentDateStart', 'enabled' => 1, 'position' => 40, 'notnull' => 1, 'visible' => 1, 'index' => 1),
 		'date_end' => array('type' => 'datetime', 'label' => 'TreatmentDateEnd', 'enabled' => 1, 'position' => 41, 'notnull' => 0, 'visible' => -1),
@@ -211,6 +212,11 @@ class DoliTraceTreatment extends CommonObject
 	 * @var ?int
 	 */
 	public $fk_dossier;
+
+	/**
+	 * @var ?int	Crop plan of a record on surfaces (one per record)
+	 */
+	public $fk_cropplan;
 
 	/**
 	 * @var int|string
@@ -409,7 +415,7 @@ class DoliTraceTreatment extends CommonObject
 		// Drop-down lists only with the farms the user can see (doliFarm >= 1.3.1)
 		dol_include_once('/dolifarm/lib/dolifarm_access.lib.php');
 		if (function_exists('dolifarmRestrictLinkFields')) {
-			dolifarmRestrictLinkFields($this, array('fk_dossier', 'fk_operator', 'fk_machine'));
+			dolifarmRestrictLinkFields($this, array('fk_dossier', 'fk_cropplan', 'fk_operator', 'fk_machine'));
 		}
 
 		if (!getDolGlobalInt('MAIN_SHOW_TECHNICAL_ID') && isset($this->fields['rowid']) && !empty($this->fields['ref'])) {
@@ -456,12 +462,118 @@ class DoliTraceTreatment extends CommonObject
 		if (empty($this->version)) {
 			$this->version = 1;
 		}
-		$result = $this->createCommon($user, $notrigger);
-		if ($result > 0 && $this->addLog($user, 'CREATE') < 0) {
+		if ($this->setFromCropPlan() < 0) {
 			return -1;
 		}
+		$this->db->begin();
+		$result = $this->createCommon($user, $notrigger);
+		if ($result > 0 && $this->addLog($user, 'CREATE') < 0) {
+			$result = -1;
+		}
+		// Surfaces: the area of the record is the plot of its crop plan
+		if ($result > 0 && empty($this->context['notargetsync']) && $this->syncCropPlanTarget($user) < 0) {
+			$result = -1;
+		}
+		if ($result < 0) {
+			$this->db->rollback();
+			return -1;
+		}
+		$this->db->commit();
 
 		return $result;
+	}
+
+	/**
+	 * Records on surfaces: farm and dossier of the crop plan, which must be of the farm of the record
+	 *
+	 * @return	int		<0 if KO, 0 if nothing to do, >0 if OK
+	 */
+	public function setFromCropPlan()
+	{
+		global $langs;
+
+		if ((int) $this->technical_type != DoliTraceTreatmentTarget::TYPE_PLOT) {
+			$this->fk_cropplan = null;
+			return 0;
+		}
+		if (empty($this->fk_cropplan)) {
+			return 0;
+		}
+		$cropplan = dolitraceTreatmentCropPlan($this->db, (int) $this->fk_cropplan);
+		if (!$cropplan) {
+			$this->error = $langs->trans('ErrorRecordNotFound').' ('.$langs->transnoentitiesnoconv('TreatmentCropPlan').')';
+			return -1;
+		}
+		if (empty($this->fk_soc)) {
+			$this->fk_soc = (int) $cropplan->fk_soc;
+		} elseif ((int) $this->fk_soc != (int) $cropplan->fk_soc) {
+			$langs->load('dolitrace@dolitrace');
+			$this->error = $langs->trans('ErrorTreatmentCropPlanFarm', $cropplan->ref);
+			return -1;
+		}
+		if (empty($this->fk_dossier) && !empty($cropplan->fk_dossier)) {
+			$this->fk_dossier = (int) $cropplan->fk_dossier;
+		}
+		return 1;
+	}
+
+	/**
+	 * Draft on surfaces: the area is the plot of the crop plan of the record (created, or moved to another crop plan)
+	 *
+	 * Bbch and treated surface typed by the user are kept while the crop plan does not change.
+	 *
+	 * @param	User	$user	User
+	 * @return	int				<0 if KO, 0 if nothing changed, >0 if OK
+	 */
+	public function syncCropPlanTarget(User $user)
+	{
+		global $langs;
+
+		if ($this->status != self::STATUS_DRAFT || (int) $this->technical_type != DoliTraceTreatmentTarget::TYPE_PLOT || empty($this->fk_cropplan)) {
+			return 0;
+		}
+		$cropplan = dolitraceTreatmentCropPlan($this->db, (int) $this->fk_cropplan);
+		if (!$cropplan) {
+			return 0;
+		}
+		if ($this->fetchLines() < 0) {
+			return -1;
+		}
+		$found = false;
+		$removed = 0;
+		foreach ($this->targets as $target) {
+			if ($target->target_type == DoliTraceTreatmentTarget::TYPE_PLOT && (int) $target->fk_cropplan == (int) $cropplan->rowid && !$found) {
+				$found = true;
+				continue;
+			}
+			// Area of another crop plan (the crop plan of the record changed) or a second area: removed
+			if ($target->delete($user) < 0) {
+				$this->setErrorsFromObject($target);
+				return -1;
+			}
+			$removed++;
+		}
+		if ($found) {
+			return ($removed ? ($this->fetchLines() < 0 ? -1 : 1) : 0);
+		}
+		$target = new DoliTraceTreatmentTarget($this->db);
+		$target->fk_treatment = $this->id;
+		$target->rang = 1;
+		$target->target_type = DoliTraceTreatmentTarget::TYPE_PLOT;
+		$target->fk_cropplan = (int) $cropplan->rowid;
+		$target->fk_plot = (int) $cropplan->fk_plot;
+		$target->fk_crop = (int) $cropplan->fk_crop;
+		$target->crop_label = $langs->transnoentitiesnoconv($cropplan->crop_label);
+		$target->crop_eppo = $cropplan->eppo_code;
+		$target->location_ref = $cropplan->iacs_parcel ? $cropplan->iacs_parcel : ($cropplan->cadastral_reference ? $cropplan->cadastral_reference : $cropplan->plot_ref);
+		$target->zone_zvn = (int) $cropplan->zone_zvn;
+		$target->treated_qty = ($cropplan->size_conducted > 0 ? $cropplan->size_conducted : ($cropplan->size_total > 0 ? $cropplan->size_total : null));
+		$target->treated_unit = 'HA';
+		if ($target->create($user) < 0) {
+			$this->setErrorsFromObject($target);
+			return -1;
+		}
+		return ($this->fetchLines() < 0 ? -1 : 1);
 	}
 
 	/**
@@ -703,8 +815,11 @@ class DoliTraceTreatment extends CommonObject
 			$this->error = 'ErrorTreatmentValidatedLocked';
 			return -1;
 		}
+		if ($this->setFromCropPlan() < 0) {
+			return -1;
+		}
 		$result = $this->updateCommon($user, $notrigger);
-		if ($result > 0 && ($this->fetchLines() < 0 || $this->updateAutoQuantities($user) < 0)) {
+		if ($result > 0 && ($this->syncCropPlanTarget($user) < 0 || $this->fetchLines() < 0 || $this->updateAutoQuantities($user) < 0)) {
 			return -1;
 		}
 		return $result;
@@ -1143,11 +1258,17 @@ class DoliTraceTreatment extends CommonObject
 			}
 		}
 
+		// Surfaces: one crop plan per record, the one of the record
+		if ((int) $this->technical_type == DoliTraceTreatmentTarget::TYPE_PLOT && empty($this->fk_cropplan)) {
+			$errors[] = $langs->trans('ErrorFieldRequired', $langs->transnoentitiesnoconv('TreatmentCropPlan'));
+		}
 		$cropplans = dolitraceTreatmentCropPlans($this->db, $this);
 		foreach ($this->targets as $target) {
 			$label = $target->location_ref ? $target->location_ref : $target->seed_batch;
 			if ($target->target_type != $this->technical_type) {
 				$errors[] = $langs->trans('ErrorTreatmentTargetType', $label);
+			} elseif ($target->target_type == DoliTraceTreatmentTarget::TYPE_PLOT && !empty($this->fk_cropplan) && (int) $target->fk_cropplan != (int) $this->fk_cropplan) {
+				$errors[] = $langs->trans('ErrorTreatmentOneCropPlan', $label);
 			} elseif ($target->target_type == DoliTraceTreatmentTarget::TYPE_PLOT && !isset($cropplans[$target->fk_cropplan])) {
 				$errors[] = $langs->trans('ErrorTreatmentCropPlanNotInProgress', $label, dol_print_date($this->date_start, 'day'));
 			}
@@ -1993,7 +2114,7 @@ class DoliTraceTreatment extends CommonObject
 
 		$this->db->begin();
 		$new = new self($this->db);
-		foreach (array('entity', 'kind', 'technical_type', 'fk_soc', 'fk_dossier', 'date_start', 'date_end', 'reason', 'fk_operator', 'fk_soc_contractor', 'contractor_mode',
+		foreach (array('entity', 'kind', 'technical_type', 'fk_soc', 'fk_dossier', 'fk_cropplan', 'date_start', 'date_end', 'reason', 'fk_operator', 'fk_soc_contractor', 'contractor_mode',
 			'contractor_signed', 'date_contractor_signed', 'delegation_ref', 'fk_machine', 'application_method', 'justification_type', 'justification_ref', 'water_volume', 'weather', 'note_public', 'note_private') as $key) {
 			$new->$key = $this->$key;
 		}

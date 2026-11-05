@@ -28,6 +28,7 @@
 dol_include_once('/dolifarm/lib/dolifarm_access.lib.php');
 dol_include_once('/dolifarm/lib/dolifarm_bio.lib.php');
 dol_include_once('/dolitrace/class/dolitracebioregister.class.php');
+dol_include_once('/dolitrace/class/dolitracecropplan.class.php');
 
 /**
  * Traceability of a harvested product
@@ -312,8 +313,8 @@ class DoliTraceTrace
 	/**
 	 * Operations of the crop plan up to the day of the harvest (not canceled), with the material used and its lot
 	 *
-	 * @param	int		$cropplanid		Crop plan
-	 * @param	int		$date			Day of the harvest
+	 * @param	int			$cropplanid		Crop plan
+	 * @param	int|null	$date			Day of the harvest, null for all the operations of the crop plan
 	 * @return	array<int,array<string,mixed>>
 	 */
 	private function getOperations($cropplanid, $date)
@@ -326,7 +327,9 @@ class DoliTraceTrace
 		$sql .= " FROM ".$prefix."dolitrace_operation as o";
 		$sql .= " LEFT JOIN ".$prefix."product as p ON p.rowid = o.fk_product";
 		$sql .= " WHERE o.fk_cropplan = ".((int) $cropplanid)." AND (o.status IS NULL OR o.status <> 9)";
-		$sql .= " AND o.date_op <= '".$this->db->idate(dol_mktime(23, 59, 59, (int) dol_print_date($date, '%m'), (int) dol_print_date($date, '%d'), (int) dol_print_date($date, '%Y')))."'";
+		if ($date !== null) {
+			$sql .= " AND o.date_op <= '".$this->db->idate(dol_mktime(23, 59, 59, (int) dol_print_date($date, '%m'), (int) dol_print_date($date, '%d'), (int) dol_print_date($date, '%Y')))."'";
+		}
 		$sql .= " ORDER BY o.date_op, o.rowid";
 		$resql = $this->db->query($sql);
 		if (!$resql) {
@@ -360,16 +363,16 @@ class DoliTraceTrace
 	 *
 	 * @param	int		$cropplanid		Crop plan
 	 * @param	int		$plotid			Plot
-	 * @param	int		$start			Start of the crop
-	 * @param	int		$date			Day of the harvest
-	 * @param	string	$cropeppo		EPPO code of the crop
+	 * @param	int			$start			Start of the crop
+	 * @param	int|null	$date			Day of the harvest, null for all the treatments of the crop plan (days before the harvest not computed)
+	 * @param	string		$cropeppo		EPPO code of the crop
 	 * @return	array<int,array<string,mixed>>
 	 */
 	private function getTreatments($cropplanid, $plotid, $start, $date, $cropeppo)
 	{
 		$prefix = $this->db->prefix();
 		$lines = array();
-		$end = dol_mktime(23, 59, 59, (int) dol_print_date($date, '%m'), (int) dol_print_date($date, '%d'), (int) dol_print_date($date, '%Y'));
+		$end = ($date !== null ? dol_mktime(23, 59, 59, (int) dol_print_date($date, '%m'), (int) dol_print_date($date, '%d'), (int) dol_print_date($date, '%Y')) : dol_mktime(23, 59, 59, 12, 31, 2099));
 		$sql = "SELECT DISTINCT t.rowid, t.ref, t.kind, t.date_start, t.date_end,";
 		$sql .= " tp.rowid as line_id, tp.fk_agrodrug, tp.fk_fertilizer, tp.product_label, tp.reg_number, tp.adversity_label, tp.dose, tp.dose_unit_label,";
 		$sql .= " tp.qty_total, tp.qty_unit, tp.batch, tp.n_applied, a.active_substance, a.safety_days_default";
@@ -379,7 +382,7 @@ class DoliTraceTrace
 		$sql .= " LEFT JOIN ".$prefix."dolifarm_agrodrug as a ON a.rowid = tp.fk_agrodrug";
 		$sql .= " WHERE t.status = 1 AND t.entity IN (".getEntity('dolitracetreatment').")";
 		$sql .= " AND t.date_start <= '".$this->db->idate($end)."'";
-		$sql .= " AND (tt.fk_cropplan = ".((int) $cropplanid);
+		$sql .= " AND (tt.fk_cropplan = ".((int) $cropplanid)." OR t.fk_cropplan = ".((int) $cropplanid);
 		if ($plotid > 0) {
 			$sql .= " OR (tt.fk_cropplan IS NULL AND tt.fk_plot = ".((int) $plotid)." AND t.date_start >= '".$this->db->idate($start)."')";
 		}
@@ -401,7 +404,7 @@ class DoliTraceTrace
 		foreach ($rows as $obj) {
 			$tdate = $this->db->jdate($obj->date_start);
 			$tend = $obj->date_end ? $this->db->jdate($obj->date_end) : $tdate;
-			$days = $harvestday - (int) floor($tend / 86400);
+			$days = ($date !== null ? $harvestday - (int) floor($tend / 86400) : null);
 			$safety = null;
 			$organicresult = '';
 			if ((int) $obj->fk_agrodrug > 0) {
@@ -424,7 +427,7 @@ class DoliTraceTrace
 				'adversity' => (string) $obj->adversity_label, 'dose' => $obj->dose !== null ? (float) $obj->dose : null, 'dose_unit' => (string) $obj->dose_unit_label,
 				'qty' => $obj->qty_total !== null ? (float) $obj->qty_total : null, 'unit' => (string) $obj->qty_unit, 'batch' => (string) $obj->batch,
 				'n_applied' => $obj->n_applied !== null ? (float) $obj->n_applied : null,
-				'days_before' => $days, 'safety_days' => $safety, 'safety_ok' => ($safety !== null && $safety > 0 ? $days >= $safety : null),
+				'days_before' => $days, 'safety_days' => $safety, 'safety_ok' => ($days !== null && $safety !== null && $safety > 0 ? $days >= $safety : null),
 				'organic_result' => $organicresult,
 			);
 		}
@@ -504,16 +507,20 @@ class DoliTraceTrace
 	/**
 	 * Treatments still in draft on the crop plan before the harvest: they are not in the history
 	 *
-	 * @param	int		$cropplanid		Crop plan
-	 * @param	int		$date			Day of the harvest
+	 * @param	int			$cropplanid		Crop plan
+	 * @param	int|null	$date			Day of the harvest, null for all the drafts of the crop plan
 	 * @return	int
 	 */
 	private function countDraftTreatments($cropplanid, $date)
 	{
-		$end = dol_mktime(23, 59, 59, (int) dol_print_date($date, '%m'), (int) dol_print_date($date, '%d'), (int) dol_print_date($date, '%Y'));
 		$sql = "SELECT COUNT(DISTINCT t.rowid) as nb FROM ".$this->db->prefix()."dolitrace_treatment as t";
-		$sql .= " INNER JOIN ".$this->db->prefix()."dolitrace_treatment_target as tt ON tt.fk_treatment = t.rowid";
-		$sql .= " WHERE t.status = 0 AND tt.fk_cropplan = ".((int) $cropplanid)." AND t.date_start <= '".$this->db->idate($end)."'";
+		$sql .= " LEFT JOIN ".$this->db->prefix()."dolitrace_treatment_target as tt ON tt.fk_treatment = t.rowid";
+		$sql .= " WHERE t.status = 0 AND (tt.fk_cropplan = ".((int) $cropplanid)." OR t.fk_cropplan = ".((int) $cropplanid).")";
+		$sql .= " AND t.entity IN (".getEntity('dolitracetreatment').")";
+		if ($date !== null) {
+			$end = dol_mktime(23, 59, 59, (int) dol_print_date($date, '%m'), (int) dol_print_date($date, '%d'), (int) dol_print_date($date, '%Y'));
+			$sql .= " AND t.date_start <= '".$this->db->idate($end)."'";
+		}
 		$resql = $this->db->query($sql);
 		$obj = $resql ? $this->db->fetch_object($resql) : null;
 		return $obj ? (int) $obj->nb : 0;
@@ -650,7 +657,7 @@ class DoliTraceTrace
 				$rows[] = array($day($line['date']), $line['ref'], $line['type_label'], $line['product'], $line['batch'], $line['seed_status'].($line['bdsb_ref'] !== '' ? ' '.$line['bdsb_ref'] : ''));
 			}
 			$html .= '<h3>'.$esc($outputlangs->transnoentities('TraceSectionOperations')).'</h3>';
-			$html .= $table(array(array('Date', 12), array('Ref', 16), array('Type', 20), array('Product', 26), array('Batch', 14), array('BioRegisterStatus', 12)), $rows);
+			$html .= $table(array(array('Date', 12), array('Ref', 16), array('Type', 20), array('Product', 26), array('HarvestBatch', 14), array('BioRegisterStatus', 12)), $rows);
 		}
 
 		if (isset($history['treatments'])) {
@@ -663,7 +670,7 @@ class DoliTraceTrace
 				);
 			}
 			$html .= '<h3>'.$esc($outputlangs->transnoentities('TraceSectionTreatments')).'</h3>';
-			$html .= $table(array(array('Date', 11), array('Ref', 14), array('Product', 27), array('TraceAdversity', 16), array('Qty', 11), array('Batch', 11), array('TraceDaysSafety', 10)), $rows);
+			$html .= $table(array(array('Date', 11), array('Ref', 14), array('Product', 27), array('TraceAdversity', 16), array('Qty', 11), array('HarvestBatch', 11), array('TraceDaysSafety', 10)), $rows);
 		}
 
 		if (isset($history['movements'])) {
@@ -690,5 +697,399 @@ class DoliTraceTrace
 		}
 		$pdf->writeHTML($html, true, false, true, false, '');
 		return $pdf->Output('', 'S');
+	}
+	/**
+	 * History of a crop plan: farm, plot, crop, all its operations and validated treatments, its harvests with their
+	 * lots, the stock and the recipients of the lots. The traceability of a product follows the history of its crop plan.
+	 * For each plant protection treatment, the days to the first following harvest and the pre-harvest interval.
+	 * The sections the user has no right to read are not loaded (key missing).
+	 *
+	 * @param	User		$user			User
+	 * @param	int			$cropplanid		Crop plan
+	 * @param	Translate	$outputlangs	Language of the labels
+	 * @return	array<string,mixed>|int		History, 0 if not found or not visible, <0 if KO
+	 */
+	public function getCropPlanHistory(User $user, $cropplanid, Translate $outputlangs)
+	{
+		$prefix = $this->db->prefix();
+		$outputlangs->loadLangs(array('dolifarm@dolifarm', 'dolitrace@dolitrace'));
+
+		$sql = "SELECT cp.rowid, cp.ref, cp.label, cp.season, cp.date_start, cp.date_end, cp.status, cp.fk_soc, cp.fk_plot, cp.fk_dossier,";
+		$sql .= " c.label as crop_label, c.eppo_code as crop_eppo,";
+		$sql .= " pl.ref as plot_ref, pl.label as plot_label, pl.cadastral_comune, pl.cadastral_sheet, pl.cadastral_parcel, pl.size_sau, pl.size_total,";
+		$sql .= " d.ref as dossier_ref";
+		$sql .= " FROM ".$prefix."dolitrace_cropplan as cp";
+		$sql .= " LEFT JOIN ".$prefix."dolifarm_crops as c ON c.rowid = cp.fk_crop";
+		$sql .= " LEFT JOIN ".$prefix."dolifarm_plot as pl ON pl.rowid = cp.fk_plot";
+		$sql .= " LEFT JOIN ".$prefix."dolifarm_farmdossier as d ON d.rowid = cp.fk_dossier";
+		$sql .= " WHERE cp.rowid = ".((int) $cropplanid)." AND cp.entity IN (".getEntity('dolitracecropplan').")";
+		$sql .= dolifarmSqlSocFilter($user, 'cp.fk_soc');
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+		$obj = $this->db->fetch_object($resql);
+		$this->db->free($resql);
+		if (!$obj) {
+			return 0;
+		}
+
+		$register = new DoliTraceBioRegister($this->db);
+		$biolabels = $register->getBioStatusLabels();
+		$plotcode = ((int) $obj->fk_plot > 0 ? dolifarmBioStatusAt($this->db, (int) $obj->fk_plot, dol_now()) : '');
+		$cropstart = $obj->date_start ? $this->db->jdate($obj->date_start) : dol_mktime(0, 0, 0, 1, 1, (int) $obj->season);
+		$cropplanobj = new DoliTraceCropplan($this->db);
+
+		$history = array(
+			'cropplan' => array(
+				'id' => (int) $obj->rowid, 'ref' => (string) $obj->ref, 'label' => (string) $obj->label, 'season' => (int) $obj->season,
+				'crop' => $outputlangs->transnoentities((string) $obj->crop_label), 'crop_eppo' => strtoupper((string) $obj->crop_eppo),
+				'date_start' => $obj->date_start ? $this->db->jdate($obj->date_start) : null, 'date_end' => $obj->date_end ? $this->db->jdate($obj->date_end) : null,
+				'status' => (int) $obj->status, 'status_label' => dol_string_nohtmltag($cropplanobj->LibStatut((int) $obj->status, 0)),
+			),
+			'farm' => array(
+				'socid' => (int) $obj->fk_soc, 'dossier' => (string) $obj->dossier_ref,
+				'header' => $register->getFarmHeader((int) $obj->fk_soc, $outputlangs),
+			),
+			'plot' => array(
+				'id' => (int) $obj->fk_plot, 'ref' => (string) $obj->plot_ref, 'label' => (string) $obj->plot_label, 'comune' => (string) $obj->cadastral_comune,
+				'sheet' => (string) $obj->cadastral_sheet, 'parcel' => (string) $obj->cadastral_parcel,
+				'surface' => $obj->size_sau !== null && (float) $obj->size_sau > 0 ? (float) $obj->size_sau : ($obj->size_total !== null ? (float) $obj->size_total : null),
+				'bio_code' => $plotcode, 'bio_label' => $biolabels[$plotcode] ?? $plotcode,
+			),
+			'harvests' => $this->getCropPlanHarvests((int) $obj->rowid),
+			'warnings' => array(),
+		);
+
+		if ($user->hasRight('dolitrace', 'dolitraceoperation', 'read')) {
+			$history['operations'] = $this->getOperations((int) $obj->rowid, null);
+		}
+		if ($user->hasRight('dolitrace', 'dolitracetreatment', 'read')) {
+			$treatments = $this->getTreatments((int) $obj->rowid, (int) $obj->fk_plot, $cropstart, null, $history['cropplan']['crop_eppo']);
+			// Days from each treatment to the first following harvest, and the pre-harvest interval
+			$harvestdays = array();
+			foreach ($history['harvests'] as $harvest) {
+				if ($harvest['date']) {
+					$harvestdays[] = array((int) floor($harvest['date'] / 86400), $harvest['ref']);
+				}
+			}
+			sort($harvestdays);
+			foreach ($treatments as $i => $line) {
+				$day = (int) floor($line['date_end'] / 86400);
+				foreach ($harvestdays as $harvestday) {
+					if ($harvestday[0] >= $day) {
+						$treatments[$i]['days_before'] = $harvestday[0] - $day;
+						$treatments[$i]['harvest_ref'] = $harvestday[1];
+						if ($line['safety_days'] !== null && $line['safety_days'] > 0) {
+							$treatments[$i]['safety_ok'] = ($harvestday[0] - $day >= $line['safety_days']);
+						}
+						break;
+					}
+				}
+			}
+			$history['treatments'] = $treatments;
+			$history['treatment_summary'] = $this->getTreatmentSummary($treatments, null);
+			$drafts = $this->countDraftTreatments((int) $obj->rowid, null);
+			if ($drafts > 0) {
+				$history['warnings'][] = $outputlangs->transnoentities('CropPlanHistoryWarningDraftTreatments', $drafts);
+			}
+			foreach ($treatments as $line) {
+				if ($line['safety_ok'] === false) {
+					$history['warnings'][] = $outputlangs->transnoentities('TraceWarningSafety', $line['product_label'], dol_print_date($line['date'], 'day', 'tzserver', $outputlangs), $line['safety_days'], $line['days_before']);
+				}
+			}
+		}
+
+		// Lots of the harvests: stock and recipients
+		if (isModEnabled('stock') && $user->hasRight('stock', 'lire')) {
+			$history['lots'] = array();
+			foreach ($history['harvests'] as $harvest) {
+				if ($harvest['product_id'] <= 0 || $harvest['batch'] === '') {
+					continue;
+				}
+				$key = $harvest['product_id'].'|'.$harvest['batch'];
+				if (isset($history['lots'][$key])) {
+					continue;
+				}
+				$lot = array('product' => $harvest['product'], 'batch' => $harvest['batch'], 'stock' => $this->getStock($harvest['product_id'], $harvest['batch']), 'movements' => array(), 'customers' => array());
+				$movements = $register->getMovements(array(), '', '', '', $harvest['product_id']);
+				if (is_array($movements)) {
+					foreach ($movements as $line) {
+						if ($line['batch'] === $harvest['batch']) {
+							$lot['movements'][] = $line;
+							if ($line['origin'] == 'SHIPPING' && $line['thirdparty'] !== '') {
+								$lot['customers'][$line['thirdparty']] = ($lot['customers'][$line['thirdparty']] ?? 0) + (float) $line['qty_out'] - (float) $line['qty_in'];
+							}
+						}
+					}
+				}
+				$history['lots'][$key] = $lot;
+			}
+			$history['lots'] = array_values($history['lots']);
+		}
+
+		$notvalidated = 0;
+		foreach ($history['harvests'] as $harvest) {
+			$notvalidated += ($harvest['status'] != 1 ? 1 : 0);
+		}
+		if ($notvalidated) {
+			$history['warnings'][] = $outputlangs->transnoentities('CropPlanHistoryWarningHarvestDraft', $notvalidated);
+		}
+		return $history;
+	}
+
+	/**
+	 * Harvests of a crop plan, not canceled
+	 *
+	 * @param	int		$cropplanid		Crop plan
+	 * @return	array<int,array<string,mixed>>
+	 */
+	private function getCropPlanHarvests($cropplanid)
+	{
+		$prefix = $this->db->prefix();
+		$lines = array();
+		$sql = "SELECT h.rowid, h.ref, h.uuid, h.date_harvest, h.qty_harvested, h.qty_unit, h.batch_number, h.bio_status, h.status, h.fk_product_out,";
+		$sql .= " p.ref as product_ref, p.label as product_label";
+		$sql .= " FROM ".$prefix."dolitrace_harvest as h";
+		$sql .= " LEFT JOIN ".$prefix."product as p ON p.rowid = h.fk_product_out";
+		$sql .= " WHERE h.fk_cropplan = ".((int) $cropplanid)." AND (h.status IS NULL OR h.status <> 9)";
+		$sql .= " AND h.entity IN (".getEntity('dolitraceharvest').")";
+		$sql .= " ORDER BY h.date_harvest, h.rowid";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
+			return $lines;
+		}
+		while ($obj = $this->db->fetch_object($resql)) {
+			$lines[] = array(
+				'id' => (int) $obj->rowid, 'ref' => (string) $obj->ref, 'uuid' => (string) $obj->uuid, 'short' => self::shortCode($obj->uuid),
+				'date' => $this->db->jdate($obj->date_harvest), 'product_id' => (int) $obj->fk_product_out,
+				'product' => trim($obj->product_ref.' - '.$obj->product_label, ' -'),
+				'qty' => $obj->qty_harvested !== null ? (float) $obj->qty_harvested : null, 'unit' => (string) $obj->qty_unit,
+				'batch' => (string) $obj->batch_number, 'bio_status' => (string) $obj->bio_status, 'status' => (int) $obj->status,
+			);
+		}
+		$this->db->free($resql);
+		return $lines;
+	}
+
+	/**
+	 * History of a crop plan in HTML: on screen with the styles of Dolibarr, or for the PDF
+	 *
+	 * @param	array<string,mixed>	$history		History (getCropPlanHistory)
+	 * @param	Translate			$outputlangs	Language
+	 * @param	bool				$forpdf			True for the PDF (TCPDF), false for the screen
+	 * @return	string								HTML
+	 */
+	public function cropPlanHistoryHtml($history, Translate $outputlangs, $forpdf = false)
+	{
+		$outputlangs->loadLangs(array('main', 'products', 'productbatch', 'stocks', 'dolitrace@dolitrace', 'dolifarm@dolifarm'));
+		$esc = function ($text) {
+			return dol_escape_htmltag((string) $text);
+		};
+		$day = function ($date) use ($outputlangs) {
+			return $date ? dol_print_date($date, 'day', 'tzserver', $outputlangs) : '';
+		};
+		$num = function ($value) use ($outputlangs) {
+			return $value === null ? '' : price(price2num($value, 'MS'), 0, $outputlangs);
+		};
+		$title = function ($key, $level = 3) use ($esc, $outputlangs, $forpdf) {
+			return $forpdf ? '<h'.$level.'>'.$esc($outputlangs->transnoentities($key)).'</h'.$level.'>' : '<div class="titre inline-block margintoponly marginbottomonly">'.$esc($outputlangs->trans($key)).'</div>';
+		};
+		$table = function ($headers, $rows) use ($esc, $outputlangs, $forpdf) {
+			$html = $forpdf ? '<table border="0.3" cellpadding="2"><tr style="background-color:#e8e8e8; font-weight:bold;">' : '<div class="div-table-responsive-no-min"><table class="noborder centpercent"><tr class="liste_titre">';
+			foreach ($headers as $header) {
+				$html .= '<th'.($forpdf ? ' width="'.$header[1].'%"' : '').'>'.$esc($outputlangs->transnoentities($header[0])).'</th>';
+			}
+			$html .= '</tr>';
+			if (empty($rows)) {
+				$html .= '<tr'.($forpdf ? '' : ' class="oddeven"').'><td'.($forpdf ? ' width="100%"' : ' colspan="'.count($headers).'"').'><span class="opacitymedium">'.$esc($outputlangs->transnoentities('None')).'</span></td></tr>';
+			}
+			foreach ($rows as $row) {
+				$html .= $forpdf ? '<tr nobr="true">' : '<tr class="oddeven">';
+				foreach ($row as $i => $cell) {
+					$html .= '<td'.($forpdf ? ' width="'.$headers[$i][1].'%"' : '').'>'.$esc($cell).'</td>';
+				}
+				$html .= '</tr>';
+			}
+			return $html.'</table>'.($forpdf ? '' : '</div>');
+		};
+		$pairs = function ($rows) use ($esc, $outputlangs, $forpdf) {
+			$html = $forpdf ? '<table cellpadding="1">' : '<table class="border centpercent tableforfield">';
+			foreach ($rows as $row) {
+				if ((string) $row[1] !== '') {
+					$html .= '<tr><td'.($forpdf ? ' width="30%"><b>' : ' class="titlefield">').$esc($outputlangs->transnoentities($row[0])).($forpdf ? '</b>' : '').'</td><td'.($forpdf ? ' width="70%"' : '').'>'.$esc($row[1]).'</td></tr>';
+				}
+			}
+			return $html.'</table>';
+		};
+
+		$cp = $history['cropplan'];
+		$p = $history['plot'];
+		$html = '';
+		if ($forpdf) {
+			$html .= '<h2>'.$esc($outputlangs->transnoentities('CropPlanHistoryTitle', $cp['ref'])).'</h2>';
+			foreach ($history['farm']['header'] as $line) {
+				$html .= $esc($line).'<br>';
+			}
+			$html .= $esc($outputlangs->transnoentities('TreatmentPdfGenerated', dol_print_date(dol_now(), 'dayhour', 'tzuser', $outputlangs)));
+		}
+
+		$html .= $title('TraceSectionOrigin');
+		$html .= $pairs(array(
+			array('TraceDossier', $history['farm']['dossier']), array('BioRegisterPlot', trim($p['ref'].' - '.$p['label'], ' -')),
+			array('TraceCadastral', trim($p['comune'].' '.($p['sheet'] !== '' ? $outputlangs->transnoentities('TraceSheetParcel', $p['sheet'], $p['parcel']) : ''))),
+			array('BioRegisterSurface', $p['surface'] !== null ? $num($p['surface']).' ha' : ''), array('BioRegisterPlotStatusAtDate', $p['bio_label']),
+			array('BioRegisterCropPlan', trim($cp['ref'].' - '.$cp['label'], ' -')), array('BioRegisterCrop', $cp['crop'].($cp['crop_eppo'] !== '' ? ' ('.$cp['crop_eppo'].')' : '')),
+			array('TraceCropPeriod', trim($day($cp['date_start']).' - '.$day($cp['date_end']), ' -')), array('Status', $cp['status_label']),
+		));
+
+		if (isset($history['operations'])) {
+			$rows = array();
+			foreach ($history['operations'] as $line) {
+				$rows[] = array($day($line['date']), $line['ref'], $line['type_label'], $line['label'], $line['product'], $line['batch'], $line['qty'] !== null ? $num($line['qty']) : '',
+					$line['seed_status'].($line['bdsb_ref'] !== '' ? ' '.$line['bdsb_ref'] : ''));
+			}
+			$html .= $title('TraceSectionOperations');
+			$html .= $table(array(array('Date', 10), array('Ref', 13), array('Type', 15), array('Label', 18), array('Product', 18), array('HarvestBatch', 10), array('Qty', 7), array('BioRegisterStatus', 9)), $rows);
+		}
+
+		if (isset($history['treatments'])) {
+			$summary = $history['treatment_summary'];
+			$rows = array();
+			foreach ($history['treatments'] as $line) {
+				$rows[] = array(
+					$day($line['date']), $line['ref'], $outputlangs->transnoentities($line['kind'] == 2 ? 'TreatmentKindFertilization' : 'TreatmentKindPlantProtection'),
+					$line['product_label'].($line['reg_number'] !== '' ? ' ('.$line['reg_number'].')' : ''), $line['adversity'],
+					$line['dose'] !== null ? $num($line['dose']).' '.$line['dose_unit'] : '', $line['qty'] !== null ? $num($line['qty']).' '.$line['unit'] : '', $line['batch'],
+					$line['days_before'] !== null ? $line['days_before'].($line['safety_days'] !== null ? ' / '.$line['safety_days'] : '').($line['safety_ok'] === false ? ' !' : '') : '',
+				);
+			}
+			$html .= $title('CropPlanHistoryTreatments');
+			$html .= '<p>'.$esc($outputlangs->transnoentities('TraceSummary', $summary['protection'], $summary['fertilization']));
+			if ($summary['all_organic']) {
+				$html .= ' '.$esc($outputlangs->transnoentities('TraceSummaryOrganic'));
+			}
+			$html .= '</p>';
+			$html .= $table(array(array('Date', 9), array('Ref', 12), array('TreatmentKind', 11), array('Product', 19), array('TraceAdversity', 13), array('TraceDose', 9), array('Qty', 9), array('HarvestBatch', 8), array('CropPlanHistoryDaysSafety', 10)), $rows);
+		}
+
+		$rows = array();
+		foreach ($history['harvests'] as $line) {
+			$rows[] = array($day($line['date']), $line['ref'], $line['product'], $line['batch'], $line['qty'] !== null ? $num($line['qty']).' '.$line['unit'] : '',
+				$line['bio_status'], $line['short'], $outputlangs->transnoentities($line['status'] == 1 ? 'Validated' : 'Draft'));
+		}
+		$html .= $title('CropPlanHistoryHarvests');
+		$html .= $table(array(array('Date', 10), array('Ref', 15), array('Product', 22), array('HarvestBatch', 14), array('Qty', 11), array('BioRegisterStatus', 9), array('TraceShortCode', 10), array('Status', 9)), $rows);
+
+		if (isset($history['lots'])) {
+			$html .= $title('TraceSectionDownstream');
+			foreach ($history['lots'] as $lot) {
+				$html .= ($forpdf ? '<h4>' : '<div class="margintoponly"><strong>').$esc($lot['product'].' - '.$outputlangs->transnoentities('HarvestBatch').' '.$lot['batch']).($forpdf ? '</h4>' : '</strong></div>');
+				$rows = array();
+				foreach ($lot['movements'] as $line) {
+					$rows[] = array($day($line['date']), $outputlangs->transnoentities('BioRegisterOrigin'.ucfirst(strtolower($line['origin']))), $line['document'], $line['thirdparty'], $line['warehouse'],
+						$line['qty_in'] !== null ? $num($line['qty_in']) : '', $line['qty_out'] !== null ? $num($line['qty_out']) : '');
+				}
+				$html .= $table(array(array('Date', 11), array('BioRegisterOrigin', 14), array('BioRegisterDocument', 16), array('ThirdParty', 22), array('Warehouse', 15), array('BioRegisterIn', 11), array('BioRegisterOut', 11)), $rows);
+				$stock = array();
+				foreach ($lot['stock'] as $line) {
+					$stock[] = $line['warehouse'].': '.$num($line['qty']);
+				}
+				$html .= '<p>'.$esc($outputlangs->transnoentities('TraceStockNow')).': '.$esc(count($stock) ? implode(', ', $stock) : '0');
+				if (count($lot['customers'])) {
+					$customers = array();
+					foreach ($lot['customers'] as $name => $qty) {
+						$customers[] = $name.' ('.$num($qty).')';
+					}
+					$html .= '<br>'.$esc($outputlangs->transnoentities('TraceCustomers')).': '.$esc(implode(', ', $customers));
+				}
+				$html .= '</p>';
+			}
+		}
+
+		if (count($history['warnings'])) {
+			$html .= $title('TraceSectionWarnings');
+			$html .= $forpdf ? '<p>' : '<div class="warning">';
+			foreach ($history['warnings'] as $warning) {
+				$html .= $esc($warning).'<br>';
+			}
+			$html .= $forpdf ? '</p>' : '</div>';
+		}
+		return $html;
+	}
+
+	/**
+	 * History of a crop plan in PDF (portrait)
+	 *
+	 * @param	array<string,mixed>	$history		History (getCropPlanHistory)
+	 * @param	Translate			$outputlangs	Language
+	 * @return	string								Content of the PDF
+	 */
+	public function cropPlanToPdf($history, Translate $outputlangs)
+	{
+		global $mysoc;
+
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/pdf.lib.php';
+		$outputlangs->loadLangs(array('main', 'dolitrace@dolitrace'));
+		$title = $outputlangs->transnoentities('CropPlanHistoryTitle', $history['cropplan']['ref']);
+		$format = pdf_getFormat($outputlangs);
+		$pdf = pdf_getInstance(array($format['width'], $format['height']), 'mm', 'P');
+		$pdf->SetCreator('Dolibarr '.DOL_VERSION);
+		$pdf->SetTitle($outputlangs->convToOutputCharset($title));
+		$pdf->SetAuthor($outputlangs->convToOutputCharset($mysoc->name));
+		$pdf->setPrintHeader(false);
+		$pdf->setPrintFooter(true);
+		$pdf->SetMargins(10, 10, 10);
+		$pdf->SetAutoPageBreak(true, 12);
+		$pdf->SetFont(pdf_getPDFFont($outputlangs), '', 8);
+		$pdf->AddPage();
+		$pdf->writeHTML($this->cropPlanHistoryHtml($history, $outputlangs, true), true, false, true, false, '');
+		return $pdf->Output('', 'S');
+	}
+
+	/**
+	 * History of a crop plan in CSV: one line per event, in order of date (operations, treatments, harvests, movements of the lots)
+	 *
+	 * @param	array<string,mixed>	$history		History (getCropPlanHistory)
+	 * @param	Translate			$outputlangs	Language
+	 * @return	string								CSV (UTF-8 with BOM, separator ";")
+	 */
+	public function cropPlanToCsv($history, Translate $outputlangs)
+	{
+		$outputlangs->loadLangs(array('main', 'dolitrace@dolitrace'));
+		$events = array();
+		foreach ($history['operations'] ?? array() as $line) {
+			$events[] = array($line['date'], 'operation', $line['ref'], $line['type_label'], $line['label'], $line['product'], $line['batch'], $line['qty'], '', '', '');
+		}
+		foreach ($history['treatments'] ?? array() as $line) {
+			$events[] = array($line['date'], $line['kind'] == 2 ? 'fertilization' : 'plant_protection', $line['ref'], $line['reg_number'], $line['adversity'], $line['product_label'], $line['batch'],
+				$line['qty'], $line['unit'], $line['dose'] !== null ? $line['dose'].' '.$line['dose_unit'] : '', $line['days_before'] !== null ? $line['days_before'].($line['safety_days'] !== null ? '/'.$line['safety_days'] : '') : '');
+		}
+		foreach ($history['harvests'] as $line) {
+			$events[] = array($line['date'], 'harvest', $line['ref'], $line['uuid'], $line['bio_status'], $line['product'], $line['batch'], $line['qty'], $line['unit'], '', '');
+		}
+		foreach ($history['lots'] ?? array() as $lot) {
+			foreach ($lot['movements'] as $line) {
+				$events[] = array($line['date'], 'stock_'.strtolower($line['origin']), $line['document'], $line['warehouse'], $line['thirdparty'], $lot['product'], $lot['batch'],
+					(float) $line['qty_in'] - (float) $line['qty_out'], '', '', '');
+			}
+		}
+		usort($events, function ($a, $b) {
+			return ((int) $a[0]) <=> ((int) $b[0]);
+		});
+		$out = fopen('php://temp', 'r+');
+		fwrite($out, "\xEF\xBB\xBF");
+		fputcsv($out, array('cropplan', 'plot', 'crop_eppo', 'date', 'event', 'ref', 'code', 'description', 'product', 'batch', 'qty', 'unit', 'dose', 'days_to_harvest'), ';', '"', '\\');
+		$cp = $history['cropplan'];
+		foreach ($events as $event) {
+			$date = array_shift($event);
+			fputcsv($out, array_merge(array($cp['ref'], $history['plot']['ref'], $cp['crop_eppo'], $date ? dol_print_date($date, '%Y-%m-%d', 'tzserver') : ''), array_map('strval', $event)), ';', '"', '\\');
+		}
+		rewind($out);
+		$csv = stream_get_contents($out);
+		fclose($out);
+		return $csv;
 	}
 }

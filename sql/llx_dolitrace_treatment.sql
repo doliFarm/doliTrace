@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS llx_dolitrace_treatment(
 	technical_type			smallint DEFAULT 1 NOT NULL,		-- 1 surfaces, 2 closed spaces, 3 seeds
 	fk_soc					integer NOT NULL,					-- farm
 	fk_dossier				integer,
+	fk_cropplan				integer,						-- surfaces: the crop plan of the record (one per record)
 	date_start				datetime NOT NULL,
 	date_end				datetime,
 	reason					varchar(255),
