@@ -152,6 +152,13 @@ include DOL_DOCUMENT_ROOT.'/core/actions_fetchobject.inc.php'; // Must be 'inclu
 // Se la pagina viene ricaricata (dal cambio select Farm), il valore arriva in GET.
 // Dobbiamo forzarlo nell'oggetto PRIMA di qualsiasi operazione di visualizzazione.
 // ==============================================================================
+// Single-farm mode: the farm of the setup, not editable (doliFarm)
+dol_include_once('/dolifarm/lib/dolifarm_farm.lib.php');
+dolifarmPrefillFarm($db, $object, $action);
+$singlefarm = dolifarmSingleFarmSocid();
+if ($singlefarm > 0 && $action == 'update') {
+    $_POST['fk_soc'] = $singlefarm;
+}
 $user_selected_soc = GETPOSTINT('fk_soc');
 if ($user_selected_soc > 0) {
     $object->fk_soc = $user_selected_soc;
@@ -280,6 +287,17 @@ if ($farm_type_id > 0) {
 } else {
     $filter_farm_sql = "(s.status:=:1)";
 }
+// Only the managed farms of doliFarm
+$managedfarms = dolifarmManagedFarmIds();
+if ($managedfarms !== null) {
+    $filter_farm_sql .= " AND (s.rowid:IN:".(empty($managedfarms) ? '0' : implode(',', $managedfarms)).")";
+}
+$farmfixedhtml = '';
+if ($singlefarm > 0) {
+    require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+    $farmfixed = new Societe($db);
+    $farmfixedhtml = ($farmfixed->fetch($singlefarm) > 0 ? $farmfixed->getNomUrl(1) : '').'<input type="hidden" name="fk_soc" value="'.$singlefarm.'">';
+}
 
 // Part to create
 if ($action == 'create') {
@@ -314,21 +332,25 @@ if ($action == 'create') {
     print '<td class="titlefield create">' . $langs->trans("Farm") . '</td>';
     print '<td>';
     
-    // Stampa select pulita (senza onchange inline che conflitto con Select2)
-    print $form->select_company($object->fk_soc, 'fk_soc', $filter_farm_sql, 1, 0, 0);
+    if ($farmfixedhtml) {
+        print $farmfixedhtml;
+    } else {
+        // Stampa select pulita (senza onchange inline che conflitto con Select2)
+        print $form->select_company($object->fk_soc, 'fk_soc', $filter_farm_sql, 1, 0, 0);
     
-    // SCRIPT JQUERY ROBUSTO PER RELOAD
-    // Usa $(document).ready e aggancia l'evento 'change' in modo sicuro anche su Select2
-    ?>
-    <script type="text/javascript">
-        jQuery(document).ready(function() {
-            jQuery("#fk_soc").change(function() {
-                var newUrl = '<?php echo $_SERVER["PHP_SELF"]; ?>?action=create&fk_soc=' + jQuery(this).val();
-                window.location.href = newUrl;
+        // SCRIPT JQUERY ROBUSTO PER RELOAD
+        // Usa $(document).ready e aggancia l'evento 'change' in modo sicuro anche su Select2
+        ?>
+        <script type="text/javascript">
+            jQuery(document).ready(function() {
+                jQuery("#fk_soc").change(function() {
+                    var newUrl = '<?php echo $_SERVER["PHP_SELF"]; ?>?action=create&fk_soc=' + jQuery(this).val();
+                    window.location.href = newUrl;
+                });
             });
-        });
-    </script>
-    <?php
+        </script>
+        <?php
+    }
     print '</td></tr>';
     
     // Rimuoviamo da fields per non duplicare
@@ -394,19 +416,23 @@ if (($id || $ref) && $action == 'edit') {
     print '<td class="titlefield">' . $langs->trans("Farm") . '</td>';
     print '<td>';
     
-    print $form->select_company($object->fk_soc, 'fk_soc', $filter_farm_sql, 1, 0, 0);
+    if ($farmfixedhtml) {
+        print $farmfixedhtml;
+    } else {
+        print $form->select_company($object->fk_soc, 'fk_soc', $filter_farm_sql, 1, 0, 0);
     
-    // SCRIPT JQUERY ROBUSTO PER RELOAD (Edit Mode)
-    ?>
-    <script type="text/javascript">
-        jQuery(document).ready(function() {
-            jQuery("#fk_soc").change(function() {
-                var newUrl = '<?php echo $_SERVER["PHP_SELF"]; ?>?action=edit&id=<?php echo $object->id; ?>&fk_soc=' + jQuery(this).val();
-                window.location.href = newUrl;
+        // SCRIPT JQUERY ROBUSTO PER RELOAD (Edit Mode)
+        ?>
+        <script type="text/javascript">
+            jQuery(document).ready(function() {
+                jQuery("#fk_soc").change(function() {
+                    var newUrl = '<?php echo $_SERVER["PHP_SELF"]; ?>?action=edit&id=<?php echo $object->id; ?>&fk_soc=' + jQuery(this).val();
+                    window.location.href = newUrl;
+                });
             });
-        });
-    </script>
-    <?php
+        </script>
+        <?php
+    }
     print '</td></tr>';
     unset($object->fields['fk_soc']);
 

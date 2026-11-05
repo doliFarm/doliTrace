@@ -253,11 +253,6 @@ class DoliTraceCropplan extends CommonObject
 
 		dol_include_once('/dolifarm/lib/dolifarm_icons.lib.php');
 		$this->picto = dolifarm_get_fa_icon('cropplan');
-		// Drop-down lists only with the farms the user can see (doliFarm >= 1.3.1)
-		dol_include_once('/dolifarm/lib/dolifarm_access.lib.php');
-		if (function_exists('dolifarmRestrictLinkFields')) {
-			dolifarmRestrictLinkFields($this, array('fk_dossier', 'fk_plot'));
-		}
 
         if (!getDolGlobalInt('MAIN_SHOW_TECHNICAL_ID') && isset($this->fields['rowid']) && !empty($this->fields['ref'])) {
             $this->fields['rowid']['visible'] = 0;
@@ -283,6 +278,11 @@ class DoliTraceCropplan extends CommonObject
         }
         // Filtriamo le aziende agricole
         $this->fields['fk_soc']['type'] = "integer:Societe:societe/class/societe.class.php:1:$filter_farm";
+		// Drop-down lists only with the farms the user can see, farm only among the managed farms (doliFarm)
+		dol_include_once('/dolifarm/lib/dolifarm_access.lib.php');
+		if (function_exists('dolifarmRestrictLinkFields')) {
+			dolifarmRestrictLinkFields($this, array('fk_dossier', 'fk_plot'));
+		}
       //   $this->fields['fk_plot']['type'] = "integer:DoliFarmPlot:custom/dolifarm/class/dolifarmplot.class.php:1:(fk_soc:=:13)";
 
         // Unset fields that are disabled
