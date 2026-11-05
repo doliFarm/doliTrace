@@ -1,5 +1,35 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.3.0
+
+Tracciabilità delle raccolte, trattamenti dal piano di produzione, ispezioni bio, lotti e costi del piano. Richiede doliFarm 1.5.0 o successiva: aggiornare doliFarm prima di doliTrace, poi disattivare e riattivare doliTrace (tabelle delle ispezioni e del preventivo, colonne nuove su trattamenti, operazioni e piani, menu). Requisito minimo PHP 8.2 e Dolibarr 23; provato su PHP 8.4, MySQL 8.4 e Dolibarr 24.0.2.
+
+### Tracciabilità
+- UUID proprio per ogni raccolta (le raccolte esistenti lo ricevono all'attivazione), QR corretto, pagina "Tracciabilità" con la storia a monte e a valle e scheda PDF.
+- Riferimenti numerati correttamente (prima tutti -0001).
+
+### Piano di produzione
+- Azienda scelta solo tra le aziende gestite, fissa in modalità azienda singola.
+- Tab "Registro trattamenti" con creazione e import dal piano; un piano per registrazione; tab "Storia" con PDF e CSV.
+- Tab "Costi": preventivo (operazioni previste con costi standard per ettaro) e consuntivo (operazioni, trattamenti con prodotti al prezzo medio ponderato, raccolte), scostamento, costo per ettaro e per unità raccolta; totali del piano aggiornati automaticamente.
+- Operazioni: superficie e costi calcolati da costi standard e prezzo medio dei prodotti se vuoti, pulsante "Ricalcola costi".
+
+### Registro dei trattamenti
+- Fitosanitari cercati anche nel catalogo del Ministero; prodotti ammessi in biologico in evidenza sulle superfici bio.
+
+### Raccolte e lotti
+- Lotto nuovo (codice proposto dal piano) o aggiunta a un lotto aperto dello stesso prodotto; controllo dello stato bio del lotto alla convalida.
+- Unità da elenco (dizionario delle unità di Dolibarr, con q, hl, cassetta, bin) e conversione nell'unità del magazzino.
+
+### Biologico
+- Ispezioni bio (anche dei trasformatori): organismo dal dizionario di doliFarm, ispettore, campioni, esito, verbale; la chiusura congela operazioni, raccolte e periodi bio fino alla data dell'ispezione e salva una copia in sola lettura dei registri (JSON con SHA-256 e PDF); riapertura con permesso dedicato e motivo.
+- Menu QdC: sezione "Biologico" e voce "Tracciabilità".
+
+### Altro
+- Home del modulo con dati reali (piani in corso, ultime raccolte e operazioni) e controllo dei permessi.
+- Traduzioni italiane, inglesi e francesi complete.
+- Dati demo: la raccolta si inserisce una sola volta.
+
 ## 1.2.0
 
 Produzione biologica nel quaderno di campagna, dati AGEA e registri bio. Richiede doliFarm 1.4.0 o successiva: aggiornare doliFarm prima di doliTrace, poi disattivare e riattivare doliTrace (colonne, dizionari e menu nuovi). Requisito minimo PHP 8.2 e Dolibarr 23; provato su PHP 8.4, MySQL 8.4 e Dolibarr 24.0.2.
