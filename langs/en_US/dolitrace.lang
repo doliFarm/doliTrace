@@ -596,3 +596,7 @@ ErrorHarvestLotOtherStatus = The lot %s has %s product (harvest %s): a %s harves
 HarvestLotNotByLot = The harvested product is not managed by lot in Dolibarr (Lots module and option of the product): the lot stays on the harvest but does not go to stock, delivery notes and invoices
 ErrorHarvestLotSuffixStatus = The lot %s is a lot of %s product: a %s harvest goes in another lot (Reg. EU 2018/848, separation of products)
 HarvestLotHarvest = 1 harvest
+
+# Units of the harvests
+HarvestUnitHelp = Unit of the Dolibarr dictionary "Units" (Setup > Dictionaries), where more units can be added. The unit of the product is proposed: q and t are converted into kg, hl into L for the stock; a unit that cannot be converted (e.g. crates for a product in kg) is refused at validation.
+ErrorHarvestUnitNotConvertible = The quantity is in "%s" but the product is stocked in "%s": give the quantity in a convertible unit (same type, weight or volume) or change the unit of the product.

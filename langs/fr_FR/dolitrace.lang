@@ -572,3 +572,7 @@ ErrorHarvestLotOtherStatus = Le lot %s contient du produit %s (récolte %s) : un
 HarvestLotNotByLot = Le produit récolté n'est pas géré par lot dans Dolibarr (module Lots et option du produit) : le lot reste sur la récolte mais ne passe pas au stock, aux bons de livraison et aux factures
 ErrorHarvestLotSuffixStatus = Le lot %s est un lot de produit %s : une récolte %s va dans un autre lot (Règl. UE 2018/848, séparation des produits)
 HarvestLotHarvest = 1 récolte
+
+# Units of the harvests
+HarvestUnitHelp = Unité du dictionnaire « Unités » de Dolibarr (Configuration > Dictionnaires), où d'autres unités peuvent être ajoutées. L'unité du produit est proposée : q et t sont convertis en kg, hl en L pour le stock ; une unité non convertible (ex. caisses pour un produit en kg) est refusée à la validation.
+ErrorHarvestUnitNotConvertible = La quantité est en « %s » mais le produit est stocké en « %s » : indiquer la quantité dans une unité convertible (même type, poids ou volume) ou changer l'unité du produit.

@@ -142,7 +142,8 @@ class DoliTraceHarvest extends CommonObject
         "fk_product_out" => array("type" => "integer:Product:product/class/product.class.php:1", "label" => "HarvestProduct", "picto" => "product", "enabled" => "1", 'position' => 40, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx", "csslist" => "tdoverflowmax150",),
         
         "qty_harvested" => array("type" => "double(24,8)", "label" => "HarvestQty", "enabled" => "1", 'position' => 45, 'notnull' => 0, "visible" => "-1",),
-        "qty_unit" => array("type" => "varchar(30)", "label" => "HarvestUnit", "enabled" => "1", 'position' => 50, 'notnull' => 0, "visible" => "-1",),
+        // Short label of a unit of the dictionary "Units" of Dolibarr (lib/dolitrace_units.lib.php), list set in the constructor
+        "qty_unit" => array("type" => "select", "label" => "HarvestUnit", "enabled" => "1", 'position' => 50, 'notnull' => 0, "visible" => "-1", "help" => "HarvestUnitHelp", "arrayofkeyval" => array(), "default" => "kg",),
         "batch_number" => array("type" => "varchar(128)", "label" => "HarvestBatch", "enabled" => "1", 'position' => 55, 'notnull' => 0, "visible" => "-1", "help" => "HarvestBatchHelp",),
         // Organic status of the harvested product, set at the validation from the status of the plot at the date
         "bio_status" => array("type" => "varchar(16)", "label" => "HarvestBioStatus", "enabled" => "1", 'position' => 56, 'notnull' => 0, "visible" => "5", "arrayofkeyval" => array('BIO' => 'SeedStatusBio', 'INCONV' => 'SeedStatusInConversion', 'NONBIO' => 'SeedStatusNonBio'), "help" => "HarvestBioStatusHelp",),
@@ -254,6 +255,9 @@ class DoliTraceHarvest extends CommonObject
 		if (function_exists('dolifarmRestrictLinkFields')) {
 			dolifarmRestrictLinkFields($this, array('fk_cropplan'));
 		}
+		// Units of the quantity: dictionary "Units" of Dolibarr (labels already translated)
+		dol_include_once('/dolitrace/lib/dolitrace_units.lib.php');
+		$this->fields['qty_unit']['arrayofkeyval'] = dolitraceUnitOptions($this->db);
 
         if (!getDolGlobalInt('MAIN_SHOW_TECHNICAL_ID') && isset($this->fields['rowid']) && !empty($this->fields['ref'])) {
             $this->fields['rowid']['visible'] = 0;
@@ -1399,6 +1403,35 @@ class DoliTraceHarvest extends CommonObject
             }
         }
         return false;
+    }
+
+    /**
+     * Quantity of the harvest in the unit of the product, for the stock movement
+     *
+     * Same unit, or weights and volumes converted (q to kg, hl to L, ...). A product without unit takes the quantity
+     * as it is. Units that cannot be converted (crates for a product in kg) give an error: the stock would be wrong.
+     *
+     * @param	string	$error	Error message (filled when null is returned)
+     * @return	float|null		Quantity for the stock, null if it cannot be computed
+     */
+    public function getStockQuantity(&$error = '')
+    {
+        global $langs;
+
+        dol_include_once('/dolitrace/lib/dolitrace_units.lib.php');
+        $qty = (float) $this->qty_harvested;
+        $unit = dolitraceUnitFind($this->db, (string) $this->qty_unit);
+        $productunit = dolitraceProductUnit($this->db, (int) $this->fk_product_out);
+        if ($productunit === '' || ($unit === '' && (string) $this->qty_unit === '')) {
+            return $qty;
+        }
+        $converted = ($unit === '' ? null : dolitraceUnitConvert($this->db, $qty, $unit, $productunit));
+        if ($converted === null) {
+            $langs->load('dolitrace@dolitrace');
+            $error = $langs->trans('ErrorHarvestUnitNotConvertible', (string) $this->qty_unit, $productunit);
+            return null;
+        }
+        return $converted;
     }
 
     /**

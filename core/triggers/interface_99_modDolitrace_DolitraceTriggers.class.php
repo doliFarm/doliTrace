@@ -484,7 +484,17 @@ class InterfaceDolitraceTriggers extends DolibarrTriggers
 
 		$origintype = $object->element.'@dolitrace';
 		$product_id = (int) $object->fk_product_out;
+		// Quantity in the unit of the product (q to kg, hl to L, ...); units that cannot be converted are refused
 		$quantity = (float) $object->qty_harvested;
+		if ($instock && method_exists($object, 'getStockQuantity')) {
+			$uniterror = '';
+			$quantity = $object->getStockQuantity($uniterror);
+			if ($quantity === null) {
+				$this->error = $uniterror;
+				$this->errors[] = $uniterror;
+				return -1;
+			}
+		}
 
 		// Quantity already in stock for this harvest, with the warehouse and the lot of its last receipt
 		$moved = 0;

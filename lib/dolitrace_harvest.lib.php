@@ -197,6 +197,8 @@ function dolitraceHarvestLotRow($form, $object)
 					$("#lot_none_div").text(data.none || "").toggle((data.options || []).length == 0);
 					$("#lot_notbylot_div").toggle(!!data.notbylot);
 					if ($("#batch_number").attr("data-auto") && data.proposal) { $("#batch_number").val(data.proposal); }
+					// Unit of the product, as proposal for the quantity
+					if (data.unit && $("#qty_unit option[value=\""+data.unit+"\"]").length) { $("#qty_unit").val(data.unit).trigger("change"); }
 					$("#lot_mode_new").prop("checked", true);
 				});
 			});

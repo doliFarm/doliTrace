@@ -78,6 +78,7 @@ if (!$res) {
 dol_include_once('/dolitrace/class/dolitraceharvest.class.php');
 dol_include_once('/dolitrace/lib/dolitrace_harvest.lib.php');
 dol_include_once('/dolitrace/lib/dolitrace_access.lib.php');
+dol_include_once('/dolitrace/lib/dolitrace_units.lib.php');
 
 if (!isModEnabled('dolitrace') || !$user->hasRight('dolitrace', 'dolitraceharvest', 'write')) {
 	http_response_code(403);
@@ -108,4 +109,5 @@ print json_encode(array(
 	'options' => $options,
 	'none' => $langs->transnoentities($object->fk_product_out > 0 ? 'HarvestLotNoOpen' : 'HarvestLotNoProduct'),
 	'notbylot' => ($object->fk_product_out > 0 && !$object->isProductByLot()),
+	'unit' => dolitraceProductUnit($db, (int) $object->fk_product_out),
 ));

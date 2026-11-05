@@ -111,6 +111,18 @@ if (($action == 'create' || $action == 'add') && $forced_cropplan_id > 0) {
 // ============================================================================
 
 
+// Unit of the quantity: the unit of the product when known; a unit written before the list stays selectable
+dol_include_once('/dolitrace/lib/dolitrace_units.lib.php');
+if ($action == 'create' && !GETPOSTISSET('qty_unit') && $object->fk_product_out > 0) {
+	$productunit = dolitraceProductUnit($db, (int) $object->fk_product_out);
+	if ($productunit !== '') {
+		$_GET['qty_unit'] = $productunit;
+	}
+}
+if ((string) $object->qty_unit !== '' && !isset($object->fields['qty_unit']['arrayofkeyval'][$object->qty_unit])) {
+	$object->fields['qty_unit']['arrayofkeyval'][$object->qty_unit] = $object->qty_unit;
+}
+
 $enablepermissioncheck = getDolGlobalInt('DOLITRACE_ENABLE_PERMISSION_CHECK');
 if ($enablepermissioncheck) {
     $permissiontoread = $user->hasRight('dolitrace', 'dolitraceharvest', 'read');
