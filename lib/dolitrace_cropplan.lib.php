@@ -87,6 +87,14 @@ function dolitracecropplanPrepareHead($object)
         $h++;
     }
 
+	// Tab: costs of the plan, budget and actual costs
+	if ($user->hasRight('dolitrace', 'dolitracecropplan', 'read')) {
+		$head[$h][0] = dol_buildpath('/dolitrace/dolitracecropplan_costs.php', 1).'?id='.$object->id;
+		$head[$h][1] = $langs->trans('CropPlanCosts');
+		$head[$h][2] = 'costs';
+		$h++;
+	}
+
 	// Tab: history of the crop plan (operations, treatments, harvests and lots), the base of the traceability
 	$head[$h][0] = dol_buildpath('/dolitrace/dolitracecropplan_history.php', 1).'?id='.$object->id;
 	$head[$h][1] = $langs->trans('CropPlanHistory');

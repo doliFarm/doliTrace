@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS llx_dolitrace_cropplan (
     cost_material   DECIMAL(24,8) DEFAULT 0,
     cost_manpower   DECIMAL(24,8) DEFAULT 0,
     cost_energy     DECIMAL(24,8) DEFAULT 0,
+    cost_service    DECIMAL(24,8) DEFAULT 0,
     actual_cost     DECIMAL(24,8) DEFAULT 0,
     
     status          INTEGER DEFAULT 1,

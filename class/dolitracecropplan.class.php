@@ -152,10 +152,11 @@ class DoliTraceCropplan extends CommonObject
         "date_end" => array("type" => "date", "label" => "Dateend", "enabled" => "1", 'position' => 60, 'notnull' => 1, "visible" => "-1",),
         
         "estimated_yield" => array("type" => "double(24,8)", "label" => "Estimatedyield", "enabled" => "1", 'position' => 65, 'notnull' => 0, "visible" => "-1",),
-        "cost_material" => array("type" => "double(24,8)", "label" => "Costmaterial", "enabled" => "1", 'position' => 70, 'notnull' => 0, "visible" => "-1",),
-        "cost_manpower" => array("type" => "double(24,8)", "label" => "Costmanpower", "enabled" => "1", 'position' => 75, 'notnull' => 0, "visible" => "-1",),
-        "cost_energy" => array("type" => "double(24,8)", "label" => "Costenergy", "enabled" => "1", 'position' => 80, 'notnull' => 0, "visible" => "-1",),
-        "actual_cost" => array("type" => "double(24,8)", "label" => "Actualcost", "enabled" => "1", 'position' => 85, 'notnull' => 0, "visible" => "-1",),
+        "cost_material" => array("type" => "double(24,8)", "label" => "Costmaterial", "enabled" => "1", 'position' => 70, 'notnull' => 0, "visible" => "-1", "noteditable" => "1",),
+        "cost_manpower" => array("type" => "double(24,8)", "label" => "Costmanpower", "enabled" => "1", 'position' => 75, 'notnull' => 0, "visible" => "-1", "noteditable" => "1",),
+        "cost_energy" => array("type" => "double(24,8)", "label" => "Costenergy", "enabled" => "1", 'position' => 80, 'notnull' => 0, "visible" => "-1", "noteditable" => "1",),
+        "cost_service" => array("type" => "double(24,8)", "label" => "Costservice", "enabled" => "1", 'position' => 82, 'notnull' => 0, "visible" => "-1", "noteditable" => "1",),
+        "actual_cost" => array("type" => "double(24,8)", "label" => "Actualcost", "enabled" => "1", 'position' => 85, 'notnull' => 0, "visible" => "-1", "noteditable" => "1",),
         
         "status" => array("type" => "int", "label" => "Status", "enabled" => "1", 'position' => 500, 'notnull' => 0, "visible" => "-1",),
         "note_public" => array("type" => "text", "label" => "NotePublic", "enabled" => "1", 'position' => 95, 'notnull' => 0, "visible" => "0", "cssview" => "wordbreak",),
@@ -188,6 +189,10 @@ class DoliTraceCropplan extends CommonObject
     public $cost_material;
     public $cost_manpower;
     public $cost_energy;
+    /**
+     * @var float|string|null Services of third parties (computed)
+     */
+    public $cost_service;
     public $actual_cost;
     public $status;
     public $note_public;
