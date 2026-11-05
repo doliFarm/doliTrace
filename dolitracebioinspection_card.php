@@ -134,6 +134,12 @@ if (empty($reshook)) {
 		}
 	}
 	$triggermodname = 'DOLITRACE_BIOINSPECTION_MODIFY';
+	// Organic control body chosen from the official list (doliFarm): its third party, created when needed
+	if (in_array($action, array('add', 'update')) && $permissiontoadd && !$cancel && dol_include_once('/dolifarm/lib/dolifarm_biobody.lib.php')) {
+		if (dolifarmBioBodyHandlePost($db, $user, 'fk_soc_body') < 0) {
+			$action = ($action == 'add' ? 'create' : 'edit');
+		}
+	}
 	include DOL_DOCUMENT_ROOT.'/core/actions_addupdatedelete.inc.php';
 
 	if ($action == 'confirm_freeze' && $confirm == 'yes' && $permissiontoadd && $isdraft && $object->id > 0) {
@@ -186,6 +192,9 @@ if ($action == 'create') {
 	print dol_get_fiche_head(array(), '');
 	print '<div class="opacitymedium marginbottomonly">'.$langs->trans('BioInspectionHelp').'</div>';
 	print '<table class="border centpercent tableforfieldcreate">'."\n";
+	if (dol_include_once('/dolifarm/lib/dolifarm_biobody.lib.php')) {
+		dolifarmBioBodyPrepareField($object, 'fk_soc_body');
+	}
 	include DOL_DOCUMENT_ROOT.'/core/tpl/commonfields_add.tpl.php';
 	print '</table>'."\n";
 	print dol_get_fiche_end();
@@ -201,6 +210,9 @@ if (($id || $ref) && $action == 'edit') {
 	print '<input type="hidden" name="id" value="'.$object->id.'">';
 	print dol_get_fiche_head();
 	print '<table class="border centpercent tableforfieldedit">'."\n";
+	if (dol_include_once('/dolifarm/lib/dolifarm_biobody.lib.php')) {
+		dolifarmBioBodyPrepareField($object, 'fk_soc_body');
+	}
 	include DOL_DOCUMENT_ROOT.'/core/tpl/commonfields_edit.tpl.php';
 	print '</table>';
 	print dol_get_fiche_end();

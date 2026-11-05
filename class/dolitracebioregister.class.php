@@ -26,6 +26,7 @@
 
 dol_include_once('/dolifarm/lib/dolifarm_access.lib.php');
 dol_include_once('/dolifarm/lib/dolifarm_bio.lib.php');
+dol_include_once('/dolifarm/lib/dolifarm_biobody.lib.php');
 
 /**
  * Registers of organic production
@@ -432,7 +433,7 @@ class DoliTraceBioRegister
 					'ref' => (string) $obj->ref,
 					'thirdparty' => $withsoc ? (string) $obj->thirdparty : '',
 					'cert' => $withsoc ? (string) $obj->dolifarm_bio_cert : '',
-					'body' => $withsoc ? (string) $obj->dolifarm_bio_body : '',
+					'body' => $withsoc ? (function_exists('dolifarmBioBodyLabel') ? dolifarmBioBodyLabel($this->db, (string) $obj->dolifarm_bio_body) : (string) $obj->dolifarm_bio_body) : '',
 				);
 			}
 			$this->db->free($resql);
@@ -1138,7 +1139,7 @@ class DoliTraceBioRegister
 		$resql = $this->db->query("SELECT dolifarm_bio_cert, dolifarm_bio_body, dolifarm_bio_cert_end FROM ".$prefix."societe_extrafields WHERE fk_object = ".((int) $socid));
 		$ef = $resql ? $this->db->fetch_object($resql) : null;
 		if ($ef && trim((string) $ef->dolifarm_bio_cert.(string) $ef->dolifarm_bio_body) !== '') {
-			$lines[] = $outputlangs->transnoentities('BioRegisterFarmCertificate', trim((string) $ef->dolifarm_bio_cert), trim((string) $ef->dolifarm_bio_body),
+			$lines[] = $outputlangs->transnoentities('BioRegisterFarmCertificate', trim((string) $ef->dolifarm_bio_cert), trim(function_exists('dolifarmBioBodyLabel') ? dolifarmBioBodyLabel($this->db, (string) $ef->dolifarm_bio_body) : (string) $ef->dolifarm_bio_body),
 				$ef->dolifarm_bio_cert_end ? dol_print_date($this->db->jdate($ef->dolifarm_bio_cert_end), 'day', 'tzserver', $outputlangs) : '-');
 		} else {
 			$lines[] = $outputlangs->transnoentities('BioRegisterFarmNoCertificate');
