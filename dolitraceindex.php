@@ -71,7 +71,7 @@ if (!$res) {
 include_once DOL_DOCUMENT_ROOT.'/core/class/html.formfile.class.php';
 
 // Load translation files required by the page
-$langs->loadLangs(array("dolitrace@dolitrace"));
+$langs->loadLangs(array("dolitrace@dolitrace", "dolifarm@dolifarm"));
 
 $action = GETPOST('action', 'aZ09');
 
@@ -85,22 +85,13 @@ if (!empty($user->socid) && $user->socid > 0) {
 	$socid = $user->socid;
 }
 
-// Initialize a technical object to manage hooks. Note that conf->hooks_modules contains array
-//$hookmanager->initHooks(array($object->element.'index'));
-
-// Security check (enable the most restrictive one)
-//if ($user->socid > 0) accessforbidden();
-//if ($user->socid > 0) $socid = $user->socid;
-//if (!isModEnabled('dolitrace')) {
-//	accessforbidden('Module not enabled');
-//}
-//if (! $user->hasRight('dolitrace', 'myobject', 'read')) {
-//	accessforbidden();
-//}
-//restrictedArea($user, 'dolitrace', 0, 'dolitrace_myobject', 'myobject', '', 'rowid');
-//if (empty($user->admin)) {
-//	accessforbidden('Must be admin');
-//}
+// Security check
+if (!isModEnabled('dolitrace')) {
+	accessforbidden('Module not enabled');
+}
+if (!$user->hasRight('dolitrace', 'dolitracecropplan', 'read') && !$user->hasRight('dolitrace', 'dolitraceharvest', 'read') && !$user->hasRight('dolitrace', 'dolitraceoperation', 'read')) {
+	accessforbidden();
+}
 
 
 /*
@@ -125,214 +116,175 @@ print load_fiche_titre($langs->trans("DolitraceArea"), '', dolifarm_get_fa_icon(
 print '<div class="fichecenter">';
 
 
-/* BEGIN MODULEBUILDER DRAFT MYOBJECT
-// Draft MyObject
-if (isModEnabled('dolitrace') && $user->hasRight('dolitrace', 'read')) {
-	$langs->load("orders");
+dol_include_once('/dolitrace/class/dolitracecropplan.class.php');
+dol_include_once('/dolitrace/class/dolitraceharvest.class.php');
+dol_include_once('/dolitrace/class/dolitraceoperation.class.php');
 
-	$sql = "SELECT c.rowid, c.ref, c.ref_client, c.total_ht, c.tva as total_tva, c.total_ttc, s.rowid as socid, s.nom as name, s.client, s.canvas";
-	$sql.= ", s.code_client";
-	$sql.= " FROM ".$db->prefix()."commande as c";
-	$sql.= ", ".$db->prefix()."societe as s";
-	$sql.= " WHERE c.fk_soc = s.rowid";
-	$sql.= " AND c.fk_statut = 0";
-	$sql.= " AND c.entity IN (".getEntity('commande').")";
-	if ($socid)	$sql.= " AND c.fk_soc = ".((int) $socid);
-
-	$resql = $db->query($sql);
-	if ($resql)
-	{
-		$total = 0;
-		$num = $db->num_rows($resql);
-
-		print '<table class="noborder centpercent">';
-		print '<tr class="liste_titre">';
-		print '<th colspan="3">'.$langs->trans("DraftMyObjects").($num?'<span class="badge marginleftonlyshort">'.$num.'</span>':'').'</th></tr>';
-
-		$var = true;
-		if ($num > 0)
-		{
-			$i = 0;
-			while ($i < $num)
-			{
-
-				$obj = $db->fetch_object($resql);
-				print '<tr class="oddeven"><td class="nowrap">';
-
-				$myobjectstatic->id=$obj->rowid;
-				$myobjectstatic->ref=$obj->ref;
-				$myobjectstatic->ref_client=$obj->ref_client;
-				$myobjectstatic->total_ht = $obj->total_ht;
-				$myobjectstatic->total_tva = $obj->total_tva;
-				$myobjectstatic->total_ttc = $obj->total_ttc;
-
-				print $myobjectstatic->getNomUrl(1);
-				print '</td>';
-				print '<td class="nowrap">';
-				print '</td>';
-				print '<td class="right" class="nowrap">'.price($obj->total_ttc).'</td></tr>';
-				$i++;
-				$total += $obj->total_ttc;
-			}
-			if ($total>0)
-			{
-
-				print '<tr class="liste_total"><td>'.$langs->trans("Total").'</td><td colspan="2" class="right">'.price($total)."</td></tr>";
-			}
-		}
-		else
-		{
-
-			print '<tr class="oddeven"><td colspan="3" class="opacitymedium">'.$langs->trans("NoOrder").'</td></tr>';
-		}
-		print "</table><br>";
-
-		$db->free($resql);
-	}
-	else
-	{
-		dol_print_error($db);
-	}
+/**
+ * Print the start of a box of the home page
+ *
+ * @param	string	$title	Title, already translated
+ * @param	string	$help	Short description, already translated
+ * @param	string	$icon	Font Awesome class
+ * @param	string	$color	Color of the border and of the icon
+ * @return	void
+ */
+function dolitraceIndexBoxStart(string $title, string $help, string $icon, string $color): void
+{
+	print '<div class="box" style="border: 1px solid #ddd; border-radius: 5px; padding: 15px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">';
+	print '<div class="box-header" style="border-bottom: 2px solid '.$color.'; padding-bottom: 10px; margin-bottom: 15px;">';
+	print '<h3 style="margin: 0; color: #222;"><i class="fa '.$icon.'" style="padding-right: 8px; color: '.$color.';"></i>'.$title.'</h3>';
+	print '</div>';
+	print '<div class="box-content">';
+	print '<p class="opacitymedium" style="font-size: 0.9em; margin-bottom: 15px;">'.$help.'</p>';
 }
-END MODULEBUILDER DRAFT MYOBJECT */
 
-
-
-
-/* BEGIN MODULEBUILDER LASTMODIFIED MYOBJECT
-// Last modified myobject
-if (isModEnabled('dolitrace') && $user->hasRight('dolitrace', 'read')) {
-	$sql = "SELECT s.rowid, s.ref, s.label, s.date_creation, s.tms";
-	$sql.= " FROM ".$db->prefix()."dolitrace_myobject as s";
-	$sql.= " WHERE s.entity IN (".getEntity($myobjectstatic->element).")";
-	//if ($socid)	$sql.= " AND s.rowid = $socid";
-	$sql .= " ORDER BY s.tms DESC";
-	$sql .= $db->plimit($max, 0);
-
-	$resql = $db->query($sql);
-	if ($resql)
-	{
-		$num = $db->num_rows($resql);
-		$i = 0;
-
-		print '<table class="noborder centpercent">';
-		print '<tr class="liste_titre">';
-		print '<th colspan="2">';
-		print $langs->trans("BoxTitleLatestModifiedMyObjects", $max);
-		print '</th>';
-		print '<th class="right">'.$langs->trans("DateModificationShort").'</th>';
-		print '</tr>';
-		if ($num)
-		{
-			while ($i < $num)
-			{
-				$objp = $db->fetch_object($resql);
-
-				$myobjectstatic->id=$objp->rowid;
-				$myobjectstatic->ref=$objp->ref;
-				$myobjectstatic->label=$objp->label;
-				$myobjectstatic->status = $objp->status;
-
-				print '<tr class="oddeven">';
-				print '<td class="nowrap">'.$myobjectstatic->getNomUrl(1).'</td>';
-				print '<td class="right nowrap">';
-				print "</td>";
-				print '<td class="right nowrap">'.dol_print_date($db->jdate($objp->tms), 'day')."</td>";
-				print '</tr>';
-				$i++;
-			}
-
-			$db->free($resql);
-		} else {
-			print '<tr class="oddeven"><td colspan="3" class="opacitymedium">'.$langs->trans("None").'</td></tr>';
-		}
-		print "</table><br>";
-	}
+/**
+ * Print the end of a box of the home page, with the link to the list
+ *
+ * @param	string	$url	Url of the list
+ * @param	string	$label	Label of the button, already translated
+ * @return	void
+ */
+function dolitraceIndexBoxEnd(string $url, string $label): void
+{
+	print '<div style="margin-top: 15px; text-align: right;"><a class="butAction" href="'.$url.'">'.$label.'</a></div>';
+	print '</div>';
+	print '</div>';
 }
-*/
 
+$sqlsoc = ($socid > 0 ? " AND cp.fk_soc = ".((int) $socid) : "");
 
-
-
-// Inizio della griglia responsive per i tre riquadri principali
 print '<div class="div-table-responsive-no-minify">';
 print '<div class="grid-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px;">';
 
-// --------------------------------------------------------
-// RIQUADRO 1: PIANI DI PRODUZIONE
-// --------------------------------------------------------
-print '<div class="box" style="border: 1px solid #ddd; border-radius: 5px; padding: 15px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">';
-print '<div class="box-header" style="border-bottom: 2px solid #0073aa; padding-bottom: 10px; margin-bottom: 15px;">';
-print '<h3 style="margin: 0; color: #222;"><i class="fa fa-calendar-check-o" style="padding-right: 8px; color: #0073aa;"></i>' . $langs->trans("DoliTraceCropplans") . '</h3>';
+// Production plans in progress
+if ($user->hasRight('dolitrace', 'dolitracecropplan', 'read')) {
+	dolitraceIndexBoxStart($langs->trans("DoliTraceCropplans"), $langs->trans('DoliTraceIndexCropPlansHelp'), 'fa-calendar-check-o', '#0073aa');
+	print '<table class="noborder centpercent">';
+	print '<tr class="liste_titre"><th>'.$langs->trans("Ref").'</th><th>'.$langs->trans("CropPlanCrop").'</th><th class="center">'.$langs->trans("Status").'</th></tr>';
+	$sql = "SELECT cp.rowid, cp.ref, cp.label, cp.status, c.label as crop_label";
+	$sql .= " FROM ".$db->prefix()."dolitrace_cropplan as cp";
+	$sql .= " LEFT JOIN ".$db->prefix()."dolifarm_crops as c ON c.rowid = cp.fk_crop";
+	$sql .= " WHERE cp.entity IN (".getEntity('dolitracecropplan').")";
+	$sql .= " AND cp.status IN (".DoliTraceCropplan::STATUS_DRAFT.", ".DoliTraceCropplan::STATUS_VALIDATED.")".$sqlsoc;
+	$sql .= " ORDER BY cp.date_start DESC, cp.rowid DESC";
+	$sql .= $db->plimit($max, 0);
+	$resql = $db->query($sql);
+	$num = 0;
+	if ($resql) {
+		$static = new DoliTraceCropplan($db);
+		while ($obj = $db->fetch_object($resql)) {
+			$num++;
+			$static->id = $obj->rowid;
+			$static->ref = $obj->ref;
+			$static->label = $obj->label;
+			$static->status = $obj->status;
+			print '<tr class="oddeven"><td class="nowraponall">'.$static->getNomUrl(1).'</td>';
+			print '<td class="tdoverflowmax150">'.dol_escape_htmltag($langs->trans((string) $obj->crop_label)).'</td>';
+			print '<td class="center">'.$static->getLibStatut(5).'</td></tr>';
+		}
+		$db->free($resql);
+	} else {
+		dol_print_error($db);
+	}
+	if (!$num) {
+		print '<tr class="oddeven"><td colspan="3"><span class="opacitymedium">'.$langs->trans("None").'</span></td></tr>';
+	}
+	print '</table>';
+	dolitraceIndexBoxEnd(dol_buildpath('/dolitrace/dolitracecropplan_list.php', 1), $langs->trans("DoliTraceCropplans"));
+}
+
+// Latest harvests
+if ($user->hasRight('dolitrace', 'dolitraceharvest', 'read')) {
+	dolitraceIndexBoxStart($langs->trans("DoliTraceHarvests"), $langs->trans('DoliTraceIndexHarvestsHelp'), 'fa-shopping-basket', '#27ae60');
+	print '<table class="noborder centpercent">';
+	print '<tr class="liste_titre"><th>'.$langs->trans("Ref").'</th><th class="right">'.$langs->trans("Qty").'</th><th class="right">'.$langs->trans("Date").'</th></tr>';
+	$sql = "SELECT h.rowid, h.ref, h.label, h.status, h.date_harvest, h.qty_harvested, h.qty_unit";
+	$sql .= " FROM ".$db->prefix()."dolitrace_harvest as h";
+	$sql .= " INNER JOIN ".$db->prefix()."dolitrace_cropplan as cp ON cp.rowid = h.fk_cropplan";
+	$sql .= " WHERE cp.entity IN (".getEntity('dolitracecropplan').")";
+	$sql .= " AND h.status <> ".DoliTraceHarvest::STATUS_CANCELED.$sqlsoc;
+	$sql .= " ORDER BY h.date_harvest DESC, h.rowid DESC";
+	$sql .= $db->plimit($max, 0);
+	$resql = $db->query($sql);
+	$num = 0;
+	if ($resql) {
+		$static = new DoliTraceHarvest($db);
+		$units = $static->fields['qty_unit']['arrayofkeyval'] ?? array();
+		while ($obj = $db->fetch_object($resql)) {
+			$num++;
+			$static->id = $obj->rowid;
+			$static->ref = $obj->ref;
+			$static->label = $obj->label;
+			$static->status = $obj->status;
+			$unit = (string) $obj->qty_unit;
+			print '<tr class="oddeven"><td class="nowraponall">'.$static->getNomUrl(1).'</td>';
+			print '<td class="right nowraponall">'.price2num((float) $obj->qty_harvested, 'MS').' '.dol_escape_htmltag($units[$unit] ?? $unit).'</td>';
+			print '<td class="right nowraponall">'.dol_print_date($db->jdate($obj->date_harvest), 'day').'</td></tr>';
+		}
+		$db->free($resql);
+	} else {
+		dol_print_error($db);
+	}
+	if (!$num) {
+		print '<tr class="oddeven"><td colspan="3"><span class="opacitymedium">'.$langs->trans("None").'</span></td></tr>';
+	}
+	print '</table>';
+	dolitraceIndexBoxEnd(dol_buildpath('/dolitrace/dolitraceharvest_list.php', 1), $langs->trans("DoliTraceHarvests"));
+}
+
+// Latest crop operations
+if ($user->hasRight('dolitrace', 'dolitraceoperation', 'read')) {
+	dolitraceIndexBoxStart($langs->trans("DoliTraceOperations"), $langs->trans('DoliTraceIndexOperationsHelp'), 'fa-wrench', '#e67e22');
+	print '<table class="noborder centpercent">';
+	print '<tr class="liste_titre"><th>'.$langs->trans("OperationType").'</th><th>'.$langs->trans("CropPlan").'</th><th class="right">'.$langs->trans("Date").'</th></tr>';
+	$sql = "SELECT o.rowid, o.ref, o.label, o.status, o.date_op, o.fk_operation_type, cp.rowid as cp_id, cp.ref as cp_ref, cp.label as cp_label, cp.status as cp_status";
+	$sql .= " FROM ".$db->prefix()."dolitrace_operation as o";
+	$sql .= " LEFT JOIN ".$db->prefix()."dolitrace_cropplan as cp ON cp.rowid = o.fk_cropplan";
+	$sql .= " WHERE o.entity IN (".getEntity('dolitraceoperation').")";
+	$sql .= " AND o.status <> ".DoliTraceOperation::STATUS_CANCELED.$sqlsoc;
+	$sql .= " ORDER BY o.date_op DESC, o.rowid DESC";
+	$sql .= $db->plimit($max, 0);
+	$resql = $db->query($sql);
+	$num = 0;
+	if ($resql) {
+		$static = new DoliTraceOperation($db);
+		$cpstatic = new DoliTraceCropplan($db);
+		$types = $static->fields['fk_operation_type']['arrayofkeyval'] ?? array();
+		while ($obj = $db->fetch_object($resql)) {
+			$num++;
+			$static->id = $obj->rowid;
+			$static->ref = $obj->ref;
+			$static->label = $obj->label;
+			$static->status = $obj->status;
+			$type = (string) $obj->fk_operation_type;
+			$typelabel = $types[$type] ?? $type;
+			print '<tr class="oddeven"><td class="tdoverflowmax200">'.$static->getNomUrl(1, '', 0, '', -1).' <span class="opacitymedium">'.dol_escape_htmltag($typelabel).'</span></td>';
+			print '<td class="nowraponall">';
+			if ($obj->cp_id > 0) {
+				$cpstatic->id = $obj->cp_id;
+				$cpstatic->ref = $obj->cp_ref;
+				$cpstatic->label = $obj->cp_label;
+				$cpstatic->status = $obj->cp_status;
+				print $cpstatic->getNomUrl(0);
+			}
+			print '</td>';
+			print '<td class="right nowraponall">'.dol_print_date($db->jdate($obj->date_op), 'day').'</td></tr>';
+		}
+		$db->free($resql);
+	} else {
+		dol_print_error($db);
+	}
+	if (!$num) {
+		print '<tr class="oddeven"><td colspan="3"><span class="opacitymedium">'.$langs->trans("None").'</span></td></tr>';
+	}
+	print '</table>';
+	dolitraceIndexBoxEnd(dol_buildpath('/dolitrace/dolitraceoperation_list.php', 1), $langs->trans("DoliTraceOperations"));
+}
+
 print '</div>';
-print '<div class="box-content">';
-print '<p style="color: #666; font-size: 0.9em; margin-bottom: 15px;">' . $langs->trans('DoliTraceIndexCropPlansHelp') . '</p>';
-
-// Tabella dimostrativa con dati consolidati
-print '<table class="noborder centpercent">';
-print '<tr class="liste_titre"><th>' . $langs->trans("Cultura") . '</th><th class="right">' . $langs->trans("Superficie") . '</th><th class="center">' . $langs->trans("Status") . '</th></tr>';
-
-print '<tr class="oddeven"><td>Pomodoro Ciliegino</td><td class="right">1.2 Ha</td><td class="center"><span class="badge badge-status" style="background-color: #4bca52; color: white; padding: 2px 6px; border-radius: 3px;">In Corso</span></td></tr>';
-print '<tr class="oddeven"><td>Zucchina Chiara</td><td class="right">0.8 Ha</td><td class="center"><span class="badge badge-status" style="background-color: #4bca52; color: white; padding: 2px 6px; border-radius: 3px;">In Corso</span></td></tr>';
-print '<tr class="oddeven"><td>Patata Novella</td><td class="right">2.5 Ha</td><td class="center"><span class="badge badge-status" style="background-color: #f39c12; color: white; padding: 2px 6px; border-radius: 3px;">Pianificato</span></td></tr>';
-
-print '</table>';
-print '<div style="margin-top: 15px; text-align: right;"><a class="butAction" href="dolitracecropplan_list.php">' . $langs->trans("DoliTraceCropplans") . '</a></div>';
 print '</div>';
-print '</div>';
-
-
-// --------------------------------------------------------
-// RIQUADRO 2: RACCOLTA
-// --------------------------------------------------------
-print '<div class="box" style="border: 1px solid #ddd; border-radius: 5px; padding: 15px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">';
-print '<div class="box-header" style="border-bottom: 2px solid #27ae60; padding-bottom: 10px; margin-bottom: 15px;">';
-print '<h3 style="margin: 0; color: #222;"><i class="fa fa-shopping-basket" style="padding-right: 8px; color: #27ae60;"></i>' . $langs->trans("DoliTraceHarvests") . '</h3>';
-print '</div>';
-print '<div class="box-content">';
-print '<p style="color: #666; font-size: 0.9em; margin-bottom: 15px;">' . $langs->trans("Ultimi volumi raccolti e stime correnti.") . '</p>';
-
-// Tabella dimostrativa dei volumi di raccolta
-print '<table class="noborder centpercent">';
-print '<tr class="liste_titre"><th>' . $langs->trans("Prodotto") . '</th><th class="right">' . $langs->trans("Quantità") . '</th><th class="right">' . $langs->trans("Data") . '</th></tr>';
-
-print '<tr class="oddeven"><td>Fragole</td><td class="right">120 Kg</td><td class="right">Oggi</td></tr>';
-print '<tr class="oddeven"><td>Insalata Gentile</td><td class="right">450 Cestini</td><td class="right">Ieri</td></tr>';
-print '<tr class="oddeven"><td>Melanzane</td><td class="right">80 Kg</td><td class="right">10/06/2026</td></tr>';
-
-print '</table>';
-print '<div style="margin-top: 15px; text-align: right;"><a class="butAction" href="dolitraceharvest_list.php">' . $langs->trans("DoliTraceHarvests") . '</a></div>';
-print '</div>';
-print '</div>';
-
-
-// --------------------------------------------------------
-// RIQUADRO 3: OPERAZIONI COLTURALI
-// --------------------------------------------------------
-print '<div class="box" style="border: 1px solid #ddd; border-radius: 5px; padding: 15px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">';
-print '<div class="box-header" style="border-bottom: 2px solid #e67e22; padding-bottom: 10px; margin-bottom: 15px;">';
-print '<h3 style="margin: 0; color: #222;"><i class="fa fa-wrench" style="padding-right: 8px; color: #e67e22;"></i>' . $langs->trans("DoliTraceOperations") . '</h3>';
-print '</div>';
-print '<div class="box-content">';
-print '<p style="color: #666; font-size: 0.9em; margin-bottom: 15px;">' . $langs->trans("Attività sul campo, trattamenti e irrigazione.") . '</p>';
-
-// Tabella dimostrativa con attività programmate ed effettuate
-print '<table class="noborder centpercent">';
-print '<tr class="liste_titre"><th>' . $langs->trans("Attività") . '</th><th>' . $langs->trans("Zona") . '</th><th class="center">' . $langs->trans("Priorità") . '</th></tr>';
-
-print '<tr class="oddeven"><td>Irrigazione Turno A</td><td>Appezzamento Nord</td><td class="center"><span style="color: #e74c3c; font-weight: bold;">Alta</span></td></tr>';
-print '<tr class="oddeven"><td>Concimazione Organica</td><td>Serra 2</td><td class="center"><span style="color: #f1c40f; font-weight: bold;">Media</span></td></tr>';
-print '<tr class="oddeven"><td>Trattamento Biologico</td><td>Uliveto Scarpata</td><td class="center"><span style="color: #7f8c8d;">Bassa</span></td></tr>';
-
-print '</table>';
-print '<div style="margin-top: 15px; text-align: right;"><a class="butAction" href="dolitraceoperation_list.php">' . $langs->trans("DoliTraceOperations") . '</a></div>';
-print '</div>';
-print '</div>';
-
-print '</div>'; // Fine grid-container
-
-
-
 
 print '</div>';
 

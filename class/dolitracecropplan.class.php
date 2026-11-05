@@ -145,7 +145,7 @@ class DoliTraceCropplan extends CommonObject
 
         // Link to Crop (DoliTrace) - Note: Assuming you will create this class
         "fk_output_product" => array("type" => "integer:Product:product/class/product.class.php","label" => "ProductOut","picto" => "product","enabled" => "1","position" => 38,"notnull" => 0,"visible" => "-2","index" => 1,),
-        "fk_crop" => array("type" => "sellist:dolifarm_crops:label:rowid::status=1","label" => "Crop","enabled" => "1","position" => 40,"notnull" => 1,"visible" => "-1", "css" => "minwidth300",),        
+        "fk_crop" => array("type" => "sellist:dolifarm_crops:label:rowid::status=1","label" => "CropPlanCrop","enabled" => "1","position" => 40,"notnull" => 1,"visible" => "-1", "css" => "minwidth300",),        
         "fk_project" => array("type" => "integer:Project:projet/class/project.class.php", "label" => "Fkproject", "picto" => "project", "enabled" => "1", 'position' => 45, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx", "csslist" => "tdoverflowmax150",),
         "season" => array("type" => "int", "label" => "Season", "enabled" => "1", 'position' => 50, 'notnull' => 1, "visible" => "0",),
         "date_start" => array("type" => "date", "label" => "Datestart", "enabled" => "1", 'position' => 55, 'notnull' => 1, "visible" => "-1",),

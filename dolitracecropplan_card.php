@@ -575,8 +575,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
             } else {
                 // Messaggio di debug utile se fallisce ancora
                 print '<div class="error" style="font-size:0.8em; color:red;">';
-                print 'Errore: Libreria Barcode non trovata.<br>Percorsi controllati:<br>';
-                foreach($tcpdf_paths as $p) print basename(dirname($p)).'/'.basename($p)."<br>";
+                print $langs->trans('TraceQrCodeLibraryMissing');
                 print '</div>';
             }
             print '</div>';
