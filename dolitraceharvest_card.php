@@ -291,11 +291,11 @@ if ($action == 'create') {
     // GENERAZIONE CAMPI STANDARD RIMANENTI
     // ------------------------------------------------------------------------
 
-    // Lot: new (code proposed) or an open lot of other harvests of the product
-    print dolitraceHarvestLotRow($form, $object);
+    // Lot: printed after the standard fields, below the product
     unset($object->fields['batch_number']);
 
     include DOL_DOCUMENT_ROOT.'/core/tpl/commonfields_add.tpl.php';
+    print dolitraceHarvestLotRow($form, $object); // Lot: new (code proposed) or an open lot of other harvests of the product
     include DOL_DOCUMENT_ROOT.'/core/tpl/extrafields_add.tpl.php';
 
     print '</table>'."\n";
@@ -358,11 +358,11 @@ if (($id || $ref) && $action == 'edit') {
 
     unset($object->fields['uuid']);
 
-    // Lot: new (code proposed) or an open lot of other harvests of the product
-    print dolitraceHarvestLotRow($form, $object);
+    // Lot: printed after the standard fields, below the product
     unset($object->fields['batch_number']);
 
     include DOL_DOCUMENT_ROOT.'/core/tpl/commonfields_edit.tpl.php';
+    print dolitraceHarvestLotRow($form, $object); // Lot: new (code proposed) or an open lot of other harvests of the product
     include DOL_DOCUMENT_ROOT.'/core/tpl/extrafields_edit.tpl.php';
 
     print '</table>';

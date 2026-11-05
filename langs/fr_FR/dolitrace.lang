@@ -571,3 +571,4 @@ ErrorHarvestLotUsed = Le lot %s existe déjà pour ce produit : pour y ajouter l
 ErrorHarvestLotOtherStatus = Le lot %s contient du produit %s (récolte %s) : une récolte %s va dans un autre lot (Règl. UE 2018/848, séparation des produits)
 HarvestLotNotByLot = Le produit récolté n'est pas géré par lot dans Dolibarr (module Lots et option du produit) : le lot reste sur la récolte mais ne passe pas au stock, aux bons de livraison et aux factures
 ErrorHarvestLotSuffixStatus = Le lot %s est un lot de produit %s : une récolte %s va dans un autre lot (Règl. UE 2018/848, séparation des produits)
+HarvestLotHarvest = 1 récolte

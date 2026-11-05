@@ -595,3 +595,4 @@ ErrorHarvestLotUsed = The lot %s already exists for this product: to add the har
 ErrorHarvestLotOtherStatus = The lot %s has %s product (harvest %s): a %s harvest goes in another lot (Reg. EU 2018/848, separation of products)
 HarvestLotNotByLot = The harvested product is not managed by lot in Dolibarr (Lots module and option of the product): the lot stays on the harvest but does not go to stock, delivery notes and invoices
 ErrorHarvestLotSuffixStatus = The lot %s is a lot of %s product: a %s harvest goes in another lot (Reg. EU 2018/848, separation of products)
+HarvestLotHarvest = 1 harvest

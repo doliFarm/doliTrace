@@ -606,3 +606,4 @@ ErrorHarvestLotUsed = Il lotto %s esiste già per questo prodotto: per aggiunger
 ErrorHarvestLotOtherStatus = Il lotto %s contiene prodotto %s (raccolta %s): una raccolta %s va in un altro lotto (Reg. UE 2018/848, separazione dei prodotti)
 HarvestLotNotByLot = Il prodotto raccolto non è gestito a lotti in Dolibarr (modulo Lotti e opzione del prodotto): il lotto resta nella raccolta ma non passa a magazzino, DDT e fatture
 ErrorHarvestLotSuffixStatus = Il lotto %s è un lotto di prodotto %s: una raccolta %s va in un altro lotto (Reg. UE 2018/848, separazione dei prodotti)
+HarvestLotHarvest = 1 raccolta
