@@ -1,5 +1,11 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.3.1
+
+Correzione della gestione di una o più aziende. Richiede doliFarm 1.5.1. Dopo l'aggiornamento non serve riattivare il modulo (nessuna modifica al database).
+
+- Filtri azienda di export, import, registri bio e ispezioni: solo le aziende gestite, fissa in modalità azienda singola.
+
 ## 1.3.0
 
 Tracciabilità delle raccolte, trattamenti dal piano di produzione, ispezioni bio, lotti e costi del piano. Richiede doliFarm 1.5.0 o successiva: aggiornare doliFarm prima di doliTrace, poi disattivare e riattivare doliTrace (tabelle delle ispezioni e del preventivo, colonne nuove su trattamenti, operazioni e piani, menu). Requisito minimo PHP 8.2 e Dolibarr 23; provato su PHP 8.4, MySQL 8.4 e Dolibarr 24.0.2.
@@ -10,7 +16,6 @@ Tracciabilità delle raccolte, trattamenti dal piano di produzione, ispezioni bi
 
 ### Piano di produzione
 - Azienda scelta solo tra le aziende gestite, fissa in modalità azienda singola.
-- Filtri azienda di export, import, registri bio e ispezioni: solo le aziende gestite, fissa in modalità azienda singola.
 - Tab "Registro trattamenti" con creazione e import dal piano; un piano per registrazione; tab "Storia" con PDF e CSV.
 - Tab "Costi": preventivo (operazioni previste con costi standard per ettaro) e consuntivo (operazioni, trattamenti con prodotti al prezzo medio ponderato, raccolte), scostamento, costo per ettaro e per unità raccolta; totali del piano aggiornati automaticamente.
 - Operazioni: superficie e costi calcolati da costi standard e prezzo medio dei prodotti se vuoti, pulsante "Ricalcola costi".
