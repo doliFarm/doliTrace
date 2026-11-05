@@ -516,21 +516,6 @@ class modDolitrace extends DolibarrModules
 			'user' => 2,
 			'object' => 'DoliTraceHarvest'
 		);
-		// Traceability of a harvested product: search by UUID, short code or lot, history upstream and downstream
-		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitraceharvest',
-			'type' => 'left',
-			'titre' => 'TraceTitle',
-			'mainmenu' => 'dolitrace',
-			'leftmenu' => 'dolitrace_trace',
-			'url' => '/dolitrace/dolitrace_trace.php',
-			'langs' => 'dolitrace@dolitrace',
-			'position' => 1000 + $r,
-			'enabled' => 'isModEnabled("dolitrace")',
-			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "read")',
-			'target' => '',
-			'user' => 2,
-		);
 		/*
 		$this->menu[$r++] = array(
 			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitraceharvest',
@@ -731,6 +716,21 @@ class modDolitrace extends DolibarrModules
 			'position' => 1000 + $r,
 			'enabled' => 'isModEnabled("dolitrace")',
 			'perms' => '$user->hasRight("dolitrace", "dolitracebioinspection", "write")',
+			'target' => '',
+			'user' => 2,
+		);
+		// Traceability of a harvested product: search by UUID, short code or lot, history upstream and downstream
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitrace_bio',
+			'type' => 'left',
+			'titre' => 'TraceTitle',
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitrace_trace',
+			'url' => '/dolitrace/dolitrace_trace.php',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "read")',
 			'target' => '',
 			'user' => 2,
 		);
