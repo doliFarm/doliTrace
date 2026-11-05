@@ -357,8 +357,18 @@ if (empty($reshook)) {
 		$product->fk_treatment = $object->id;
 		$product->rang = count($object->products) + 1;
 		if ($object->kind == $object::KIND_PLANTPROTECTION) {
+			// A product of the catalogue of the Ministry of Health becomes an agrodrug of the farm
+			dol_include_once('/dolifarm/lib/dolifarm_ppp.lib.php');
+			$catalogerror = '';
+			$catalogcreated = false;
+			$agrodrugid = dolifarmAgroDrugResolve($db, $user, GETPOST('fk_agrodrug', 'alphanohtml'), $catalogerror, $catalogcreated);
+			if ($agrodrugid < 0) {
+				setEventMessages($catalogerror, null, 'errors');
+			} elseif ($catalogcreated) {
+				setEventMessages($langs->trans('PppAgroDrugCreated'), null, 'mesgs');
+			}
 			$agrodrugs = dolitraceTreatmentAgroDrugs($db);
-			$agrodrug = isset($agrodrugs[GETPOSTINT('fk_agrodrug')]) ? $agrodrugs[GETPOSTINT('fk_agrodrug')] : null;
+			$agrodrug = isset($agrodrugs[$agrodrugid]) ? $agrodrugs[$agrodrugid] : null;
 			$adversityerror = '';
 			if (GETPOST('adversity_eppo', 'alphanohtml') !== '') {
 				// Search on the whole EPPO database: the code is added to the dictionary when missing
@@ -982,10 +992,9 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		print '<tr class="oddeven nohover">';
 		$options = array();
 		if ($plantprotection) {
-			foreach (dolitraceTreatmentAgroDrugs($db) as $agrodrug) {
-				$options[$agrodrug->rowid] = $agrodrug->label.($agrodrug->reg_number ? ' ('.$agrodrug->reg_number.')' : '');
-			}
-			print '<td colspan="2">'.$form->selectarray('fk_agrodrug', $options, GETPOSTINT('fk_agrodrug'), 1, 0, 0, '', 0, 0, 0, '', 'minwidth200 maxwidth300', 1).'</td>';
+			// Agrodrugs of the farm and, by typing, the authorised products of the catalogue of the Ministry of Health
+			dol_include_once('/dolifarm/lib/dolifarm_ppp.lib.php');
+			print '<td colspan="2">'.dolifarmAgroDrugSelect($db, 'fk_agrodrug', (!empty($agrodrugid) && $agrodrugid > 0 ? (string) $agrodrugid : GETPOST('fk_agrodrug', 'alphanohtml')), true, 'minwidth200 maxwidth300').'</td>';
 			if (dol_include_once('/dolifarm/lib/dolifarm_eppo.lib.php') && function_exists('dolifarmEppoSelect') && dolifarmEppoDataAvailable() && !empty($conf->use_javascript_ajax)) {
 				// Whole EPPO database (pests, diseases, weeds), not only the dictionary
 				print '<td>'.dolifarmEppoSelect($db, 'adversity_eppo', GETPOST('adversity_eppo', 'alphanohtml'), 'pest', 'minwidth200 maxwidth300').'</td>';

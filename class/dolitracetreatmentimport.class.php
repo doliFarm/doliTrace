@@ -76,6 +76,11 @@ class DoliTraceTreatmentImport
 	public $cropplanid = 0;
 
 	/**
+	 * @var ?User	User of the import (creation of the agrodrugs from the catalogue)
+	 */
+	public $user = null;
+
+	/**
 	 * Constructor
 	 *
 	 * @param	DoliDB	$db		Database handler
@@ -176,6 +181,7 @@ class DoliTraceTreatmentImport
 	public function import(User $user, $socid, $dryrun, $cropplanid = 0)
 	{
 		$this->cropplanid = (int) $cropplanid;
+		$this->user = $user;
 		global $langs;
 
 		$langs->loadLangs(array('dolitrace@dolitrace', 'dolifarm@dolifarm'));
@@ -597,6 +603,23 @@ class DoliTraceTreatmentImport
 				if (($data['reg_number'] !== '' && $agrodrug->reg_number == $data['reg_number']) || ($data['reg_number'] === '' && $data['product_ref'] !== '' && $agrodrug->ref == $data['product_ref'])) {
 					$found = $agrodrug;
 					break;
+				}
+			}
+			// Registration number not among the agrodrugs: the authorised product of the catalogue of the Ministry of Health
+			// becomes an agrodrug of the farm (in the check only the transaction is rolled back)
+			if (!$found && $data['reg_number'] !== '' && dol_include_once('/dolifarm/lib/dolifarm_ppp.lib.php')) {
+				$catalogerror = '';
+				$catalogcreated = false;
+				$agrodrugid = dolifarmAgroDrugFromCatalog($this->db, $this->user, $data['reg_number'], $catalogerror, $catalogcreated);
+				if ($agrodrugid > 0) {
+					$agrodrugs = dolitraceTreatmentAgroDrugs($this->db);
+					$found = $agrodrugs[$agrodrugid] ?? null;
+					if ($found && $catalogcreated) {
+						$result['warnings'][] = $prefix.$langs->transnoentities('PppAgroDrugCreatedFrom', $found->label, $found->reg_number);
+					}
+				} elseif ($catalogerror !== '') {
+					$result['errors'][] = $prefix.$catalogerror;
+					return null;
 				}
 			}
 			if (!$found) {
