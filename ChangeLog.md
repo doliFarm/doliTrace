@@ -1,5 +1,13 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.3.2 (2026-11-06)
+
+Scarico del seme dalle semine. Dopo l'aggiornamento disattivare e riattivare il modulo (colonne nuove sulle operazioni).
+
+- Semine e impianti convalidati scaricano il seme (prodotto, lotto e quantità dell'operazione, nell'unità del prodotto) dal magazzino dei mezzi tecnici dell'azienda, alla data dell'operazione. Il ritorno in bozza, l'annullamento e la cancellazione lo stornano alla stessa data; una modifica di prodotto, lotto, quantità o piano storna e scarica di nuovo. Un errore di magazzino non blocca l'operazione: il seme resta "da regolarizzare" con il motivo e il pulsante Regolarizza magazzino.
+- Registri bio: i movimenti delle semine hanno l'origine "Semina o impianto"; la scheda Sementi mostra l'acquisto del lotto (ordine o ricevimento, fornitore e certificato bio) e lo stato del magazzino.
+- Più piani di produzione in bozza di seguito (prima il secondo dava "riferimento già esistente").
+
 ## 1.3.1
 
 Correzione della gestione di una o più aziende. Richiede doliFarm 1.5.1. Dopo l'aggiornamento non serve riattivare il modulo (nessuna modifica al database).

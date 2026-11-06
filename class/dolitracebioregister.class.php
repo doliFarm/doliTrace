@@ -73,7 +73,7 @@ class DoliTraceBioRegister
 	 * Origin of a stock movement
 	 *
 	 * @param	string	$origintype		Origin type of the movement
-	 * @return	string					HARVEST, TREATMENT, SHIPPING, RECEPTION or ADJUSTMENT (inventories, transfers, manual)
+	 * @return	string					HARVEST, TREATMENT, SOWING, SHIPPING, RECEPTION or ADJUSTMENT (inventories, transfers, manual)
 	 */
 	public static function originOf($origintype)
 	{
@@ -83,6 +83,10 @@ class DoliTraceBioRegister
 		}
 		if ($origintype == 'dolitracetreatment@dolitrace') {
 			return 'TREATMENT';
+		}
+		if ($origintype == 'dolitraceoperation@dolitrace') {
+			// Seed of a sowing or planting
+			return 'SOWING';
 		}
 		if (in_array($origintype, self::SALE_TYPES)) {
 			return 'SHIPPING';
@@ -397,6 +401,7 @@ class DoliTraceBioRegister
 			'shipping' => 'expedition', 'commande' => 'commande', 'facture' => 'facture',
 			'reception' => 'reception', 'order_supplier' => 'commande_fournisseur', 'invoice_supplier' => 'facture_fourn',
 			'dolitraceharvest@dolitrace' => 'dolitrace_harvest', 'dolitracetreatment@dolitrace' => 'dolitrace_treatment',
+			'dolitraceoperation@dolitrace' => 'dolitrace_operation',
 		);
 		$prefix = $this->db->prefix();
 		$documents = array();
@@ -405,7 +410,7 @@ class DoliTraceBioRegister
 				continue;
 			}
 			$table = $tables[$type];
-			$withsoc = !in_array($type, array('dolitraceharvest@dolitrace', 'dolitracetreatment@dolitrace'));
+			$withsoc = !in_array($type, array('dolitraceharvest@dolitrace', 'dolitracetreatment@dolitrace', 'dolitraceoperation@dolitrace'));
 			$sql = "SELECT d.rowid, d.ref";
 			if ($withsoc) {
 				$sql .= ", s.nom as thirdparty, se.dolifarm_bio_cert, se.dolifarm_bio_body";
@@ -803,7 +808,7 @@ class DoliTraceBioRegister
 		$prefix = $this->db->prefix();
 		list($start, $end) = $this->yearBounds($year);
 		$labels = $this->getBioStatusLabels();
-		$sql = "SELECT o.rowid, o.ref, o.date_op, o.fk_product, o.batch_input, o.qty_used, o.seed_status, o.bdsb_ref, o.bdsb_date,";
+		$sql = "SELECT o.rowid, o.ref, o.date_op, o.fk_product, o.batch_input, o.qty_used, o.seed_status, o.bdsb_ref, o.bdsb_date, o.stock_status,";
 		$sql .= " cp.fk_plot, pl.ref as plot_ref, c.label as crop_label, p.ref as product_ref, p.label as product_label";
 		$sql .= " FROM ".$prefix."dolitrace_operation as o";
 		$sql .= " INNER JOIN ".$prefix."dolitrace_cropplan as cp ON cp.rowid = o.fk_cropplan";
@@ -833,6 +838,7 @@ class DoliTraceBioRegister
 		}
 		$this->db->free($resql);
 		$productstatus = $this->getProductStatuses($products);
+		$purchases = $this->getLotPurchases($products);
 		$lines = array();
 		foreach ($rows as $obj) {
 			$date = $this->db->jdate($obj->date_op);
@@ -847,11 +853,64 @@ class DoliTraceBioRegister
 				'qty' => $obj->qty_used !== null ? (float) $obj->qty_used : null, 'bio_status' => $status,
 				'bdsb_ref' => (string) $obj->bdsb_ref, 'bdsb_date' => $obj->bdsb_date ? $this->db->jdate($obj->bdsb_date) : null,
 				'plot_bio' => $labels[$plotcode] ?? $plotcode,
+				// Purchase of the lot of seed, and its stock movement
+				'purchase' => $purchases[(int) $obj->fk_product][(string) $obj->batch_input] ?? '',
+				'stock' => (int) $obj->stock_status,
 				// Plot organic or in conversion, material not organic and no derogation
 				'missing_derogation' => (dolifarmBioIsOrganic($plotcode) && $status !== 'BIO' && trim((string) $obj->bdsb_ref) === ''),
 			);
 		}
 		return $lines;
+	}
+
+	/**
+	 * Purchase of each lot of the products: the first entry of the lot from a reception, a supplier order or a supplier
+	 * invoice, with the document, the supplier and its organic certificate (stock movements are only read)
+	 *
+	 * @param	int[]	$products	Ids of the products
+	 * @return	array<int,array<string,string>>	Product => lot => purchase
+	 */
+	private function getLotPurchases($products)
+	{
+		$purchases = array();
+		if (!count($products)) {
+			return $purchases;
+		}
+		$prefix = $this->db->prefix();
+		$sql = "SELECT sm.fk_product, sm.batch, sm.origintype, sm.fk_origin, sm.datem FROM ".$prefix."stock_mouvement as sm";
+		$sql .= " INNER JOIN ".$prefix."entrepot as e ON e.rowid = sm.fk_entrepot";
+		$sql .= " WHERE e.entity IN (".getEntity('stock').") AND sm.value > 0 AND sm.batch IS NOT NULL AND sm.batch <> ''";
+		$sql .= " AND sm.fk_product IN (".$this->db->sanitize(implode(',', array_map('intval', $products))).")";
+		$sql .= " AND sm.origintype IN ('".implode("','", array_map(array($this->db, 'escape'), self::PURCHASE_TYPES))."')";
+		$sql .= " ORDER BY sm.datem, sm.rowid";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
+			return $purchases;
+		}
+		$first = array();
+		$origins = array();
+		while ($obj = $this->db->fetch_object($resql)) {
+			$key = (int) $obj->fk_product.'|'.$obj->batch;
+			if (!isset($first[$key])) {
+				$first[$key] = $obj;
+				$origins[(string) $obj->origintype][(int) $obj->fk_origin] = (int) $obj->fk_origin;
+			}
+		}
+		$this->db->free($resql);
+		$documents = $this->getOriginDocuments($origins);
+		foreach ($first as $obj) {
+			$doc = $documents[(string) $obj->origintype][(int) $obj->fk_origin] ?? null;
+			$text = dol_print_date($this->db->jdate($obj->datem), 'day');
+			if ($doc) {
+				$text .= ' '.$doc['ref'].($doc['thirdparty'] !== '' ? ' - '.$doc['thirdparty'] : '');
+				if ($doc['cert'] !== '') {
+					$text .= ' ('.$doc['cert'].($doc['body'] !== '' ? ', '.$doc['body'] : '').')';
+				}
+			}
+			$purchases[(int) $obj->fk_product][(string) $obj->batch] = $text;
+		}
+		return $purchases;
 	}
 
 	/**
@@ -1366,10 +1425,11 @@ class DoliTraceBioRegister
 				);
 			case 'seeds':
 				return array(
-					array('date', 'Date', 7, false), array('ref', 'Ref', 9, false), array('plot_ref', 'BioRegisterPlot', 9, false),
-					array('plot_bio', 'BioRegisterPlotStatusAtDate', 10, false), array('crop', 'BioRegisterCrop', 10, false), array('product', 'Product', 14, false),
-					array('batch', 'Batch', 7, false), array('qty', 'Qty', 5, true), array('bio_status', 'BioRegisterSeedStatus', 8, false),
-					array('bdsb_ref', 'OperationBdsbRef', 8, false), array('bdsb_date', 'OperationBdsbDate', 6, false), array('check', 'BioRegisterCheck', 7, false),
+					array('date', 'Date', 6, false), array('ref', 'Ref', 8, false), array('plot_ref', 'BioRegisterPlot', 7, false),
+					array('plot_bio', 'BioRegisterPlotStatusAtDate', 7, false), array('crop', 'BioRegisterCrop', 8, false), array('product', 'Product', 11, false),
+					array('batch', 'Batch', 7, false), array('qty', 'Qty', 5, true), array('bio_status', 'BioRegisterSeedStatus', 7, false),
+					array('purchase', 'BioRegisterSeedPurchase', 12, false), array('stock', 'OperationStockStatus', 6, false),
+					array('bdsb_ref', 'OperationBdsbRef', 6, false), array('bdsb_date', 'OperationBdsbDate', 5, false), array('check', 'BioRegisterCheck', 5, false),
 				);
 			case 'inputs':
 				return array(
@@ -1444,6 +1504,9 @@ class DoliTraceBioRegister
 				$map = array('yes' => 'OrganicResultYes', 'no' => 'OrganicResultNo', 'verify' => 'OrganicResultVerify');
 				$text = ($raw ? $line['organic_result'] : $outputlangs->transnoentities($map[$line['organic_result']] ?? $line['organic_result']));
 				return $text.($line['organic_confirmed'] ? ($raw ? ';confirmed' : ' ('.$outputlangs->transnoentities('BioRegisterConfirmed').')') : '');
+			case 'stock':
+				$stocks = array(0 => 'TreatmentStockNone', 1 => 'TreatmentStockMoved', 2 => 'TreatmentStockToRegularize', 3 => 'TreatmentStockReversed');
+				return $raw ? (string) (int) $line['stock'] : $outputlangs->transnoentities($stocks[(int) $line['stock']] ?? $stocks[0]);
 			case 'check':
 				return !empty($line['missing_derogation']) ? ($raw ? 'MISSING_DEROGATION' : $outputlangs->transnoentities('BioRegisterMissingDerogation')) : '';
 			case 'qty_in':

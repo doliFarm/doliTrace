@@ -345,13 +345,23 @@ class DoliTraceCropplan extends CommonObject
                 // Se num_rows > 0, il ciclo si ripete e ne genera un altro
             }
         }
-        // IMPOSTAZIONE PRE-SALVATAGGIO
-        // Se il ref è vuoto, mettiamo una stringa temporanea per passare i controlli NotNull (se ci sono)
-        if (empty($this->ref)) {
-            $this->ref = '(PROV)';
-        }  
+        // Draft: provisional ref unique until the id is known, then "(PROV<id>)" as the core does (the ref is a unique key)
+        $provisional = false;
+        if (empty($this->ref) || $this->ref == '(PROV)') {
+            $this->ref = '(PROV-'.bin2hex(random_bytes(6)).')';
+            $provisional = true;
+        }
 
         $result = $this->createCommon($user, $notrigger);
+        if ($result > 0 && $provisional) {
+            $sql = "UPDATE ".$this->db->prefix().$this->table_element." SET ref = '(PROV".((int) $this->id).")' WHERE rowid = ".((int) $this->id);
+            if ($this->db->query($sql)) {
+                $this->ref = '(PROV'.((int) $this->id).')';
+            } else {
+                $this->error = $this->db->lasterror();
+                return -1;
+            }
+        }
 
         // uncomment lines below if you want to validate object after creation
         // if ($result > 0) {

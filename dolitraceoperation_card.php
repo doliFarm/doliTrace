@@ -196,6 +196,17 @@ if (empty($reshook)) {
         exit;
     }
 
+    // Seed of a sowing or planting to regularize: the stock movement is tried again
+    if ($action == 'confirm_movestock' && $permissiontoadd && $object->id > 0 && $object->status == $object::STATUS_VALIDATED) {
+        if ($object->moveStock($user) < 0) {
+            setEventMessages($langs->trans('OperationStockStillToRegularize'), null, 'warnings');
+        } else {
+            setEventMessages($langs->trans('TreatmentStockRegularized'), null, 'mesgs');
+        }
+        header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+        exit;
+    }
+
     // Actions cancel, add, update, update_extras, confirm_validate, confirm_delete, confirm_deleteline, confirm_clone, confirm_close, confirm_setdraft, confirm_reopen
     include DOL_DOCUMENT_ROOT.'/core/actions_addupdatedelete.inc.php';
 
@@ -421,6 +432,26 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
         print info_admin(implode('<br>', array_map('dol_escape_htmltag', $organicwarnings)), 0, 0, 'warning');
     }
 
+    // Seed of a sowing or planting: movement of the inputs warehouse of the farm
+    if (in_array((string) $object->fk_operation_type, $object::$seedingTypes) && isModEnabled('stock')
+        && ((int) $object->stock_status != $object::STOCK_NONE || ($object->fk_product > 0 && $object->status == $object::STATUS_VALIDATED))) {
+        $stocklabels = array(
+            $object::STOCK_NONE => array('TreatmentStockNone', 'status0'),
+            $object::STOCK_MOVED => array('TreatmentStockMoved', 'status4'),
+            $object::STOCK_TO_REGULARIZE => array('TreatmentStockToRegularize', 'status1'),
+            $object::STOCK_REVERSED => array('TreatmentStockReversed', 'status6'),
+        );
+        $sl = $stocklabels[(int) $object->stock_status] ?? $stocklabels[$object::STOCK_NONE];
+        $stockinfo = $langs->trans('OperationStockStatus').': '.dolGetStatus($langs->trans($sl[0]), '', '', $sl[1], 1);
+        if ($object->fk_stock_movement > 0) {
+            $stockinfo .= ' &nbsp; <a href="'.DOL_URL_ROOT.'/product/stock/movement_list.php?search_movement='.((int) $object->fk_stock_movement).'">'.img_picto('', 'movement', 'class="pictofixedwidth"').$langs->trans('OperationStockMovement').'</a>';
+        }
+        if ((string) $object->stock_error !== '') {
+            $stockinfo .= '<br>'.$langs->trans('TreatmentStockError').': '.dol_escape_htmltag((string) $object->stock_error);
+        }
+        print info_admin($stockinfo, 0, 0, ((int) $object->stock_status == $object::STOCK_TO_REGULARIZE ? 'warning' : '1'));
+    }
+
     print dol_get_fiche_end();
 
 
@@ -501,6 +532,11 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
             // Modify
             print dolGetButtonAction('', $langs->trans('Modify'), 'default', $_SERVER["PHP_SELF"].'?id='.$object->id.'&action=edit&token='.newToken(), '', $permissiontoadd);
+
+            // Seed to regularize: try again the stock movement
+            if ($object->status == $object::STATUS_VALIDATED && (int) $object->stock_status == $object::STOCK_TO_REGULARIZE && isModEnabled('stock')) {
+                print dolGetButtonAction('', $langs->trans('TreatmentStockRegularize'), 'default', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=confirm_movestock&token='.newToken(), '', $permissiontoadd);
+            }
 
             // Costs from the standard costs per hectare
             if (isModEnabled('dolifarm')) {
