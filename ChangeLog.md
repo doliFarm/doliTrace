@@ -1,6 +1,6 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-## 1.3.2 (in sviluppo)
+## 1.3.2 (2026-11-06)
 
 Scarico del seme dalle semine. Dopo l'aggiornamento disattivare e riattivare il modulo (colonne nuove sulle operazioni).
 
