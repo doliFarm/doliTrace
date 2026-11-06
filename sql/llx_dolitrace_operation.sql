@@ -35,7 +35,11 @@ CREATE TABLE IF NOT EXISTS llx_dolitrace_operation(
 	seed_status varchar(16),		-- organic: reproductive material BIO, INCONV or NONBIO
 	bdsb_ref varchar(64),			-- organic: number of the derogation of the BDSB for non organic material
 	bdsb_date date,					-- organic: date of the derogation
-	qty_used decimal(24,8), 
+	qty_used decimal(24,8),
+	stock_status smallint DEFAULT 0 NOT NULL,			-- seed taken out of the stock: 0 none, 1 taken out, 2 to regularize, 3 put back
+	stock_error varchar(255),							-- reason of a movement to regularize
+	fk_warehouse integer,								-- warehouse of the movement
+	fk_stock_movement integer,							-- movement that took the seed out
 	water_vol_ha decimal(24,8),
 	irrigation_method varchar(16),						-- llx_dolitrace_c_irrigation_method.code
 	water_volume double(24,8),							-- m3 of water of the irrigation

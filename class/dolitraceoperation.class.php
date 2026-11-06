@@ -85,6 +85,12 @@ class DoliTraceOperation extends CommonObject
 	const STATUS_VALIDATED = 1;
 	const STATUS_CANCELED = 9;
 
+	// State of the stock of the seed of a sowing or planting
+	const STOCK_NONE = 0;
+	const STOCK_MOVED = 1;
+	const STOCK_TO_REGULARIZE = 2;
+	const STOCK_REVERSED = 3;
+
 	// Type of the irrigations (register of the irrigations)
 	const TYPE_IRRIGATION = 'IRRIGATION';
 
@@ -176,6 +182,11 @@ class DoliTraceOperation extends CommonObject
 		"bdsb_ref" => array("type" => "varchar(64)", "label" => "OperationBdsbRef", "enabled" => "1", 'position' => 82, 'notnull' => 0, "visible" => "-1", "help" => "OperationBdsbRefHelp",),
 		"bdsb_date" => array("type" => "date", "label" => "OperationBdsbDate", "enabled" => "1", 'position' => 83, 'notnull' => 0, "visible" => "-1",),
 		"qty_used" => array("type" => "decimal(24,8)", "label" => "Qtyused", "enabled" => "1", 'position' => 85, 'notnull' => 0, "visible" => "-1",),
+		// Seed taken out of the inputs warehouse of the farm by a validated sowing or planting (set by moveStock() only)
+		"stock_status" => array("type" => "integer", "label" => "OperationStockStatus", "enabled" => "1", 'position' => 86, 'notnull' => 1, "visible" => "0", "default" => "0",),
+		"stock_error" => array("type" => "varchar(255)", "label" => "OperationStockError", "enabled" => "1", 'position' => 87, 'notnull' => 0, "visible" => "0",),
+		"fk_warehouse" => array("type" => "integer", "label" => "Warehouse", "enabled" => "1", 'position' => 87, 'notnull' => 0, "visible" => "0",),
+		"fk_stock_movement" => array("type" => "integer", "label" => "StockMovement", "enabled" => "1", 'position' => 87, 'notnull' => 0, "visible" => "0",),
 		"water_vol_ha" => array("type" => "decimal(24,8)", "label" => "Watervolha", "enabled" => "1", 'position' => 88, 'notnull' => 0, "visible" => "-1",),
 		"irrigation_method" => array("type" => "sellist:dolitrace_c_irrigation_method:label:code::active=1", "label" => "IrrigationMethod", "enabled" => "1", 'position' => 89, 'notnull' => 0, "visible" => "-1", "help" => "IrrigationOnlyHelp", "css" => "maxwidth300",),
 		"water_volume" => array("type" => "double(24,8)", "label" => "IrrigationWaterVolume", "enabled" => "1", 'position' => 90, 'notnull' => 0, "visible" => "-1", "help" => "IrrigationWaterVolumeHelp", "isameasure" => 1,),
@@ -236,6 +247,26 @@ class DoliTraceOperation extends CommonObject
 	 */
 	public $bdsb_date;
 	public $qty_used;
+
+	/**
+	 * @var int		State of the stock of the seed (STOCK_*)
+	 */
+	public $stock_status = 0;
+
+	/**
+	 * @var string|null	Reason of a movement of the seed to regularize
+	 */
+	public $stock_error;
+
+	/**
+	 * @var int|null	Warehouse the seed was taken out of
+	 */
+	public $fk_warehouse;
+
+	/**
+	 * @var int|null	Movement that took the seed out
+	 */
+	public $fk_stock_movement;
 	public $water_vol_ha;
 	public $entity;
 	public $irrigation_method;
@@ -473,6 +504,11 @@ class DoliTraceOperation extends CommonObject
 		if (property_exists($object, 'status')) {
 			$object->status = self::STATUS_DRAFT;
 		}
+		// The copy has not moved any seed
+		$object->stock_status = self::STOCK_NONE;
+		$object->stock_error = null;
+		$object->fk_warehouse = null;
+		$object->fk_stock_movement = null;
 		if (property_exists($object, 'date_creation')) {
 			$object->date_creation = dol_now();
 		}
@@ -660,7 +696,196 @@ class DoliTraceOperation extends CommonObject
 			return -1;
 		}
 		$this->fillCosts();
-		return $this->updateCommon($user, $notrigger);
+		// Seed already taken out: a change of product, lot, quantity or crop plan puts it back and takes it out again
+		$old = null;
+		if ((int) $this->stock_status == self::STOCK_MOVED && $this->id > 0) {
+			$old = new self($this->db);
+			if ($old->fetch($this->id) <= 0 || (int) $old->stock_status != self::STOCK_MOVED || !$this->stockChanged($old)) {
+				$old = null;
+			}
+		}
+		$result = $this->updateCommon($user, $notrigger);
+		if ($result > 0 && $this->status == self::STATUS_VALIDATED) {
+			if ($old) {
+				$old->reverseStock($user);
+				$this->stock_status = $old->stock_status;
+				$this->stock_error = $old->stock_error;
+				$this->fk_warehouse = $old->fk_warehouse;
+				$this->fk_stock_movement = $old->fk_stock_movement;
+			}
+			$this->moveStock($user);
+		}
+		return $result;
+	}
+
+	/**
+	 * Data of the stock movement of the seed changed since the record was saved
+	 *
+	 * @param	self	$old	Operation as saved
+	 * @return	bool
+	 */
+	private function stockChanged($old)
+	{
+		return ((int) $old->fk_product != (int) $this->fk_product || (int) $old->fk_cropplan != (int) $this->fk_cropplan
+			|| (string) $old->batch_input !== (string) $this->batch_input || (string) $old->fk_operation_type !== (string) $this->fk_operation_type
+			|| price2num((float) $old->qty_used, 'MS') != price2num((float) $this->qty_used, 'MS'));
+	}
+
+	/**
+	 * Take the seed of a validated sowing or planting out of the inputs warehouse of the farm
+	 *
+	 * After the validation, in its own transaction: an error of the stock never blocks the operation, the seed stays
+	 * "to regularize" with the reason and the movement can be tried again. The quantity used is in the unit of the product.
+	 *
+	 * @param	User	$user	User that validates
+	 * @return	int				1 if moved, 0 if nothing to move, <0 if to regularize
+	 */
+	public function moveStock(User $user)
+	{
+		return $this->stockMovement($user, false);
+	}
+
+	/**
+	 * Put back in stock the seed taken out by an operation set back to draft, canceled, deleted or changed
+	 *
+	 * @param	User	$user	User of the action
+	 * @return	int				1 if put back, 0 if nothing to put back, <0 if KO
+	 */
+	public function reverseStock(User $user)
+	{
+		return $this->stockMovement($user, true);
+	}
+
+	/**
+	 * Stock movement of the seed of the operation (MouvementStock, never SQL on the stock tables)
+	 *
+	 * @param	User	$user		User of the action
+	 * @param	bool	$reverse	False to take the seed out, true to put back what was taken out
+	 * @return	int					1 if moved, 0 if nothing to move, <0 if the movement failed
+	 */
+	private function stockMovement(User $user, $reverse)
+	{
+		global $langs;
+
+		if (!isModEnabled('stock') || $this->id <= 0) {
+			return 0;
+		}
+		require_once DOL_DOCUMENT_ROOT.'/product/stock/class/mouvementstock.class.php';
+		require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
+		$langs->load('dolitrace@dolitrace');
+
+		$status = (int) $this->stock_status;
+		$warehouseid = $this->fk_warehouse;
+		$movementid = $this->fk_stock_movement;
+		if ($reverse) {
+			// Only what was taken out goes back
+			if ($status != self::STOCK_MOVED) {
+				if ($status == self::STOCK_TO_REGULARIZE) {
+					$this->saveStockStatus(self::STOCK_NONE, '', null, null);
+				}
+				return 0;
+			}
+		} elseif ($status == self::STOCK_MOVED || $this->status != self::STATUS_VALIDATED) {
+			return 0;
+		}
+
+		$prod = new Product($this->db);
+		if (!$reverse && (!in_array((string) $this->fk_operation_type, self::$seedingTypes) || empty($this->fk_product)
+			|| $prod->fetch((int) $this->fk_product) <= 0 || $prod->type != Product::TYPE_PRODUCT || !((float) $this->qty_used > 0))) {
+			// No seed of the stock: nothing to move
+			if ($status != self::STOCK_NONE || (string) $this->stock_error !== '') {
+				$this->saveStockStatus(self::STOCK_NONE, '', null, null);
+			}
+			return 0;
+		}
+
+		$error = '';
+		$qty = 0;
+		$batch = '';
+		$reversedate = 0;
+		if ($reverse) {
+			// The same product, lot and quantity that were taken out
+			$mouvout = new MouvementStock($this->db);
+			if (!($movementid > 0) || $mouvout->fetch($movementid) <= 0 || $prod->fetch((int) $mouvout->product_id) <= 0) {
+				$error = $langs->transnoentitiesnoconv('ErrorTreatmentStockMovement');
+			} else {
+				$qty = abs((float) $mouvout->qty);
+				$batch = (string) $mouvout->batch;
+				$warehouseid = (int) $mouvout->warehouse_id;
+				// At the date of the movement it reverses: the registers of the period stay balanced (the creation date keeps when it was done)
+				$reversedate = (int) $mouvout->datem;
+			}
+		} else {
+			dol_include_once('/dolitrace/lib/dolitrace_treatment.lib.php');
+			dol_include_once('/dolifarm/lib/dolifarm_warehouse.lib.php');
+			$cropplan = dolitraceTreatmentCropPlan($this->db, (int) $this->fk_cropplan);
+			$warehouseid = (($cropplan && function_exists('dolifarmGetFarmWarehouse')) ? dolifarmGetFarmWarehouse($this->db, (int) $cropplan->fk_soc, 'inputs') : 0);
+			$batch = ($prod->hasbatch() ? trim((string) $this->batch_input) : '');
+			$qty = (float) $this->qty_used;
+			if ($warehouseid <= 0) {
+				$error = $langs->transnoentitiesnoconv('ErrorTreatmentNoWarehouse');
+			} elseif ($prod->hasbatch() && $batch === '') {
+				$error = $langs->transnoentitiesnoconv('ErrorTreatmentBatchRequired');
+			}
+		}
+
+		if ($error === '') {
+			$this->db->begin();
+			$mouv = new MouvementStock($this->db);
+			$mouv->setOrigin($this->element.'@dolitrace', $this->id);
+			if ($reverse) {
+				$result = $mouv->reception($user, $prod->id, $warehouseid, $qty, (float) $prod->pmp, $langs->trans('OperationStockReversal', $this->ref), '', '', $batch, ($reversedate > 0 ? $reversedate : dol_now()));
+			} else {
+				$date = (is_numeric($this->date_op) ? (int) $this->date_op : dol_stringtotime((string) $this->date_op));
+				$result = $mouv->livraison($user, $prod->id, $warehouseid, $qty, (float) $prod->pmp, $langs->trans('OperationStockTaken', $this->ref), (empty($date) ? '' : $date), '', '', $batch);
+			}
+			if ($result > 0) {
+				$this->db->commit();
+				$status = ($reverse ? self::STOCK_REVERSED : self::STOCK_MOVED);
+				$movementid = ($reverse ? $movementid : (int) $result);
+			} else {
+				$this->db->rollback();
+				$error = dol_string_nohtmltag(dol_html_entity_decode($mouv->error ? $mouv->error : implode(', ', $mouv->errors), ENT_QUOTES | ENT_HTML5));
+				if ($error === '') {
+					$error = $langs->transnoentitiesnoconv('ErrorTreatmentStockMovement');
+				}
+			}
+		}
+		if ($error !== '') {
+			if (!$reverse) {
+				$status = self::STOCK_TO_REGULARIZE;
+			}
+			dol_syslog(__METHOD__.' operation '.$this->id.': '.$error, LOG_WARNING);
+		}
+		$this->saveStockStatus($status, $error, $warehouseid, $movementid);
+		return ($error !== '' ? -1 : 1);
+	}
+
+	/**
+	 * Save the state of the stock of the seed
+	 *
+	 * @param	int			$status			State of the stock (STOCK_*)
+	 * @param	string		$error			Reason of a movement to regularize
+	 * @param	int|null	$warehouseid	Warehouse
+	 * @param	int|null	$movementid		Movement that took the seed out
+	 * @return	void
+	 */
+	private function saveStockStatus($status, $error, $warehouseid, $movementid)
+	{
+		$sql = "UPDATE ".$this->db->prefix().$this->table_element." SET";
+		$sql .= " stock_status = ".((int) $status);
+		$sql .= ", stock_error = ".($error !== '' ? "'".$this->db->escape(dol_trunc($error, 250, 'right', 'UTF-8', 1))."'" : "NULL");
+		$sql .= ", fk_warehouse = ".($warehouseid > 0 ? ((int) $warehouseid) : "NULL");
+		$sql .= ", fk_stock_movement = ".($movementid > 0 ? ((int) $movementid) : "NULL");
+		$sql .= " WHERE rowid = ".((int) $this->id);
+		if (!$this->db->query($sql)) {
+			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
+			return;
+		}
+		$this->stock_status = $status;
+		$this->stock_error = ($error !== '' ? $error : null);
+		$this->fk_warehouse = ($warehouseid > 0 ? (int) $warehouseid : null);
+		$this->fk_stock_movement = ($movementid > 0 ? (int) $movementid : null);
 	}
 
 	/**
@@ -888,8 +1113,12 @@ class DoliTraceOperation extends CommonObject
 		if (dolitraceFrozenCheck($this) < 0) {
 			return -1;
 		}
-		return $this->deleteCommon($user, $notrigger);
-		//return $this->deleteCommon($user, $notrigger, 1);
+		$result = $this->deleteCommon($user, $notrigger);
+		if ($result > 0) {
+			// The seed taken out goes back to the warehouse
+			$this->reverseStock($user);
+		}
+		return $result;
 	}
 
 	/**
@@ -1043,6 +1272,7 @@ class DoliTraceOperation extends CommonObject
 
 		if (!$error) {
 			$this->db->commit();
+			$this->moveStock($user);
 			return 1;
 		} else {
 			$this->db->rollback();
@@ -1076,7 +1306,11 @@ class DoliTraceOperation extends CommonObject
 		 return -1;
 		 }*/
 
-		return $this->setStatusCommon($user, self::STATUS_DRAFT, $notrigger, 'DOLITRACE_OPERATION_UNVALIDATE');
+		$result = $this->setStatusCommon($user, self::STATUS_DRAFT, $notrigger, 'DOLITRACE_OPERATION_UNVALIDATE');
+		if ($result > 0) {
+			$this->reverseStock($user);
+		}
+		return $result;
 	}
 
 	/**
@@ -1104,7 +1338,11 @@ class DoliTraceOperation extends CommonObject
 		 return -1;
 		 }*/
 
-		return $this->setStatusCommon($user, self::STATUS_CANCELED, $notrigger, 'DOLITRACE_OPERATION_CANCEL');
+		$result = $this->setStatusCommon($user, self::STATUS_CANCELED, $notrigger, 'DOLITRACE_OPERATION_CANCEL');
+		if ($result > 0) {
+			$this->reverseStock($user);
+		}
+		return $result;
 	}
 
 	/**
@@ -1132,7 +1370,11 @@ class DoliTraceOperation extends CommonObject
 		 return -1;
 		 }*/
 
-		return $this->setStatusCommon($user, self::STATUS_VALIDATED, $notrigger, 'DOLITRACE_OPERATION_REOPEN');
+		$result = $this->setStatusCommon($user, self::STATUS_VALIDATED, $notrigger, 'DOLITRACE_OPERATION_REOPEN');
+		if ($result > 0) {
+			$this->moveStock($user);
+		}
+		return $result;
 	}
 
 	/**
