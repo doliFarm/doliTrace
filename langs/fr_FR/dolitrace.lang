@@ -653,3 +653,14 @@ QtyUsed = Quantité utilisée
 ProductOut = Produit récolté
 Season = Campagne
 CropPlanCrop = Culture
+
+#
+# Weather conditions from doliField
+#
+TreatmentWeatherHelp = Conditions météo pendant le traitement. Avec doliField activé, si le champ est vide à la validation, les conditions de la parcelle (vent, température, humidité, pluie pendant et après le traitement) y sont copiées depuis les données météo de son point.
+TreatmentWeatherProposed = Conditions météo de la parcelle (doliField)
+TreatmentWeatherCopiedAtValidation = Le champ Conditions météo est vide : ce texte y sera copié à la validation.
+TreatmentWeatherUse = Utiliser dans l'enregistrement
+TreatmentWeatherCopied = Conditions météo copiées dans l'enregistrement
+TreatmentWeatherNone = Aucune donnée météo de doliField pour la parcelle sur cette période (point météo pas encore relié ou données pas encore téléchargées).
+OperationWeatherHelp = Avec doliField activé, si le champ est vide à la validation, les conditions météo de la parcelle pendant l'opération y sont copiées.
