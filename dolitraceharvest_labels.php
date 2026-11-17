@@ -108,6 +108,7 @@ print '<span class="opacitymedium">'.$langs->trans('TraceLabelsHelp').'</span><b
 print '<form method="GET" action="'.$_SERVER['PHP_SELF'].'" target="_blank" id="dolitrace-labels-form">';
 print '<input type="hidden" name="id" value="'.$h['id'].'">';
 print '<input type="hidden" name="action" value="pdf">';
+print '<input type="hidden" name="token" value="'.newToken().'">';
 print '<table class="border centpercent tableforfield">';
 print '<tr><td class="titlefield">'.$langs->trans('HarvestProduct').'</td><td>'.dol_escape_htmltag($h['product'] !== '' ? $h['product'] : $history['cropplan']['crop']).'</td></tr>';
 print '<tr><td>'.$langs->trans('HarvestBatch').'</td><td>'.dol_escape_htmltag($h['batch']).'</td></tr>';
