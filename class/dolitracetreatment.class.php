@@ -27,6 +27,7 @@
 require_once DOL_DOCUMENT_ROOT.'/core/class/commonobject.class.php';
 dol_include_once('/dolitrace/lib/dolitrace_inspection.lib.php');
 dol_include_once('/dolitrace/lib/dolitrace_treatment.lib.php');
+dol_include_once('/dolitrace/lib/dolitrace_weather.lib.php');
 //require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 //require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 
@@ -171,7 +172,7 @@ class DoliTraceTreatment extends CommonObject
 		'machine_check_date' => array('type' => 'date', 'label' => 'TreatmentMachineCheckDate', 'enabled' => 1, 'position' => 63, 'notnull' => 0, 'visible' => -5, 'noteditable' => 1),
 		'machine_cert_ref' => array('type' => 'varchar(64)', 'label' => 'TreatmentMachineCertRef', 'enabled' => 1, 'position' => 64, 'notnull' => 0, 'visible' => -5, 'noteditable' => 1),
 		'water_volume' => array('type' => 'double(24,8)', 'label' => 'TreatmentWaterVolume', 'enabled' => 1, 'position' => 65, 'notnull' => 0, 'visible' => -1, 'css' => 'maxwidth100', 'help' => 'TreatmentWaterVolumeHelp'),
-		'weather' => array('type' => 'varchar(255)', 'label' => 'TreatmentWeather', 'enabled' => 1, 'position' => 66, 'notnull' => 0, 'visible' => -1, 'css' => 'minwidth300'),
+		'weather' => array('type' => 'varchar(255)', 'label' => 'TreatmentWeather', 'enabled' => 1, 'position' => 66, 'notnull' => 0, 'visible' => -1, 'css' => 'minwidth300', 'help' => 'TreatmentWeatherHelp'),
 		'application_method' => array('type' => 'sellist:dolitrace_c_application_method:label:code::active=1', 'label' => 'TreatmentApplicationMethod', 'enabled' => 1, 'position' => 67, 'notnull' => 0, 'visible' => -1, 'css' => 'maxwidth500 widthcentpercentminusxx', 'help' => 'TreatmentApplicationMethodHelp'),
 		'justification_type' => array('type' => 'sellist:dolitrace_c_justification:label:code::active=1', 'label' => 'TreatmentJustificationType', 'enabled' => 1, 'position' => 68, 'notnull' => 0, 'visible' => -1, 'css' => 'maxwidth300', 'help' => 'TreatmentJustificationTypeHelp'),
 		'justification_ref' => array('type' => 'varchar(255)', 'label' => 'TreatmentJustificationRef', 'enabled' => 1, 'position' => 69, 'notnull' => 0, 'visible' => -1, 'css' => 'minwidth300', 'help' => 'TreatmentJustificationRefHelp'),
@@ -932,6 +933,13 @@ class DoliTraceTreatment extends CommonObject
 			$this->late = ($now - (!empty($this->date_end) ? $this->date_end : $this->date_start) > 30 * 86400 ? 1 : 0);
 			$this->date_valid = $now;
 			$this->fk_user_valid = $user->id;
+			// Weather conditions of the plot copied from doliField when not typed: part of the hash
+			if (trim((string) $this->weather) === '') {
+				$weather = $this->getWeatherText();
+				if ($weather !== '') {
+					$this->weather = $weather;
+				}
+			}
 			$this->content_hash = $this->computeHash();
 
 			$sql = "UPDATE ".$this->db->prefix().$this->table_element;
@@ -941,6 +949,7 @@ class DoliTraceTreatment extends CommonObject
 			$sql .= ", fk_user_valid = ".((int) $user->id);
 			$sql .= ", late = ".((int) $this->late);
 			$sql .= ", content_hash = '".$this->db->escape($this->content_hash)."'";
+			$sql .= ", weather = ".(trim((string) $this->weather) !== '' ? "'".$this->db->escape($this->weather)."'" : "NULL");
 			$sql .= ", operator_name = ".($this->operator_name !== null ? "'".$this->db->escape($this->operator_name)."'" : "NULL");
 			$sql .= ", operator_license = ".($this->operator_license !== null ? "'".$this->db->escape($this->operator_license)."'" : "NULL");
 			$sql .= ", operator_license_end = ".(!empty($this->operator_license_end) ? "'".$this->db->idate($this->operator_license_end)."'" : "NULL");
@@ -1242,6 +1251,29 @@ class DoliTraceTreatment extends CommonObject
 	}
 
 	/**
+	 * Weather conditions of the plot of the record in its period, from doliField
+	 *
+	 * @return	?array<string,mixed>	Conditions, null without doliField, plot, weather point or data
+	 */
+	public function getWeatherConditions(): ?array
+	{
+		if ((int) $this->technical_type != self::TECHNICAL_SURFACES || empty($this->fk_cropplan) || empty($this->date_start)) {
+			return null;
+		}
+		return dolitraceWeatherConditions($this->db, (int) $this->fk_cropplan, (int) $this->date_start, (int) $this->date_end);
+	}
+
+	/**
+	 * Text of the weather conditions to copy in the record
+	 *
+	 * @return	string		'' if not available
+	 */
+	public function getWeatherText(): string
+	{
+		return dolitraceWeatherText($this->getWeatherConditions(), 255);
+	}
+
+	/**
 	 * Blocking checks before the validation
 	 *
 	 * @return	string[]	Translated errors, empty if the record can be validated
@@ -1451,6 +1483,11 @@ class DoliTraceTreatment extends CommonObject
 		// Resistance management: maximum of applications of the label and groups of the mode of action in a row
 		if ($this->kind == self::KIND_PLANTPROTECTION) {
 			$warnings = array_merge($warnings, $this->getResistanceWarnings());
+		}
+
+		// Weather of the plot (doliField): wind, rain during and after the treatment, temperature; drafts only
+		if ($this->kind == self::KIND_PLANTPROTECTION && $this->status == self::STATUS_DRAFT) {
+			$warnings = array_merge($warnings, dolitraceWeatherWarnings($this->getWeatherConditions()));
 		}
 
 		// Organic production: products not allowed on organic areas, copper over 7 years

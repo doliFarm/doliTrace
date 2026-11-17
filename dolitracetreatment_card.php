@@ -234,6 +234,21 @@ if (empty($reshook)) {
 		$action = '';
 	}
 
+	// Weather conditions of doliField copied in the draft
+	if ($action == 'useweather' && $permissiontoadd && $isdraft) {
+		$weather = $object->getWeatherText();
+		if ($weather !== '') {
+			$object->weather = $weather;
+			if ($object->update($user) < 0) {
+				setEventMessages($object->error, $object->errors, 'errors');
+			} else {
+				setEventMessages($langs->trans('TreatmentWeatherCopied'), null, 'mesgs');
+			}
+		}
+		header('Location: '.$_SERVER['PHP_SELF'].'?id='.((int) $object->id));
+		exit;
+	}
+
 	// Correction: a new draft version of a validated record
 	if ($action == 'confirm_correct' && $confirm == 'yes') {
 		$newid = $object->createCorrection($user, GETPOST('reason', 'alphanohtml'));
@@ -1030,6 +1045,22 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	}
 	if ($warningshtml) {
 		print info_admin($warningshtml, 0, 0, 'warning');
+	}
+	// Weather conditions of the plot from doliField: proposed on the draft, copied at the validation when empty
+	if ($object->status == $object::STATUS_DRAFT && $object->technical_type == $object::TECHNICAL_SURFACES && dolitraceWeatherAvailable()) {
+		$weathertext = $object->getWeatherText();
+		if ($weathertext !== '') {
+			$html = '<b>'.$langs->trans('TreatmentWeatherProposed').'</b>: '.dol_escape_htmltag($weathertext);
+			if (trim((string) $object->weather) === '') {
+				$html .= '<br><span class="opacitymedium">'.$langs->trans('TreatmentWeatherCopiedAtValidation').'</span>';
+			}
+			if ($permissiontoadd && $weathertext !== (string) $object->weather) {
+				$html .= ' <a class="butActionSmall" href="'.dol_escape_htmltag($_SERVER['PHP_SELF'].'?id='.((int) $object->id).'&action=useweather&token='.newToken()).'">'.$langs->trans('TreatmentWeatherUse').'</a>';
+			}
+			print info_admin($html, 0, 0, 'info');
+		} elseif (!empty($object->fk_cropplan)) {
+			print '<div class="opacitymedium small">'.$langs->trans('TreatmentWeatherNone').'</div>';
+		}
 	}
 	// Validated record with a product not allowed on an organic area: proposal of the new conversion of the plot
 	// (Reg. EU 2018/848, annex II part I point 1.7.3), until the history of the plot has a period from the date of the record

@@ -26,6 +26,7 @@
 // Put here all includes required by your class file
 require_once DOL_DOCUMENT_ROOT.'/core/class/commonobject.class.php';
 dol_include_once('/dolitrace/lib/dolitrace_inspection.lib.php');
+dol_include_once('/dolitrace/lib/dolitrace_weather.lib.php');
 //require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 //require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 
@@ -169,7 +170,7 @@ class DoliTraceOperation extends CommonObject
     ),
 		
 		"label" => array("type" => "varchar(255)", "label" => "Label", "enabled" => "1", 'position' => 40, 'notnull' => 0, "visible" => "1", "alwayseditable" => "1", "css" => "minwidth300", "cssview" => "wordbreak", "csslist" => "tdoverflowmax150",),
-		"weather_cond" => array("type" => "varchar(128)", "label" => "Weathercond", "enabled" => "1", 'position' => 45, 'notnull' => 0, "visible" => "-1",),
+		"weather_cond" => array("type" => "varchar(128)", "label" => "Weathercond", "help" => "OperationWeatherHelp", "enabled" => "1", 'position' => 45, 'notnull' => 0, "visible" => "-1",),
 		"fk_pheno_stage" => array("type" => "varchar(64)", "label" => "OperationBbch", "help" => "OperationBbchHelp", "enabled" => "1", 'position' => 50, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
 		"fk_adversity" => array("type" => "varchar(64)", "label" => "Fkadversity", "enabled" => "1", 'position' => 55, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
 		"fk_machine" => array("type" => "int", "label" => "Fkmachine", "enabled" => "1", 'position' => 60, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
@@ -1193,6 +1194,14 @@ class DoliTraceOperation extends CommonObject
 				$sql .= " ref = '".$this->db->escape($num)."',";
 			}
 			$sql .= " status = ".self::STATUS_VALIDATED;
+			// Weather conditions of the plot copied from doliField when not typed
+			if (trim((string) $this->weather_cond) === '') {
+				$weather = dolitraceWeatherText(dolitraceWeatherConditions($this->db, (int) $this->fk_cropplan, (int) $this->date_op, (int) $this->date_op_end), 128);
+				if ($weather !== '') {
+					$this->weather_cond = $weather;
+					$sql .= ", weather_cond = '".$this->db->escape($weather)."'";
+				}
+			}
 			if (!empty($this->fields['date_validation'])) {
 				$sql .= ", date_validation = '".$this->db->idate($now)."'";
 			}

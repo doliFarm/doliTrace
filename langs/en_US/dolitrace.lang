@@ -677,3 +677,14 @@ QtyUsed = Quantity used
 ProductOut = Harvested product
 Season = Season
 CropPlanCrop = Crop
+
+#
+# Weather conditions from doliField
+#
+TreatmentWeatherHelp = Weather conditions during the treatment. With doliField enabled, when the field is empty at the validation the conditions of the plot (wind, temperature, humidity, rain during and after the treatment) are copied from the weather data of its point.
+TreatmentWeatherProposed = Weather conditions of the plot (doliField)
+TreatmentWeatherCopiedAtValidation = The field Weather conditions is empty: this text will be copied at the validation.
+TreatmentWeatherUse = Use in the record
+TreatmentWeatherCopied = Weather conditions copied in the record
+TreatmentWeatherNone = No weather data of doliField for the plot in this period (weather point not linked yet or data not downloaded yet).
+OperationWeatherHelp = With doliField enabled, when the field is empty at the validation the weather conditions of the plot in the period of the operation are copied.
