@@ -257,7 +257,7 @@ foreach ($budget['lines'] as $line) {
 	print '<td class="right nowraponall"><b>'.$money($line['total']).'</b></td>';
 	print '<td class="center nowraponall">';
 	if ($permissiontoadd && $action != 'editline') {
-		print '<a class="editfielda reposition marginrightonly" href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=editline&lineid='.$line['id'].'#budget">'.img_edit().'</a>';
+		print '<a class="editfielda reposition marginrightonly" href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=editline&lineid='.$line['id'].'&token='.newToken().'#budget">'.img_edit().'</a>';
 		print '<a class="reposition marginrightonly" href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=reloadrates&lineid='.$line['id'].'&token='.newToken().'#budget" title="'.dol_escape_htmltag($langs->trans('BudgetReloadRates')).'">'.img_picto('', 'refresh').'</a>';
 		print '<a class="reposition" href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=deleteline&lineid='.$line['id'].'&token='.newToken().'">'.img_delete().'</a>';
 	}
