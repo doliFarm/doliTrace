@@ -79,7 +79,7 @@ class modDolitrace extends DolibarrModules
 		$this->editor_squarred_logo = '';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@dolitrace'
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = '1.4.2';
+		$this->version = '1.5.0';
 		// Url to the file with your last numberversion of this module
 		//$this->url_last_version = 'http://www.example.com/versionmodule.txt';
 
@@ -410,6 +410,13 @@ class modDolitrace extends DolibarrModules
 		$this->rights[$r][5] = 'reopen';
 		$r++;
 
+		// Field app (PWA): workers and contractors make drafts that the office completes and validates
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', (5 * 10) + 0 + 1);
+		$this->rights[$r][1] = 'Use the field app: create drafts of operations and harvests on the farms the user can see (no update, no delete)';
+		$this->rights[$r][4] = 'dolitracepwa';
+		$this->rights[$r][5] = 'use';
+		$r++;
+
 		/* END MODULEBUILDER PERMISSIONS */
 
 
@@ -732,6 +739,22 @@ class modDolitrace extends DolibarrModules
 			'position' => 1000 + $r,
 			'enabled' => 'isModEnabled("dolitrace")',
 			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "read")',
+			'target' => '',
+			'user' => 2,
+		);
+		// Field app (PWA) for the phone: page with the QR code of the app and how to install it
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace',
+			'type' => 'left',
+			'titre' => 'PwaTitle',
+			'prefix' => img_picto('', 'fa-mobile-alt', 'class="paddingright pictofixedwidth valignmiddle"'),
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitrace_pwa',
+			'url' => '/dolitrace/dolitrace_pwa.php',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitracepwa", "use") || $user->hasRight("dolitrace", "dolitraceoperation", "write") || $user->hasRight("dolitrace", "dolitraceharvest", "write")',
 			'target' => '',
 			'user' => 2,
 		);

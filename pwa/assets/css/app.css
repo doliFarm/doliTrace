@@ -1,0 +1,424 @@
+/* Copyright (C) 2026 Luigi Grillo - doliFarm.com <info@dolifarm.com>
+ * Licence: GNU AGPL v3 or later
+ * Field app of doliTrace: large touch targets, readable in the sun, dark theme of the phone.
+ */
+
+:root {
+	--bg: #f4f6f4;
+	--card: #ffffff;
+	--text: #1d261d;
+	--muted: #5c6b5c;
+	--line: #d8e0d8;
+	--accent: #2e7d32;
+	--accent-text: #ffffff;
+	--warn-bg: #fff4d6;
+	--warn-text: #6b4b00;
+	--error-bg: #fde3e1;
+	--error-text: #8a1c12;
+	--ok-bg: #e3f2e4;
+	--ok-text: #1b5e20;
+	--radius: 12px;
+	color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #121712;
+		--card: #1c241c;
+		--text: #e6ece6;
+		--muted: #a3b2a3;
+		--line: #2f3a2f;
+		--accent: #66bb6a;
+		--accent-text: #0d1a0d;
+		--warn-bg: #3a2f10;
+		--warn-text: #ffd977;
+		--error-bg: #3d1714;
+		--error-text: #ffb4a9;
+		--ok-bg: #173019;
+		--ok-text: #a5d6a7;
+	}
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html, body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--text);
+	font: 17px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	-webkit-text-size-adjust: 100%;
+}
+
+a {
+	color: var(--accent);
+}
+
+.topbar {
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	display: flex;
+	align-items: center;
+	padding: calc(env(safe-area-inset-top) + 8px) 16px 8px;
+	background: var(--accent);
+}
+
+.brand {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--accent-text);
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.brand img {
+	border-radius: 6px;
+}
+
+.status {
+	padding: 8px 16px 0;
+}
+
+.status-line {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 15px;
+	color: var(--muted);
+}
+
+.status-text {
+	flex: 1;
+}
+
+.dot {
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	flex: none;
+}
+
+.dot.on {
+	background: #43a047;
+}
+
+.dot.off {
+	background: #9e9e9e;
+}
+
+.view {
+	padding: 8px 16px calc(env(safe-area-inset-bottom) + 24px);
+	max-width: 720px;
+	margin: 0 auto;
+}
+
+h1 {
+	font-size: 24px;
+	margin: 8px 0 12px;
+}
+
+h2 {
+	font-size: 19px;
+	margin: 20px 0 8px;
+}
+
+h3 {
+	font-size: 16px;
+	margin: 14px 0 4px;
+	color: var(--muted);
+}
+
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	min-height: 44px;
+	padding: 8px 16px;
+	border: 1px solid var(--accent);
+	border-radius: var(--radius);
+	background: var(--card);
+	color: var(--accent);
+	font: inherit;
+	font-weight: 600;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.btn.big {
+	flex: 1;
+	min-height: 64px;
+	background: var(--accent);
+	color: var(--accent-text);
+	font-size: 18px;
+}
+
+.btn.small {
+	min-height: 36px;
+	padding: 4px 12px;
+	font-size: 15px;
+}
+
+.btn:disabled {
+	opacity: 0.5;
+}
+
+.link {
+	border: 0;
+	background: none;
+	color: var(--muted);
+	font: inherit;
+	font-size: 14px;
+	text-decoration: underline;
+	padding: 8px 0;
+	cursor: pointer;
+}
+
+.actions {
+	display: flex;
+	gap: 12px;
+	margin: 8px 0;
+}
+
+.buttons {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 12px;
+}
+
+.search {
+	width: 100%;
+	min-height: 48px;
+	padding: 10px 14px;
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+	background: var(--card);
+	color: var(--text);
+	font: inherit;
+}
+
+.inline {
+	display: flex;
+	gap: 8px;
+	margin-top: 12px;
+}
+
+.list {
+	margin-top: 12px;
+}
+
+.item {
+	display: block;
+	padding: 12px 14px;
+	margin-bottom: 8px;
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+	background: var(--card);
+	color: var(--text);
+	text-decoration: none;
+}
+
+.item-title, .card-title {
+	font-weight: 600;
+}
+
+.item-sub {
+	font-size: 15px;
+	color: var(--muted);
+}
+
+.card {
+	padding: 14px;
+	margin-bottom: 12px;
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+	background: var(--card);
+}
+
+.field {
+	display: flex;
+	gap: 12px;
+	padding: 4px 0;
+}
+
+.field .label {
+	min-width: 96px;
+	color: var(--muted);
+}
+
+.note {
+	padding: 10px 12px;
+	margin: 8px 0;
+	border-radius: var(--radius);
+	font-size: 15px;
+}
+
+.note.warn {
+	background: var(--warn-bg);
+	color: var(--warn-text);
+}
+
+.note.error {
+	background: var(--error-bg);
+	color: var(--error-text);
+}
+
+.note.ok {
+	background: var(--ok-bg);
+	color: var(--ok-text);
+}
+
+.records {
+	margin: 0;
+	padding-left: 18px;
+	font-size: 15px;
+}
+
+.records li {
+	margin: 4px 0;
+}
+
+.date {
+	color: var(--muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.badge {
+	display: inline-block;
+	margin-left: 6px;
+	padding: 0 6px;
+	border-radius: 6px;
+	background: var(--warn-bg);
+	color: var(--warn-text);
+	font-size: 13px;
+}
+
+.empty {
+	color: var(--muted);
+}
+
+.back {
+	display: inline-block;
+	padding: 8px 0;
+	text-decoration: none;
+	font-weight: 600;
+}
+
+.scanner {
+	width: 100%;
+	max-height: 60vh;
+	border-radius: var(--radius);
+	background: #000;
+	object-fit: cover;
+}
+
+.footer {
+	margin-top: 32px;
+	font-size: 14px;
+	color: var(--muted);
+	text-align: center;
+}
+
+/* Icons drawn with CSS: no icon font, the app works offline */
+.icon {
+	position: relative;
+	display: inline-block;
+	width: 22px;
+	height: 22px;
+	flex: none;
+}
+
+.icon.qr {
+	border: 3px solid currentColor;
+	border-radius: 3px;
+}
+
+.icon.qr::before, .icon.qr::after {
+	content: "";
+	position: absolute;
+	width: 6px;
+	height: 6px;
+	background: currentColor;
+}
+
+.icon.qr::before {
+	top: 2px;
+	left: 2px;
+}
+
+.icon.qr::after {
+	right: 2px;
+	bottom: 2px;
+}
+
+.icon.pin {
+	width: 18px;
+	border: 3px solid currentColor;
+	border-radius: 50% 50% 50% 0;
+	transform: rotate(-45deg);
+}
+
+.icon.pin::after {
+	content: "";
+	position: absolute;
+	top: 4px;
+	left: 4px;
+	width: 4px;
+	height: 4px;
+	border-radius: 50%;
+	background: currentColor;
+}
+
+/* Records made on the phone (P2) */
+.btn.primary {
+	background: var(--accent);
+	color: var(--accent-text);
+}
+
+.btn.danger {
+	border-color: var(--error-text);
+	color: var(--error-text);
+}
+
+.form {
+	margin-top: 8px;
+}
+
+.form-row {
+	display: block;
+	margin-bottom: 12px;
+}
+
+.form-label {
+	display: block;
+	margin-bottom: 4px;
+	font-size: 15px;
+	color: var(--muted);
+}
+
+textarea.search {
+	resize: vertical;
+}
+
+select.search {
+	appearance: auto;
+}
+
+.note.info {
+	background: var(--card);
+	border: 1px solid var(--line);
+	color: var(--text);
+}
+
+.note.queue a {
+	font-weight: 600;
+}
+
+.badge.err {
+	background: var(--error-bg);
+	color: var(--error-text);
+}

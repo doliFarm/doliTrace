@@ -435,6 +435,37 @@ class DoliTraceTrace
 	}
 
 	/**
+	 * Pre-harvest intervals still running at a date on a crop plan: validated plant protection treatments whose interval
+	 * ends on the day or later (field app)
+	 *
+	 * @param	int		$cropplanid		Crop plan
+	 * @param	int		$plotid			Plot
+	 * @param	int		$start			Start of the crop
+	 * @param	string	$cropeppo		EPPO code of the crop
+	 * @param	int		$now			Date
+	 * @return	array<int,array{treatment_id:int,ref:string,product:string,date_end:int,safety_days:int,until:int}>
+	 */
+	public function getSafetyInProgress($cropplanid, $plotid, $start, $cropeppo, $now)
+	{
+		$list = array();
+		$today = (int) floor($now / 86400);
+		foreach ($this->getTreatments($cropplanid, $plotid, $start, null, $cropeppo) as $line) {
+			if (empty($line['safety_days']) || (int) $line['safety_days'] <= 0) {
+				continue;
+			}
+			$until = dol_time_plus_duree((int) $line['date_end'], (int) $line['safety_days'], 'd');
+			if ((int) floor($until / 86400) < $today) {
+				continue;
+			}
+			$list[] = array(
+				'treatment_id' => (int) $line['id'], 'ref' => (string) $line['ref'], 'product' => (string) $line['product_label'],
+				'date_end' => (int) $line['date_end'], 'safety_days' => (int) $line['safety_days'], 'until' => $until,
+			);
+		}
+		return $list;
+	}
+
+	/**
 	 * Pre-harvest interval of a plant protection product on a crop: the longest among the authorised uses on the crop
 	 * or on a group of the EPPO taxonomy that contains it
 	 *
