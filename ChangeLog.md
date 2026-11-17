@@ -1,5 +1,13 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## Non rilasciato
+
+Dopo l'aggiornamento **riattivare doliTrace** (nuova tabella e nuovo permesso).
+
+- App di campo (PWA), fase 2 del piano: endpoint JSON `ajax/pwa.php` con la sessione di Dolibarr. `session` (utente, permessi, token), `data` (appezzamenti, piani di produzione aperti, ultime operazioni e raccolte, tempi di carenza in corso, tipi di operazione, unità, macchine; solo le aziende visibili all'utente), `send` (POST con token: bozze di operazioni e raccolte, fino a 50 per invio). Ogni registrazione ha un identificativo generato dal telefono: se arriva due volte si restituisce quella già creata (tabella `llx_dolitrace_pwa_receipt`). Le bozze riportano nella nota privata chi le ha registrate e quando.
+- Nuovo permesso "Usare l'app di campo" (`dolitracepwa`/`use`): crea solo bozze di operazioni e raccolte sulle aziende visibili, senza modifica né cancellazione. Chi ha già la scrittura di operazioni o raccolte può usare l'app anche senza.
+- Sicurezza: tolti `ajax/dolitraceoperation.php`, `ajax/dolitraceharvest.php` e `ajax/dolitracecropplan.php`, generati da ModuleBuilder e mai usati: con il permesso di scrittura permettevano di cambiare qualsiasi campo di operazioni, raccolte e piani (anche convalidati e di altre aziende) senza token CSRF.
+
 ## 1.4.2 (2026-11-18)
 
 Correzioni della protezione CSRF. Dopo l'aggiornamento non serve riattivare il modulo.

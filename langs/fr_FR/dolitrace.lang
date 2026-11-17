@@ -731,3 +731,11 @@ TracePublicFormPlaceholder = Code ou lot sur l'étiquette
 TracePublicFormButton = Rechercher
 TracePublicFormHelp = Saisissez le code de 8 caractères ou le lot imprimé sur l'étiquette, ou scannez le QR code.
 TracePublicChoose = Plusieurs produits correspondent au code : choisissez celui de votre étiquette.
+
+# Field app (PWA)
+PwaErrorForbidden = Vous n'êtes pas autorisé à utiliser l'application de terrain
+PwaErrorToken = Session modifiée ou expirée : l'application recharge la session et réessaie
+PwaErrorCropPlan = Plan de production introuvable, clôturé ou non visible
+PwaErrorClientId = Identifiant de l'enregistrement non valide
+PwaErrorValue = Valeur non valide : %s
+PwaNoteFromApp = Enregistré avec l'application de terrain par %s le %s

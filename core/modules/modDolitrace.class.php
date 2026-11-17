@@ -410,6 +410,13 @@ class modDolitrace extends DolibarrModules
 		$this->rights[$r][5] = 'reopen';
 		$r++;
 
+		// Field app (PWA): workers and contractors make drafts that the office completes and validates
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', (5 * 10) + 0 + 1);
+		$this->rights[$r][1] = 'Use the field app: create drafts of operations and harvests on the farms the user can see (no update, no delete)';
+		$this->rights[$r][4] = 'dolitracepwa';
+		$this->rights[$r][5] = 'use';
+		$r++;
+
 		/* END MODULEBUILDER PERMISSIONS */
 
 

@@ -755,3 +755,11 @@ TracePublicFormPlaceholder = Code or lot on the label
 TracePublicFormButton = Search
 TracePublicFormHelp = Type the 8-character code or the lot printed on the label, or scan the QR code.
 TracePublicChoose = More products match the code: choose the one on your label.
+
+# Field app (PWA)
+PwaErrorForbidden = You are not allowed to use the field app
+PwaErrorToken = Session changed or expired: the app reloads the session and tries again
+PwaErrorCropPlan = Production plan not found, closed or not visible
+PwaErrorClientId = Invalid identifier of the record
+PwaErrorValue = Invalid value: %s
+PwaNoteFromApp = Recorded with the field app by %s on %s
