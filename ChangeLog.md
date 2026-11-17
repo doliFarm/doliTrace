@@ -1,6 +1,6 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-## 1.4.0 (in sviluppo)
+## 1.4.0 (2026-11-17)
 
 Tracciabilità, fase T2: pagina pubblica dal QR in etichetta. Dopo il `git pull` va riattivato il modulo (campi aggiuntivi "Storia").
 
