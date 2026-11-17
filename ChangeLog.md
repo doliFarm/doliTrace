@@ -1,6 +1,8 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-## Non rilasciato
+## 1.4.2 (2026-11-18)
+
+Correzioni della protezione CSRF. Dopo l'aggiornamento non serve riattivare il modulo.
 
 - Etichette QR delle raccolte: "Crea il PDF" mostrava l'errore della protezione CSRF di Dolibarr ("Token not provided") invece del PDF; il modulo ora invia il token.
 - Costi del piano di produzione: la matita per modificare una riga del preventivo era bloccata dalla stessa protezione.
