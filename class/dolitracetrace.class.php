@@ -1092,4 +1092,382 @@ class DoliTraceTrace
 		fclose($out);
 		return $csv;
 	}
+
+	/**
+	 * Address of the public page of a harvest: from DOLITRACE_PUBLIC_URL when Dolibarr has another address on internet,
+	 * otherwise from the address of this server
+	 *
+	 * @param	string	$uuid	UUID of the harvest
+	 * @return	string
+	 */
+	public static function publicUrl(string $uuid): string
+	{
+		global $conf;
+
+		return self::publicPageUrl().'?u='.urlencode($uuid).((int) $conf->entity > 1 ? '&entity='.((int) $conf->entity) : '');
+	}
+
+	/**
+	 * Address of the public page, without parameters (action of the form for the website of the farm)
+	 *
+	 * @return	string
+	 */
+	public static function publicPageUrl(): string
+	{
+		$base = rtrim(getDolGlobalString('DOLITRACE_PUBLIC_URL'), '/');
+		if ($base !== '') {
+			$path = dol_buildpath('/dolitrace/public/trace.php', 1);
+			if (DOL_URL_ROOT !== '' && strpos($path, DOL_URL_ROOT.'/') === 0) {
+				$path = substr($path, strlen(DOL_URL_ROOT));
+			}
+			$url = $base.$path;
+		} else {
+			$url = dol_buildpath('/dolitrace/public/trace.php', 2);
+		}
+		return $url;
+	}
+
+	/**
+	 * Address in the QR code of a harvest: the public page when it is enabled, otherwise the internal page
+	 *
+	 * @param	string	$uuid	UUID of the harvest
+	 * @return	string
+	 */
+	public static function qrUrl(string $uuid): string
+	{
+		if (getDolGlobalInt('DOLITRACE_PUBLIC_ENABLED')) {
+			return self::publicUrl($uuid);
+		}
+		return dol_buildpath('/dolitrace/dolitrace_trace.php', 2).'?uuid='.urlencode($uuid);
+	}
+
+	/**
+	 * History shown on the public page (no login): only validated harvests of the current entity, and only what the
+	 * farm publishes (setup of doliTrace). Never customers, prices, quantities, operators, private notes, cadastral
+	 * data or data of the farm dossier. When the lot comes from more harvests of the same farm, all of them.
+	 *
+	 * @param	string		$uuid			UUID of the harvest (36 characters)
+	 * @param	Translate	$outputlangs	Language
+	 * @return	?array<string,mixed>		null when the page is disabled or the harvest is not found or not published
+	 */
+	public function getPublicHistory(string $uuid, Translate $outputlangs): ?array
+	{
+		global $conf;
+
+		$uuid = strtolower(trim($uuid));
+		if (!getDolGlobalInt('DOLITRACE_PUBLIC_ENABLED') || !preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $uuid)) {
+			return null;
+		}
+		$outputlangs->loadLangs(array('dolifarm@dolifarm', 'dolitrace@dolitrace'));
+		$rows = $this->getPublicHarvests("h.uuid = '".$this->db->escape($uuid)."'");
+		if (count($rows) != 1) {
+			return null;
+		}
+		$main = $rows[0];
+		$lot = $rows;
+		if ((int) $main->fk_product_out > 0 && (string) $main->batch_number !== '') {
+			$lot = $this->getPublicHarvests("h.fk_product_out = ".((int) $main->fk_product_out)." AND h.batch_number = '".$this->db->escape((string) $main->batch_number)."' AND cp.fk_soc = ".((int) $main->fk_soc));
+		}
+
+		$list = (bool) getDolGlobalInt('DOLITRACE_PUBLIC_TREATMENT_LIST');
+		$map = (bool) getDolGlobalInt('DOLITRACE_PUBLIC_MAP');
+		$harvests = array();
+		foreach ($lot as $obj) {
+			$date = $this->db->jdate($obj->date_harvest);
+			$cropstart = $obj->cp_start ? $this->db->jdate($obj->cp_start) : dol_mktime(0, 0, 0, 1, 1, (int) $obj->season);
+			$treatments = $this->getTreatments((int) $obj->cp_id, (int) $obj->fk_plot, $cropstart, $date, strtoupper((string) $obj->crop_eppo));
+			$lines = array();
+			if ($list) {
+				foreach ($treatments as $line) {
+					if (!isset($lines[$line['id']])) {
+						$lines[$line['id']] = array('date' => $line['date'], 'kind' => ($line['kind'] == 2 ? 2 : 1), 'items' => array());
+					}
+					// Active substance of a plant protection product, name of a fertilizer
+					$item = ($line['kind'] == 2 ? $line['product_label'] : ($line['substance'] !== '' ? $line['substance'] : $line['product_label']));
+					if ($item !== '') {
+						$lines[$line['id']]['items'][$item] = $item;
+					}
+				}
+			}
+			$biocode = (string) $obj->bio_status;
+			$harvests[] = array(
+				'current' => ((string) $obj->uuid === $uuid), 'date' => $date, 'bio_status' => $biocode,
+				'bio_label' => ($biocode !== '' ? $outputlangs->transnoentities('BioRegisterFilter'.$biocode) : ''),
+				'note_public' => (string) $obj->note_public, 'crop' => $outputlangs->transnoentities((string) $obj->crop_label),
+				'plot' => (string) $obj->plot_label, 'comune' => dol_ucwords(dol_strtolower((string) $obj->cadastral_comune)),
+				'lat' => ($map && $obj->geo_lat !== null && (float) $obj->geo_lat != 0 ? (float) $obj->geo_lat : null),
+				'lon' => ($map && $obj->geo_lon !== null && (float) $obj->geo_lon != 0 ? (float) $obj->geo_lon : null),
+				'summary' => $this->getTreatmentSummary($treatments, $date), 'treatments' => array_values($lines),
+			);
+		}
+		// The harvest of the QR code first
+		usort($harvests, function ($a, $b) {
+			return ($a['current'] == $b['current'] ? $a['date'] <=> $b['date'] : ($a['current'] ? -1 : 1));
+		});
+
+		return array(
+			'short' => self::shortCode($uuid), 'batch' => (string) $main->batch_number, 'list' => $list, 'map' => $map,
+			'farm' => $this->getPublicFarm((int) $main->fk_soc),
+			'product' => $this->getPublicProduct((int) $main->fk_product_out, $outputlangs->transnoentities((string) $main->crop_label)),
+			'harvests' => $harvests,
+		);
+	}
+
+	/**
+	 * Harvests published that match a code typed on the public page or in the form of the website of the farm: the
+	 * short code (first 8 characters of the UUID), the whole UUID or the lot printed on the label. One line per lot:
+	 * the harvests of the same lot are on the same page.
+	 *
+	 * @param	string		$code			Code typed
+	 * @param	int			$farmid			Only the harvests of this farm (third party), 0 for all
+	 * @param	Translate	$outputlangs	Language
+	 * @return	array<int,array<string,mixed>>	Lines with uuid, date, product, batch
+	 */
+	public function findPublic(string $code, int $farmid, Translate $outputlangs): array
+	{
+		$code = trim($code);
+		if (!getDolGlobalInt('DOLITRACE_PUBLIC_ENABLED') || $code === '' || dol_strlen($code) > 64) {
+			return array();
+		}
+		$conditions = array("h.batch_number = '".$this->db->escape($code)."'");
+		if (preg_match('/^[0-9a-fA-F]{8}$/', $code)) {
+			$conditions[] = "h.uuid LIKE '".$this->db->escape(strtolower($code))."-%'";
+		} elseif (preg_match('/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/', $code)) {
+			$conditions[] = "h.uuid = '".$this->db->escape(strtolower($code))."'";
+		}
+		$outputlangs->loadLangs(array('dolifarm@dolifarm', 'dolitrace@dolitrace'));
+		$where = "(".implode(' OR ', $conditions).")".($farmid > 0 ? " AND cp.fk_soc = ".((int) $farmid) : '');
+		$lines = array();
+		foreach ($this->getPublicHarvests($where) as $obj) {
+			$key = ((int) $obj->fk_product_out > 0 && (string) $obj->batch_number !== '' ? $obj->fk_product_out.'|'.$obj->batch_number.'|'.$obj->fk_soc : 'h'.$obj->rowid);
+			if (!isset($lines[$key])) {
+				$lines[$key] = array(
+					'uuid' => (string) $obj->uuid, 'date' => $this->db->jdate($obj->date_harvest), 'batch' => (string) $obj->batch_number,
+					'product' => (string) ($obj->product_label ?: $outputlangs->transnoentities((string) $obj->crop_label)),
+				);
+			}
+		}
+		return array_values($lines);
+	}
+
+	/**
+	 * Validated harvests of the current entity for the public page
+	 *
+	 * @param	string	$where	SQL condition
+	 * @return	array<int,object>
+	 */
+	private function getPublicHarvests(string $where): array
+	{
+		global $conf;
+
+		$prefix = $this->db->prefix();
+		$sql = "SELECT h.rowid, h.uuid, h.date_harvest, h.fk_product_out, h.batch_number, h.bio_status, h.note_public,";
+		$sql .= " cp.rowid as cp_id, cp.season, cp.date_start as cp_start, cp.fk_soc, cp.fk_plot, c.label as crop_label, c.eppo_code as crop_eppo,";
+		$sql .= " pl.label as plot_label, pl.cadastral_comune, pl.geo_lat, pl.geo_lon, p.label as product_label";
+		$sql .= " FROM ".$prefix."dolitrace_harvest as h";
+		$sql .= " INNER JOIN ".$prefix."dolitrace_cropplan as cp ON cp.rowid = h.fk_cropplan";
+		$sql .= " LEFT JOIN ".$prefix."dolifarm_crops as c ON c.rowid = cp.fk_crop";
+		$sql .= " LEFT JOIN ".$prefix."dolifarm_plot as pl ON pl.rowid = cp.fk_plot";
+		$sql .= " LEFT JOIN ".$prefix."product as p ON p.rowid = h.fk_product_out";
+		$sql .= " WHERE h.status = 1 AND h.entity = ".((int) $conf->entity)." AND (".$where.")";
+		$sql .= " ORDER BY h.date_harvest, h.rowid";
+		$sql .= $this->db->plimit(50);
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
+			return array();
+		}
+		$rows = array();
+		while ($obj = $this->db->fetch_object($resql)) {
+			$rows[] = $obj;
+		}
+		$this->db->free($resql);
+		return $rows;
+	}
+
+	/**
+	 * Public data of the farm: commercial name, town, website, logo, story, organic certificate
+	 *
+	 * @param	int		$socid	Third party of the farm
+	 * @return	array<string,string>
+	 */
+	private function getPublicFarm(int $socid): array
+	{
+		global $conf;
+
+		$farm = array('name' => '', 'town' => '', 'url' => '', 'logo' => '', 'story' => '', 'bio_cert' => '', 'bio_body' => '');
+		if ($socid <= 0) {
+			return $farm;
+		}
+		$prefix = $this->db->prefix();
+		$resql = $this->db->query("SELECT nom, name_alias, town, url, logo FROM ".$prefix."societe WHERE rowid = ".((int) $socid)." AND entity IN (".getEntity('societe').")");
+		$soc = $resql ? $this->db->fetch_object($resql) : null;
+		if (!$soc) {
+			return $farm;
+		}
+		$farm['name'] = (string) ($soc->name_alias ?: $soc->nom);
+		$farm['town'] = (string) $soc->town;
+		$farm['url'] = (preg_match('/^https?:\/\//i', (string) $soc->url) ? (string) $soc->url : ((string) $soc->url !== '' ? 'https://'.$soc->url : ''));
+		if ((string) $soc->logo !== '' && !empty($conf->societe->multidir_output[$conf->entity])) {
+			$farm['logo'] = $this->publicImage($conf->societe->multidir_output[$conf->entity].'/'.((int) $socid).'/logos', (string) $soc->logo);
+		}
+		// Extra fields: the columns exist only when the modules that create them were enabled
+		$resql = $this->db->query("SELECT * FROM ".$prefix."societe_extrafields WHERE fk_object = ".((int) $socid));
+		$ef = $resql ? $this->db->fetch_object($resql) : null;
+		if ($ef) {
+			$farm['story'] = (string) ($ef->dolitrace_public_story ?? '');
+			$farm['bio_cert'] = trim((string) ($ef->dolifarm_bio_cert ?? ''));
+			$body = trim((string) ($ef->dolifarm_bio_body ?? ''));
+			if ($body !== '') {
+				dol_include_once('/dolifarm/lib/dolifarm_biobody.lib.php');
+				$farm['bio_body'] = (function_exists('dolifarmBioBodyLabel') ? (string) dolifarmBioBodyLabel($this->db, $body) : $body);
+			}
+		}
+		return $farm;
+	}
+
+	/**
+	 * Public data of the product: label, story, first photo
+	 *
+	 * @param	int		$productid	Product
+	 * @param	string	$default	Label when there is no product (crop)
+	 * @return	array<string,string>
+	 */
+	private function getPublicProduct(int $productid, string $default): array
+	{
+		global $conf;
+
+		$data = array('label' => $default, 'story' => '', 'photo' => '');
+		if ($productid <= 0) {
+			return $data;
+		}
+		require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
+		$product = new Product($this->db);
+		if ($product->fetch($productid) <= 0) {
+			return $data;
+		}
+		$data['label'] = (string) ($product->label ?: $default);
+		$product->fetch_optionals();
+		$data['story'] = (string) ($product->array_options['options_dolitrace_public_story'] ?? '');
+		$entity = (int) ($product->entity ?: $conf->entity);
+		if (!empty($conf->product->multidir_output[$entity])) {
+			$data['photo'] = $this->publicImage($conf->product->multidir_output[$entity].'/'.get_exdir(0, 0, 0, 0, $product, 'product').dol_sanitizeFileName($product->ref));
+		}
+		return $data;
+	}
+
+	/**
+	 * Image as a data URI, so that the public page does not need the protected document viewer: the small thumbnail
+	 * when there is one
+	 *
+	 * @param	string	$dir	Directory
+	 * @param	string	$file	File, '' for the first image of the directory
+	 * @return	string			'' if none
+	 */
+	private function publicImage(string $dir, string $file = ''): string
+	{
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+		if (!is_dir($dir)) {
+			return '';
+		}
+		if ($file === '') {
+			$files = dol_dir_list($dir, 'files', 0, '\.(jpe?g|png|gif|webp)$', '', 'name', SORT_ASC);
+			if (empty($files)) {
+				return '';
+			}
+			$file = (string) $files[0]['name'];
+		}
+		$file = basename($file);
+		$ext = pathinfo($file, PATHINFO_EXTENSION);
+		$candidates = array($dir.'/thumbs/'.pathinfo($file, PATHINFO_FILENAME).'_small.'.$ext, $dir.'/'.$file);
+		foreach ($candidates as $path) {
+			if (is_file($path) && filesize($path) > 0 && filesize($path) <= 1500000 && preg_match('/\.(jpe?g|png|gif|webp)$/i', $path)) {
+				return 'data:'.dol_mimetype($path).';base64,'.base64_encode((string) file_get_contents($path));
+			}
+		}
+		return '';
+	}
+
+	/**
+	 * Labels with the QR code of a harvest, in PDF, on sheets of adhesive labels
+	 *
+	 * @param	array<string,mixed>	$history		History (getHistory)
+	 * @param	string				$format			Format of the sheet (key of labelFormats())
+	 * @param	int					$number			Number of labels
+	 * @param	int					$skip			Labels already used on the first sheet
+	 * @param	Translate			$outputlangs	Language
+	 * @return	string								Content of the PDF
+	 */
+	public function labelsToPdf(array $history, string $format, int $number, int $skip, Translate $outputlangs): string
+	{
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/pdf.lib.php';
+		$outputlangs->loadLangs(array('main', 'dolitrace@dolitrace'));
+		$formats = self::labelFormats();
+		$f = $formats[$format] ?? reset($formats);
+		$h = $history['harvest'];
+		$url = self::qrUrl($h['uuid']);
+		$farm = (string) ($history['farm']['header'][0] ?? '');
+		$farm = trim(preg_replace('/ - CUAA .*$/', '', $farm));
+		$texts = array(
+			array((string) ($h['product_label'] !== '' ? $h['product_label'] : $history['cropplan']['crop']), 'B', 1.15),
+			array($outputlangs->transnoentities('TraceLabelLot', $h['batch'] !== '' ? $h['batch'] : $h['ref']), '', 1),
+			array($outputlangs->transnoentities('TraceLabelHarvest', dol_print_date($h['date'], 'day', 'tzserver', $outputlangs)), '', 1),
+			array($farm, '', 1),
+			array($outputlangs->transnoentities('TraceLabelScan').' - '.$h['short'], 'I', 0.85),
+		);
+
+		$pdf = pdf_getInstance(array(210, 297), 'mm', 'P');
+		$pdf->SetCreator('Dolibarr '.DOL_VERSION);
+		$pdf->SetTitle($outputlangs->convToOutputCharset($outputlangs->transnoentities('TraceLabelsTitle', $h['ref'])));
+		$pdf->setPrintHeader(false);
+		$pdf->setPrintFooter(false);
+		$pdf->SetMargins(0, 0, 0);
+		$pdf->SetAutoPageBreak(false, 0);
+		$pdf->setCellPaddings(0, 0.2, 0, 0.2);
+		$font = pdf_getPDFFont($outputlangs);
+		$perpage = $f['cols'] * $f['rows'];
+		$skip = max(0, min($skip, $perpage - 1));
+		$number = max(1, min($number, 1000));
+		$style = array('border' => 0, 'padding' => 0, 'fgcolor' => array(0, 0, 0), 'bgcolor' => false);
+		for ($i = 0; $i < $number; $i++) {
+			$pos = ($i + $skip) % $perpage;
+			if ($i == 0 || $pos == 0) {
+				$pdf->AddPage();
+			}
+			$x = $f['left'] + ($pos % $f['cols']) * $f['w'];
+			$y = $f['top'] + intdiv($pos, $f['cols']) * $f['h'];
+			$pad = 3;
+			$qr = min($f['h'] - 2 * $pad, $f['w'] * 0.42);
+			$pdf->write2DBarcode($url, 'QRCODE,M', $x + $pad, $y + ($f['h'] - $qr) / 2, $qr, $qr, $style, 'N');
+			$tx = $x + $pad + $qr + 2;
+			$tw = $f['w'] - ($tx - $x) - $pad;
+			$pdf->SetXY($tx, $y + $pad);
+			foreach ($texts as $text) {
+				if ($text[0] === '') {
+					continue;
+				}
+				$pdf->SetFont($font, $text[1], $f['font'] * $text[2]);
+				$pdf->SetX($tx);
+				$pdf->MultiCell($tw, 0, $outputlangs->convToOutputCharset($text[0]), 0, 'L', false, 1, '', '', true, 0, false, true, $f['font'] * $text[2] * 0.9, 'T', true);
+				if ($pdf->GetY() > $y + $f['h'] - $pad) {
+					break;
+				}
+			}
+		}
+		return $pdf->Output('', 'S');
+	}
+
+	/**
+	 * Sheets of adhesive labels: size of the label, columns, rows, margins (mm), size of the font
+	 *
+	 * @return	array<string,array<string,float|int>>
+	 */
+	public static function labelFormats(): array
+	{
+		return array(
+			'A4_3x8' => array('w' => 70, 'h' => 37, 'cols' => 3, 'rows' => 8, 'left' => 0, 'top' => 0.5, 'font' => 7),
+			'A4_2x5' => array('w' => 105, 'h' => 57, 'cols' => 2, 'rows' => 5, 'left' => 0, 'top' => 6, 'font' => 9),
+			'A4_2x4' => array('w' => 105, 'h' => 74, 'cols' => 2, 'rows' => 4, 'left' => 0, 'top' => 0.5, 'font' => 10),
+		);
+	}
 }
