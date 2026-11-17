@@ -22,18 +22,23 @@
 import { kvGet, kvSet, kvClear } from './store.js';
 import { API_VERSION, LOGIN_URL, OfflineError, LoginError, ApiError, getSession, getData } from './api.js';
 import { t, setLang, fmtDate, fmtNumber } from './i18n.js';
+import { newClientId, saveRecord, loadQueue, removeRecord, loadSent, sendQueue } from './queue.js';
 
-export const APP_VERSION = '1.0.1';
+export const APP_VERSION = '1.1.0';
 
 /** Days without update after which the app warns (Safari deletes the data of the apps not used for about 7 days) */
 const OLD_DATA_DAYS = 5;
+/** Days after which a record waiting to be sent is shown as old */
+const OLD_QUEUE_DAYS = 2;
 
 const state = {
 	session: null,	// answer of action=session
 	data: null,		// answer of action=data
 	syncedAt: null,	// ISO date of the last update
+	queue: [],		// records waiting to be sent
+	sent: [],		// records sent recently
 	syncing: false,
-	problem: '',	// login, forbidden, api, or a message
+	problem: '',	// login, forbidden, api, otheruser, or a message
 	toast: '',
 	search: '',
 };
@@ -172,16 +177,23 @@ async function loadLocal() {
 		state.session = (await kvGet('session')) || null;
 		state.data = (await kvGet('data')) || null;
 		state.syncedAt = (await kvGet('syncedAt')) || null;
+		await reloadQueue();
 	} catch (e) {
 		state.problem = String(e.message || e);
 	}
 	setLang(state.session && state.session.user ? state.session.user.lang : undefined);
 }
 
+async function reloadQueue() {
+	state.queue = await loadQueue();
+	state.sent = await loadSent();
+}
+
 /**
- * Update the data from the server. Without network or without session the data of the phone stay as they are.
+ * Send the records waiting on the phone, then update the data from the server. Without network or without session
+ * the data and the records stay on the phone.
  *
- * @param {boolean} [manual] Asked by the user
+ * @param {boolean} [manual] Asked by the user: the records refused before are sent again too
  */
 async function sync(manual = false) {
 	if (state.syncing) {
@@ -190,12 +202,32 @@ async function sync(manual = false) {
 	state.syncing = true;
 	renderStatus();
 	try {
-		const session = await getSession();
-		// Another user on the same phone: the data of the previous one are deleted
+		let session = await getSession();
+		// Another user on the same phone: the records of the previous one must be sent first (with his login),
+		// then his data are deleted
+		const others = state.queue.filter((r) => r.user_id !== session.user.id);
+		if (others.length) {
+			state.problem = 'otheruser';
+			state.otherUser = others[0].user_name || ('#' + others[0].user_id);
+			state.otherCount = others.length;
+			return;
+		}
 		if (state.session && state.session.user && state.session.user.id !== session.user.id) {
 			await kvClear();
 			state.data = null;
 			state.syncedAt = null;
+			state.sent = [];
+		}
+		if (state.queue.length) {
+			const result = await sendQueue(session, manual);
+			session = result.session;
+			await reloadQueue();
+			if (result.sent) {
+				toast(t('SentOk', result.sent));
+			}
+			if (result.errors) {
+				toast(t('SentErrors', result.errors));
+			}
 		}
 		const data = await getData();
 		state.session = session;
@@ -228,7 +260,10 @@ async function sync(manual = false) {
 	} finally {
 		state.syncing = false;
 		renderStatus();
-		route();
+		// Do not redraw a form being filled in, the camera or the GPS
+		if (!/^#\/(new|edit|scan|near)/.test(location.hash)) {
+			route();
+		}
 	}
 }
 
@@ -252,8 +287,21 @@ function renderStatus() {
 		notes.push(h('div.note.error', null, t('Forbidden')));
 	} else if (state.problem === 'api') {
 		notes.push(h('div.note.warn', null, t('ApiNewer')));
+	} else if (state.problem === 'otheruser') {
+		notes.push(h('div.note.error', null, t('OtherUserQueue', state.otherCount, state.otherUser)));
 	} else if (state.problem) {
 		notes.push(h('div.note.error', null, t('SyncFailed', state.problem)));
+	}
+	// Records waiting on the phone: always visible, with the age of the oldest one
+	if (state.queue.length) {
+		const errors = state.queue.filter((r) => r.status === 'error').length;
+		const oldest = daysSince(state.queue[0].saved_at || state.queue[0].created_at);
+		const cls = errors ? 'div.note.error.queue' : (oldest !== null && oldest >= OLD_QUEUE_DAYS ? 'div.note.warn.queue' : 'div.note.info.queue');
+		notes.push(h(cls, null,
+			h('a', { href: '#/queue' }, t('QueueCount', state.queue.length)),
+			oldest ? ' · ' + t('QueueOldest', oldest) : '',
+			errors ? ' · ' + t('QueueErrors', errors) : '',
+		));
 	}
 	if (state.toast) {
 		notes.push(h('div.note.ok', null, state.toast));
@@ -307,6 +355,10 @@ function footer() {
 		h('button.link', {
 			type: 'button',
 			onclick: async () => {
+				if (state.queue.length) {
+					toast(t('ClearBlocked', state.queue.length));
+					return;
+				}
 				if (window.confirm(t('ClearConfirm'))) {
 					await kvClear();
 					state.session = null;
@@ -371,9 +423,16 @@ function planCard(plan) {
 	const ops = byPlan('operations', plan.id);
 	const harvests = byPlan('harvests', plan.id);
 	const draft = (status) => (status === 0 ? h('span.badge', null, t('Draft')) : null);
+	const rights = (state.session && state.session.rights) || {};
+	const waiting = state.queue.filter((r) => Number(r.data.cropplan_id) === plan.id);
 	return h('div.card', null,
 		h('div.card-title', null, [plan.crop, plan.variety].filter(Boolean).join(' - ') || plan.label || plan.ref),
 		h('div.item-sub', null, [plan.ref, plan.season ? t('Season', plan.season) : '', plan.status === 0 ? t('Draft') : t('Validated')].filter(Boolean).join(' · ')),
+		(rights.operation || rights.harvest) ? h('div.buttons', null,
+			rights.operation ? h('a.btn.primary', { href: '#/new/operation/' + plan.id }, '+ ' + t('NewOperation')) : null,
+			rights.harvest ? h('a.btn.primary', { href: '#/new/harvest/' + plan.id }, '+ ' + t('NewHarvest')) : null,
+		) : null,
+		waiting.length ? h('div.note.info', null, h('strong', null, t('WaitingHere', waiting.length)), h('ul.records', null, waiting.map((r) => h('li', null, h('a', { href: '#/edit/' + encodeURIComponent(r.client_id) }, recordSummary(r)), r.status === 'error' ? h('span.badge.err', null, t('Error')) : null)))) : null,
 		safety.length
 			? safety.map((s) => h('div.note.error', null, h('strong', null, t('SafetyUntil', fmtDate(s.until))), ' ', t('SafetyLine', s.product, s.ref, fmtDate(s.date_end), s.safety_days)))
 			: h('div.note.ok', null, t('NoSafety')),
@@ -567,13 +626,236 @@ function viewNear() {
 	};
 }
 
+/* ---------- Records made on the phone (P2) ---------- */
+
+const planById = (id) => ((state.data && state.data.cropplans) || []).find((p) => p.id === Number(id)) || null;
+const plotById = (id) => plots().find((p) => p.id === Number(id)) || null;
+const typeLabel = (code) => (((state.data && state.data.operation_types) || []).find((x) => x.code === code) || {}).label || code;
+
+/** One line describing a record of the queue */
+function recordSummary(r) {
+	const d = r.data || {};
+	const plan = planById(d.cropplan_id);
+	const plot = plan ? plotById(plan.plot_id) : null;
+	const where = plot ? (plot.label || plot.ref) : (plan ? plan.ref : '');
+	const what = (r.kind === 'harvest'
+		? t('HarvestOf', fmtNumber(Number(d.qty) || 0) + ' ' + (d.unit || ''))
+		: typeLabel(d.type)) + (d.label ? ' - ' + d.label : '');
+	return [fmtDate(d.date), what, where].filter(Boolean).join(' · ');
+}
+
+/** Now as 2026-11-18T08:30 in the time zone of the phone */
+const nowLocal = () => isoLocal(new Date().toISOString());
+
+/**
+ * Check a record before saving it: same rules as the server (ajax/pwa.php)
+ *
+ * @returns {string} Error, empty when valid
+ */
+function checkRecord(kind, d) {
+	const limit = isoLocal(new Date(Date.now() + 86400000).toISOString());
+	if (kind === 'operation') {
+		if (!d.type) {
+			return t('Required', t('OperationType'));
+		}
+		if (!d.date) {
+			return t('Required', t('DateStart'));
+		}
+		if (d.date > limit) {
+			return t('FutureDate');
+		}
+		if (d.date_end && (d.date_end < d.date || d.date_end > limit)) {
+			return t('EndBeforeStart');
+		}
+		if (d.bbch && !/^\d{1,2}$/.test(d.bbch)) {
+			return t('InvalidValue', 'BBCH');
+		}
+	} else {
+		if (!d.date) {
+			return t('Required', t('HarvestDate'));
+		}
+		if (d.date > limit.slice(0, 10)) {
+			return t('FutureDate');
+		}
+		if (!(Number(d.qty) > 0)) {
+			return t('InvalidValue', t('Quantity'));
+		}
+		if (!d.unit) {
+			return t('Required', t('Unit'));
+		}
+	}
+	return '';
+}
+
+/** Form field with its label */
+function formRow(label, input, required) {
+	return h('label.form-row', null, h('span.form-label', null, label, required ? ' *' : ''), input);
+}
+
+function select(name, options, value, empty) {
+	const el = h('select.search', { name },
+		empty !== undefined ? h('option', { value: '' }, empty) : null,
+		options.map((o) => h('option', { value: o.value, selected: String(o.value) === String(value ?? '') }, o.label)),
+	);
+	return el;
+}
+
+/**
+ * Form of a new record, or of a record of the queue to correct
+ *
+ * @param {string} kind operation or harvest
+ * @param {number|null} planId Production plan (new record)
+ * @param {Object|null} record Record of the queue
+ */
+function viewForm(kind, planId, record) {
+	const d = record ? record.data : {};
+	const plan = planById(record ? d.cropplan_id : planId);
+	if (!plan) {
+		show(backLink(), h('p.empty', null, t('PlanNotFound')));
+		return;
+	}
+	const plot = plotById(plan.plot_id);
+	document.title = kind === 'harvest' ? t('NewHarvest') : t('NewOperation');
+	const error = h('div.note.error', { hidden: !(record && record.message) }, record && record.message ? record.message : '');
+	let fields;
+	if (kind === 'operation') {
+		const machines = ((state.data && state.data.machines) || []).filter((m) => !m.farm_id || m.farm_id === plan.farm_id);
+		fields = [
+			formRow(t('OperationType'), select('type', ((state.data && state.data.operation_types) || []).map((x) => ({ value: x.code, label: x.label })), d.type, t('Choose')), true),
+			formRow(t('DateStart'), h('input.search', { type: 'datetime-local', name: 'date', value: d.date || nowLocal(), required: true }), true),
+			formRow(t('DateEnd'), h('input.search', { type: 'datetime-local', name: 'date_end', value: d.date_end || '' })),
+			formRow(t('Label'), h('input.search', { type: 'text', name: 'label', maxlength: 255, value: d.label || '' })),
+			formRow(t('DurationMin'), h('input.search', { type: 'number', name: 'duration_min', min: 0, step: 1, inputmode: 'numeric', value: d.duration_min || '' })),
+			formRow(t('AreaHa'), h('input.search', { type: 'number', name: 'area_ha', min: 0, step: 'any', inputmode: 'decimal', value: d.area_ha || (plot && plot.area_ha ? plot.area_ha : '') })),
+			machines.length ? formRow(t('Machine'), select('machine_id', machines.map((m) => ({ value: m.id, label: [m.label, m.ref].filter(Boolean).join(' - ') })), d.machine_id, t('None'))) : null,
+			formRow(t('Bbch'), h('input.search', { type: 'text', name: 'bbch', maxlength: 2, inputmode: 'numeric', pattern: '[0-9]{1,2}', value: d.bbch || '' })),
+			formRow(t('Note'), h('textarea.search', { name: 'note', rows: 3, maxlength: 2000 }, d.note || '')),
+		];
+	} else {
+		const units = (state.data && state.data.units) || [];
+		fields = [
+			formRow(t('HarvestDate'), h('input.search', { type: 'date', name: 'date', value: d.date || nowLocal().slice(0, 10), required: true }), true),
+			formRow(t('Quantity'), h('input.search', { type: 'number', name: 'qty', min: 0, step: 'any', inputmode: 'decimal', value: d.qty || '', required: true }), true),
+			formRow(t('Unit'), select('unit', units.map((u) => ({ value: u.code, label: u.label + (u.label !== u.code ? ' (' + u.code + ')' : '') })), d.unit || (units.some((u) => u.code === 'kg') ? 'kg' : '')), true),
+			plan.product ? formRow(t('Product'), h('span.value', null, plan.product)) : null,
+			formRow(t('Label'), h('input.search', { type: 'text', name: 'label', maxlength: 255, value: d.label || '' })),
+			formRow(t('Note'), h('textarea.search', { name: 'note', rows: 3, maxlength: 2000 }, d.note || '')),
+		];
+	}
+	const form = h('form.form', {
+		onsubmit: async (e) => {
+			e.preventDefault();
+			const values = {};
+			new FormData(form).forEach((v, k) => {
+				values[k] = String(v).trim();
+			});
+			const data = { cropplan_id: plan.id };
+			for (const [k, v] of Object.entries(values)) {
+				if (v !== '') {
+					data[k] = (['duration_min', 'machine_id'].includes(k) ? parseInt(v, 10) : (['qty', 'area_ha'].includes(k) ? Number(v.replace(',', '.')) : v));
+				}
+			}
+			const problem = checkRecord(kind, data);
+			if (problem) {
+				error.textContent = problem;
+				error.hidden = false;
+				error.scrollIntoView({ block: 'center' });
+				return;
+			}
+			const user = state.session.user;
+			const saved = Object.assign({}, record || {}, {
+				client_id: record ? record.client_id : newClientId(),
+				kind,
+				user_id: user.id,
+				user_name: user.name || user.login,
+				created_at: record ? record.created_at : nowLocal(),
+				saved_at: new Date().toISOString(),
+				data,
+			});
+			saved.summary = recordSummary(saved);
+			await saveRecord(saved);
+			await reloadQueue();
+			toast(navigator.onLine ? t('SavedSending') : t('SavedOnPhone'));
+			location.hash = plot ? '#/plot/' + plot.id : '#/queue';
+			if (navigator.onLine) {
+				sync(Boolean(record));
+			}
+		},
+	},
+	error,
+	fields,
+	h('div.buttons', null,
+		h('button.btn.primary', { type: 'submit' }, t('Save')),
+		record ? h('button.btn.danger', { type: 'button', onclick: () => deleteRecord(record) }, t('Delete')) : null,
+	));
+	show(
+		backLink(),
+		h('h1', null, kind === 'harvest' ? t('NewHarvest') : t('NewOperation')),
+		h('div.item-sub', null, [plot ? (plot.label || plot.ref) : '', [plan.crop, plan.variety].filter(Boolean).join(' - '), plan.ref].filter(Boolean).join(' · ')),
+		h('p.empty', null, t('DraftOnly')),
+		form,
+	);
+}
+
+async function deleteRecord(record) {
+	if (!window.confirm(t('DeleteConfirm', recordSummary(record)))) {
+		return;
+	}
+	await removeRecord(record.client_id);
+	await reloadQueue();
+	renderStatus();
+	location.hash = '#/queue';
+}
+
+function viewQueue() {
+	document.title = t('Queue');
+	const online = navigator.onLine;
+	show(
+		backLink(),
+		h('h1', null, t('Queue')),
+		state.queue.length
+			? [
+				h('div.buttons', null, h('button.btn.primary', { type: 'button', disabled: !online || state.syncing, onclick: () => sync(true) }, state.syncing ? t('Sending') : t('SendNow'))),
+				online ? null : h('p.empty', null, t('SendWhenOnline')),
+				h('div.list', null, state.queue.map((r) => h('a.item', { href: '#/edit/' + encodeURIComponent(r.client_id) },
+					h('div.item-title', null, recordSummary(r)),
+					h('div.item-sub', null, t('SavedAt', fmtDate(isoLocal(r.saved_at || r.created_at))), r.status === 'error' ? '' : ' · ' + t('Pending')),
+					r.status === 'error' ? h('div.note.error', null, t('ErrorLabel', r.message || r.error)) : null,
+				))),
+			]
+			: h('p.empty', null, t('QueueEmpty')),
+		state.sent.length ? [
+			h('h2', null, t('RecentSent')),
+			h('ul.records', null, state.sent.map((s) => h('li', null,
+				h('span.date', null, fmtDate(isoLocal(s.sent_at))), ' ',
+				s.kind === 'harvest' ? t('Harvest') : t('Operation'), ' ',
+				h('a', { href: s.url, target: '_blank', rel: 'noopener' }, s.ref || ('#' + s.id)),
+				s.label ? ' · ' + s.label : '',
+			))),
+		] : null,
+	);
+}
+
 /* ---------- Router ---------- */
 
 function route() {
 	const hash = location.hash || '#/';
 	const m = /^#\/plot\/(\d+)$/.exec(hash);
+	const n = /^#\/new\/(operation|harvest)\/(\d+)$/.exec(hash);
+	const e = /^#\/edit\/(.+)$/.exec(hash);
 	if (m) {
 		viewPlot(Number(m[1]));
+	} else if (n) {
+		viewForm(n[1], Number(n[2]), null);
+	} else if (e) {
+		const record = state.queue.find((r) => r.client_id === decodeURIComponent(e[1]));
+		if (record) {
+			viewForm(record.kind, null, record);
+		} else {
+			location.replace('#/queue');
+		}
+	} else if (hash === '#/queue') {
+		viewQueue();
 	} else if (hash === '#/scan') {
 		viewScan();
 	} else if (hash === '#/near') {
@@ -629,6 +911,19 @@ async function start() {
 		sync();
 	});
 	window.addEventListener('offline', renderStatus);
+	// Records waiting: try again every minute while the app is open (the network may come back without the
+	// "online" event, e.g. a weak signal in the field)
+	setInterval(() => {
+		if (navigator.onLine && !state.syncing && state.queue.some((r) => r.status !== 'error')) {
+			sync();
+		}
+	}, 60000);
+	// Back to the app (iPhone suspends it): send and update
+	document.addEventListener('visibilitychange', () => {
+		if (document.visibilityState === 'visible' && navigator.onLine && state.queue.length) {
+			sync();
+		}
+	});
 	registerServiceWorker();
 	if (navigator.onLine) {
 		sync();

@@ -372,3 +372,53 @@ h3 {
 	border-radius: 50%;
 	background: currentColor;
 }
+
+/* Records made on the phone (P2) */
+.btn.primary {
+	background: var(--accent);
+	color: var(--accent-text);
+}
+
+.btn.danger {
+	border-color: var(--error-text);
+	color: var(--error-text);
+}
+
+.form {
+	margin-top: 8px;
+}
+
+.form-row {
+	display: block;
+	margin-bottom: 12px;
+}
+
+.form-label {
+	display: block;
+	margin-bottom: 4px;
+	font-size: 15px;
+	color: var(--muted);
+}
+
+textarea.search {
+	resize: vertical;
+}
+
+select.search {
+	appearance: auto;
+}
+
+.note.info {
+	background: var(--card);
+	border: 1px solid var(--line);
+	color: var(--text);
+}
+
+.note.queue a {
+	font-weight: 600;
+}
+
+.badge.err {
+	background: var(--error-bg);
+	color: var(--error-text);
+}
