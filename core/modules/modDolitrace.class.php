@@ -742,6 +742,22 @@ class modDolitrace extends DolibarrModules
 			'target' => '',
 			'user' => 2,
 		);
+		// Field app (PWA) for the phone: page with the QR code of the app and how to install it
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace',
+			'type' => 'left',
+			'titre' => 'PwaTitle',
+			'prefix' => img_picto('', 'fa-mobile-alt', 'class="paddingright pictofixedwidth valignmiddle"'),
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolitrace_pwa',
+			'url' => '/dolitrace/dolitrace_pwa.php',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 1000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitracepwa", "use") || $user->hasRight("dolitrace", "dolitraceoperation", "write") || $user->hasRight("dolitrace", "dolitraceharvest", "write")',
+			'target' => '',
+			'user' => 2,
+		);
 		/* END MODULEBUILDER LEFTMENU DOLITRACETREATMENT */
 		/* BEGIN MODULEBUILDER LEFTMENU MYOBJECT */
 		/*

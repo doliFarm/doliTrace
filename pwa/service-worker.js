@@ -1,49 +1,77 @@
-const CACHE_NAME = 'dolitrace-v3';
-const ASSETS_TO_CACHE = [
-    './',
-    './index.html',
-    './assets/css/style.css',
-    './assets/js/app.js',
-    './manifest.json',
-    'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
-    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
-    'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
-    'https://unpkg.com/vue@3/dist/vue.global.prod.js',
-    'https://unpkg.com/html5-qrcode',
-    'https://cdn-icons-png.flaticon.com/512/5556/5556468.png'
+/* Copyright (C) 2026		Luigi Grillo - doliFarm.com	<info@dolifarm.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/**
+ * Service worker of the field app: keeps the files of the app so that it starts without network. The data of
+ * Dolibarr (ajax/pwa.php) and the login page always go to the network: the app keeps them in IndexedDB.
+ * Change VERSION at every change of the files of the app.
+ */
+
+const VERSION = 'dolitrace-field-1.0.1';
+const FILES = [
+	'./',
+	'./index.html',
+	'./manifest.json',
+	'./assets/css/app.css',
+	'./assets/js/app.js',
+	'./assets/js/api.js',
+	'./assets/js/i18n.js',
+	'./assets/js/store.js',
+	'./assets/vendor/jsqr/jsQR.js',
+	'./assets/img/icon-192.png',
+	'./assets/img/icon-512.png',
+	'./assets/img/icon-maskable-512.png',
+	'./assets/img/apple-touch-icon.png',
+	'./assets/img/favicon-32.png',
 ];
+const SCOPE = new URL('./', self.location.href).pathname;
 
-// 1. Installazione: Scarica i file
-self.addEventListener('install', (evt) => {
-    evt.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => {
-            console.log('[ServiceWorker] Caching assets');
-            return cache.addAll(ASSETS_TO_CACHE);
-        })
-    );
+self.addEventListener('install', (event) => {
+	event.waitUntil(caches.open(VERSION).then((cache) => cache.addAll(FILES.map((f) => new Request(f, { cache: 'reload' })))));
 });
 
-// 2. Attivazione: Pulisce vecchie cache
-self.addEventListener('activate', (evt) => {
-    evt.waitUntil(
-        caches.keys().then((keyList) => {
-            return Promise.all(keyList.map((key) => {
-                if (key !== CACHE_NAME) {
-                    console.log('[ServiceWorker] Removing old cache', key);
-                    return caches.delete(key);
-                }
-            }));
-        })
-    );
-    self.clients.claim();
+self.addEventListener('activate', (event) => {
+	event.waitUntil(
+		caches.keys()
+			.then((keys) => Promise.all(keys.filter((k) => k.startsWith('dolitrace-field-') && k !== VERSION).map((k) => caches.delete(k))))
+			.then(() => self.clients.claim()),
+	);
 });
 
-// 3. Fetch: Serve i file dalla cache se offline
-self.addEventListener('fetch', (evt) => {
-    // Strategia: Cache First, falling back to Network
-    evt.respondWith(
-        caches.match(evt.request).then((response) => {
-            return response || fetch(evt.request);
-        })
-    );
+// The page asks to use the new version
+self.addEventListener('message', (event) => {
+	if (event.data === 'skipWaiting') {
+		self.skipWaiting();
+	}
+});
+
+self.addEventListener('fetch', (event) => {
+	const request = event.request;
+	if (request.method !== 'GET') {
+		return;
+	}
+	const url = new URL(request.url);
+	// Only the files of the app; PHP pages (login.php, ajax) and other sites go to the network
+	if (url.origin !== self.location.origin || !url.pathname.startsWith(SCOPE) || url.pathname.endsWith('.php')) {
+		return;
+	}
+	// Opening of the app, also from the address of a sign (index.html?ref=...)
+	if (request.mode === 'navigate') {
+		event.respondWith(caches.match('./index.html').then((cached) => cached || fetch(request)));
+		return;
+	}
+	event.respondWith(caches.match(request, { ignoreSearch: true }).then((cached) => cached || fetch(request)));
 });

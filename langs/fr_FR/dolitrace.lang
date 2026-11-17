@@ -733,6 +733,19 @@ TracePublicFormHelp = Saisissez le code de 8 caractères ou le lot imprimé sur 
 TracePublicChoose = Plusieurs produits correspondent au code : choisissez celui de votre étiquette.
 
 # Field app (PWA)
+PwaTitle = Application de terrain
+PwaIntro = L'application de terrain fonctionne dans le navigateur du téléphone et s'installe comme une application. Elle utilise la connexion de Dolibarr et ne montre que les exploitations visibles par l'utilisateur.
+PwaFeaturePlots = Parcelles avec les plans de production ouverts, les dernières opérations et récoltes, les délais avant récolte en cours.
+PwaFeatureQr = Lecture des QR codes des panneaux des parcelles (avec l'appareil photo, aussi sur iPhone ; ou en saisissant la référence).
+PwaFeatureNear = Parcelle la plus proche avec le GPS.
+PwaFeatureOffline = Hors ligne pendant des jours : les données restent sur le téléphone et sont mises à jour au retour du réseau. L'enregistrement des opérations et des récoltes depuis le terrain arrive dans la prochaine phase.
+PwaInstall = Installation
+PwaInstallAndroid = Android (Chrome) : ouvrez l'application, connectez-vous, puis menu ⋮ → « Installer l'application » ou « Ajouter à l'écran d'accueil ».
+PwaInstalliPhone = iPhone (Safari) : ouvrez l'application, connectez-vous, puis Partager → « Sur l'écran d'accueil ». Ouvrez-la au moins une fois par semaine : Safari efface les données des applications non utilisées depuis environ 7 jours.
+PwaPrivacy = Les données téléchargées restent sur le téléphone jusqu'à leur effacement depuis l'application (en bas de la page d'accueil). Si un autre utilisateur se connecte depuis le même téléphone, les données du précédent sont effacées.
+PwaNeedsHttps = L'application de terrain nécessite une adresse https : sans elle, le téléphone ne l'installe pas et n'utilise ni l'appareil photo ni la position.
+PwaOpen = Ouvrir l'application de terrain
+PwaQrHelp = Cadrez-le avec le téléphone pour ouvrir l'application
 PwaErrorForbidden = Vous n'êtes pas autorisé à utiliser l'application de terrain
 PwaErrorToken = Session modifiée ou expirée : l'application recharge la session et réessaie
 PwaErrorCropPlan = Plan de production introuvable, clôturé ou non visible

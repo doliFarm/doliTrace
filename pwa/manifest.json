@@ -1,21 +1,17 @@
 {
-  "name": "DoliTrace Field",
-  "short_name": "DoliTrace",
-  "start_url": "./index.html",
-  "display": "standalone",
-  "background_color": "#d35400",
-  "theme_color": "#e67e22",
-  "orientation": "portrait",
-  "icons": [
-    {
-      "src": "https://cdn-icons-png.flaticon.com/512/5556/5556468.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "https://cdn-icons-png.flaticon.com/512/5556/5556468.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
-  ]
+	"name": "doliTrace - App di campo",
+	"short_name": "Campo",
+	"description": "Appezzamenti, piani di produzione e registrazioni di campo di doliTrace, anche senza rete",
+	"lang": "it",
+	"start_url": "./index.html",
+	"scope": "./",
+	"display": "standalone",
+	"orientation": "portrait",
+	"background_color": "#f4f6f4",
+	"theme_color": "#2e7d32",
+	"icons": [
+		{ "src": "assets/img/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+		{ "src": "assets/img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+		{ "src": "assets/img/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+	]
 }
