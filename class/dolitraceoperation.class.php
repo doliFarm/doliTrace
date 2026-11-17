@@ -150,7 +150,7 @@ class DoliTraceOperation extends CommonObject
 	 */
 	public $fields = array(
 		"rowid" => array("type" => "int", "label" => "TechnicalID", "enabled" => "1", 'position' => 10, 'notnull' => 1, "visible" => "0",),
-		"ref" => array("type" => "varchar(128)", "label" => "Ref", "enabled" => "1", 'position' => 15, 'notnull' => 0, "visible" => "5", "csslist" => "tdoverflowmax150", "showoncombobox" => "1",),
+		"ref" => array("type" => "varchar(128)", "label" => "Ref", 'searchall' => 1, "enabled" => "1", 'position' => 15, 'notnull' => 0, "visible" => "5", "csslist" => "tdoverflowmax150", "showoncombobox" => "1",),
 		"entity" => array("type" => "integer", "label" => "Entity", "enabled" => "1", 'position' => 20, 'notnull' => 1, "visible" => "0", "default" => "1", "index" => 1,),
 		"fk_cropplan" => array("type" => "integer:DoliTraceCropplan:dolitrace/class/dolitracecropplan.class.php","label" => "CropPlan","enabled" => "1","position" => 25,"notnull" => 1,"visible" => "1","index" => 1,"css" => "minwidth300", ),
 		"date_op" => array("type" => "datetime", "label" => "Dateop", "enabled" => "1", 'position' => 30, 'notnull' => 1, "visible" => "-1",),
@@ -169,7 +169,7 @@ class DoliTraceOperation extends CommonObject
         "arrayofkeyval" => array(), 
     ),
 		
-		"label" => array("type" => "varchar(255)", "label" => "Label", "enabled" => "1", 'position' => 40, 'notnull' => 0, "visible" => "1", "alwayseditable" => "1", "css" => "minwidth300", "cssview" => "wordbreak", "csslist" => "tdoverflowmax150",),
+		"label" => array("type" => "varchar(255)", "label" => "Label", 'searchall' => 1, "enabled" => "1", 'position' => 40, 'notnull' => 0, "visible" => "1", "alwayseditable" => "1", "css" => "minwidth300", "cssview" => "wordbreak", "csslist" => "tdoverflowmax150",),
 		"weather_cond" => array("type" => "varchar(128)", "label" => "Weathercond", "help" => "OperationWeatherHelp", "enabled" => "1", 'position' => 45, 'notnull' => 0, "visible" => "-1",),
 		"fk_pheno_stage" => array("type" => "varchar(64)", "label" => "OperationBbch", "help" => "OperationBbchHelp", "enabled" => "1", 'position' => 50, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
 		"fk_adversity" => array("type" => "varchar(64)", "label" => "Fkadversity", "enabled" => "1", 'position' => 55, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),

@@ -1,5 +1,13 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.4.1 (2026-11-17)
+
+Correzioni trovate nei test di accettazione sul Docker. Dopo l'aggiornamento **riattivare doliTrace** (normalizzazione delle unità delle raccolte).
+
+- Ricerca "in tutti i campi" negli elenchi di piani di produzione, raccolte, operazioni e registro: dava un errore SQL (operazioni: pagina vuota). Ora cerca in riferimento e titolo, nelle raccolte anche in lotto e UUID di tracciabilità, nel registro nel riferimento; con un solo risultato apre la scheda.
+- Unità delle raccolte scritte a mano: all'attivazione diventano quelle della lista anche quando cambiano solo maiuscole e minuscole ("Kg" → "kg", "LT" → "L", "t" → "T"); prima il confronto del database, che non distingue le maiuscole, le lasciava com'erano.
+- Inglese: titolo della home "Field notebooks" (era "Home Dolitrace").
+
 ## 1.4.0 (2026-11-17)
 
 Tracciabilità, fase T2: pagina pubblica dal QR in etichetta. Dopo il `git pull` va riattivato il modulo (campi aggiuntivi "Storia").

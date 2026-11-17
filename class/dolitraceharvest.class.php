@@ -131,9 +131,9 @@ class DoliTraceHarvest extends CommonObject
      */
     public $fields = array(
         "rowid" => array("type" => "int", "label" => "TechnicalID", "enabled" => "1", 'position' => 10, 'notnull' => 1, "visible" => "0",),
-        "ref" => array("type" => "varchar(128)", "label" => "Ref", "enabled" => "1", 'position' => 15, 'notnull' => 0, "visible" => "1", "csslist" => "tdoverflowmax150", "showoncombobox" => "-2",),
-        "uuid" => array("type" => "varchar(36)", "label" => "TraceUuid", "enabled" => "1", 'position' => 20, 'notnull' => 0, "visible" => "0", "noteditable" => 1,),
-        "label" => array("type" => "varchar(255)", "label" => "Label", "enabled" => "1", 'position' => 25, 'notnull' => 0, "visible" => "1", "alwayseditable" => "1", "css" => "minwidth300", "cssview" => "wordbreak", "csslist" => "tdoverflowmax150",),
+        "ref" => array("type" => "varchar(128)", "label" => "Ref", 'searchall' => 1, "enabled" => "1", 'position' => 15, 'notnull' => 0, "visible" => "1", "csslist" => "tdoverflowmax150", "showoncombobox" => "-2",),
+        "uuid" => array("type" => "varchar(36)", "label" => "TraceUuid", 'searchall' => 1, "enabled" => "1", 'position' => 20, 'notnull' => 0, "visible" => "0", "noteditable" => 1,),
+        "label" => array("type" => "varchar(255)", "label" => "Label", 'searchall' => 1, "enabled" => "1", 'position' => 25, 'notnull' => 0, "visible" => "1", "alwayseditable" => "1", "css" => "minwidth300", "cssview" => "wordbreak", "csslist" => "tdoverflowmax150",),
         
         "fk_cropplan" => array("type" => "integer:DoliTraceCropplan:custom/dolitrace/class/dolitracecropplan.class.php", "label" => "HarvestCropPlan", "enabled" => "1", 'position' => 30, 'notnull' => 1, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
         
@@ -144,7 +144,7 @@ class DoliTraceHarvest extends CommonObject
         "qty_harvested" => array("type" => "double(24,8)", "label" => "HarvestQty", "enabled" => "1", 'position' => 45, 'notnull' => 0, "visible" => "-1",),
         // Short label of a unit of the dictionary "Units" of Dolibarr (lib/dolitrace_units.lib.php), list set in the constructor
         "qty_unit" => array("type" => "select", "label" => "HarvestUnit", "enabled" => "1", 'position' => 50, 'notnull' => 0, "visible" => "-1", "help" => "HarvestUnitHelp", "arrayofkeyval" => array(), "default" => "kg",),
-        "batch_number" => array("type" => "varchar(128)", "label" => "HarvestBatch", "enabled" => "1", 'position' => 55, 'notnull' => 0, "visible" => "-1", "help" => "HarvestBatchHelp",),
+        "batch_number" => array("type" => "varchar(128)", "label" => "HarvestBatch", 'searchall' => 1, "enabled" => "1", 'position' => 55, 'notnull' => 0, "visible" => "-1", "help" => "HarvestBatchHelp",),
         // Organic status of the harvested product, set at the validation from the status of the plot at the date
         "bio_status" => array("type" => "varchar(16)", "label" => "HarvestBioStatus", "enabled" => "1", 'position' => 56, 'notnull' => 0, "visible" => "5", "arrayofkeyval" => array('BIO' => 'SeedStatusBio', 'INCONV' => 'SeedStatusInConversion', 'NONBIO' => 'SeedStatusNonBio'), "help" => "HarvestBioStatusHelp",),
         
