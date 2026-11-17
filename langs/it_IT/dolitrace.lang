@@ -752,3 +752,17 @@ TracePublicProduct = Il prodotto
 TracePublicFarm = L'azienda
 TracePublicCertificate = Certificato biologico n. %s, organismo di controllo %s
 TracePublicFooter = Dati registrati dall'azienda nel quaderno di campagna.
+
+TracePublicEmbed = Modulo di tracciabilità per il sito aziendale
+TracePublicEmbedHelp = Copia questo codice HTML in una pagina del sito dell'azienda: il visitatore scrive il codice breve o il lotto stampato in etichetta e si apre la pagina pubblica del prodotto in una nuova scheda. Il modulo prende lo stile del sito (classe CSS dolitrace-form); i testi sono nella lingua di questa configurazione e si possono cambiare nel codice
+TracePublicEmbedDisabled = Per avere il codice da incorporare nel sito, attiva prima "Pubblica la pagina di tracciabilità" e salva.
+TracePublicEmbedFarm = Azienda
+TracePublicEmbedAllFarms = Tutte le aziende
+TracePublicEmbedCode = Codice HTML
+TracePublicEmbedCopy = Copia il codice
+TracePublicEmbedCopied = Codice copiato
+TracePublicEmbedPreview = Anteprima
+TracePublicFormPlaceholder = Codice o lotto in etichetta
+TracePublicFormButton = Cerca
+TracePublicFormHelp = Scrivi il codice di 8 caratteri o il lotto stampato in etichetta, oppure inquadra il QR.
+TracePublicChoose = Più prodotti corrispondono al codice: scegli quello della tua etichetta.

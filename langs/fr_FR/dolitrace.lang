@@ -717,3 +717,17 @@ TracePublicProduct = Le produit
 TracePublicFarm = L'exploitation
 TracePublicCertificate = Certificat bio n° %s, organisme de contrôle %s
 TracePublicFooter = Données enregistrées par l'exploitation dans son cahier de culture.
+
+TracePublicEmbed = Formulaire de traçabilité pour le site de l'exploitation
+TracePublicEmbedHelp = Copiez ce code HTML dans une page du site de l'exploitation : le visiteur saisit le code court ou le lot imprimé sur l'étiquette et la page publique du produit s'ouvre dans un nouvel onglet. Le formulaire prend le style du site (classe CSS dolitrace-form) ; les textes sont dans la langue de cette configuration et peuvent être modifiés dans le code
+TracePublicEmbedDisabled = Pour obtenir le code à intégrer au site, activez d'abord « Publier la page de traçabilité » et enregistrez.
+TracePublicEmbedFarm = Exploitation
+TracePublicEmbedAllFarms = Toutes les exploitations
+TracePublicEmbedCode = Code HTML
+TracePublicEmbedCopy = Copier le code
+TracePublicEmbedCopied = Code copié
+TracePublicEmbedPreview = Aperçu
+TracePublicFormPlaceholder = Code ou lot sur l'étiquette
+TracePublicFormButton = Rechercher
+TracePublicFormHelp = Saisissez le code de 8 caractères ou le lot imprimé sur l'étiquette, ou scannez le QR code.
+TracePublicChoose = Plusieurs produits correspondent au code : choisissez celui de votre étiquette.

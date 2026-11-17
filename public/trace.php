@@ -21,6 +21,8 @@
  *    \brief      Public traceability page of a harvest, opened by the QR code on the label (no login): the story of the
  *                farm and of the product, the harvest, the place and the treatments, only as the farm publishes them
  *                (setup of doliTrace). Same answer for a UUID that does not exist and for a harvest not published.
+ *                Also the target of the form for the website of the farm: a short code or a lot typed by the visitor
+ *                (parameter c, optionally limited to one farm with the parameter farm).
  */
 
 if (!defined('NOLOGIN')) {
@@ -82,12 +84,29 @@ $lang = GETPOST('lang', 'aZ09');
 $langs->setDefaultLang($lang !== '' ? $lang : 'auto');
 $langs->loadLangs(array('main', 'dolitrace@dolitrace'));
 
+$uuid = GETPOST('u', 'aZ09');
+$code = trim(GETPOST('c', 'alphanohtml'));
+$farmid = GETPOSTINT('farm');
+$enabled = (isModEnabled('dolitrace') && getDolGlobalInt('DOLITRACE_PUBLIC_ENABLED'));
 $history = null;
-if (isModEnabled('dolitrace')) {
+$choices = array();
+if ($enabled) {
 	dol_include_once('/dolitrace/class/dolitracetrace.class.php');
 	$trace = new DoliTraceTrace($db);
-	$history = $trace->getPublicHistory(GETPOST('u', 'aZ09'), $langs);
+	// Code typed in the form: one lot opens its page, more lots are listed
+	if ($uuid === '' && $code !== '') {
+		$choices = $trace->findPublic($code, $farmid, $langs);
+		if (count($choices) == 1) {
+			$uuid = $choices[0]['uuid'];
+			$choices = array();
+		}
+	}
+	if ($uuid !== '') {
+		$history = $trace->getPublicHistory($uuid, $langs);
+	}
 }
+// Only the form: no code asked yet
+$formonly = ($enabled && $uuid === '' && $code === '');
 
 $esc = function ($text) {
 	return dol_escape_htmltag((string) $text);
@@ -96,7 +115,7 @@ $day = function ($date) use ($langs) {
 	return $date ? dol_print_date($date, 'day', 'tzserver', $langs) : '';
 };
 
-if ($history === null) {
+if ($history === null && !$formonly && empty($choices)) {
 	http_response_code(404);
 }
 header('Content-Type: text/html; charset=utf-8');
@@ -130,12 +149,47 @@ ul { margin: 6px 0 0; padding-left: 20px; }
 iframe { width: 100%; height: 240px; border: 0; border-radius: 8px; margin-top: 10px; }
 footer { text-align: center; color: var(--muted); font-size: .85rem; margin: 18px 0; }
 a { color: var(--accent); }
+form.search { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+form.search input[type=text] { flex: 1 1 200px; padding: 10px 12px; font-size: 1rem; border: 1px solid var(--line); border-radius: 8px; }
+form.search button { padding: 10px 18px; font-size: 1rem; border: 0; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer; }
+ul.choices { list-style: none; padding: 0; } ul.choices li { padding: 8px 0; border-bottom: 1px solid var(--line); }
 </style>';
 print '</head><body><main>';
 
+// Search form: a short code or the lot printed on the label
+$searchform = function ($value) use ($esc, $langs, $farmid, $lang) {
+	global $conf;
+	$html = '<form class="search" method="get" action="'.$esc(DoliTraceTrace::publicPageUrl()).'">';
+	$html .= '<input type="text" name="c" required maxlength="64" value="'.$esc($value).'" placeholder="'.$esc($langs->transnoentities('TracePublicFormPlaceholder')).'" aria-label="'.$esc($langs->transnoentities('TracePublicFormPlaceholder')).'">';
+	if ($farmid > 0) {
+		$html .= '<input type="hidden" name="farm" value="'.((int) $farmid).'">';
+	}
+	if ((int) $conf->entity > 1) {
+		$html .= '<input type="hidden" name="entity" value="'.((int) $conf->entity).'">';
+	}
+	if ($lang !== '') {
+		$html .= '<input type="hidden" name="lang" value="'.$esc($lang).'">';
+	}
+	$html .= '<button type="submit">'.$esc($langs->transnoentities('TracePublicFormButton')).'</button></form>';
+	return $html;
+};
+
 if ($history === null) {
 	print '<section><h1>'.$esc($langs->transnoentities('TracePublicTitle')).'</h1>';
-	print '<p>'.$esc($langs->transnoentities('TracePublicNotFound')).'</p></section>';
+	if (!$enabled) {
+		print '<p>'.$esc($langs->transnoentities('TracePublicNotFound')).'</p>';
+	} elseif (count($choices) > 1) {
+		print '<p>'.$esc($langs->transnoentities('TracePublicChoose')).'</p><ul class="choices">';
+		foreach ($choices as $line) {
+			print '<li><a href="'.$esc(DoliTraceTrace::publicUrl($line['uuid']).($lang !== '' ? '&lang='.urlencode($lang) : '')).'">'.$esc($line['product']).'</a>';
+			print '<div class="muted">'.$esc($day($line['date'])).($line['batch'] !== '' ? ' &middot; '.$esc($langs->transnoentities('TracePublicLot')).' '.$esc($line['batch']) : '').'</div></li>';
+		}
+		print '</ul>';
+	} else {
+		print '<p>'.$esc($langs->transnoentities($formonly ? 'TracePublicFormHelp' : 'TracePublicNotFound')).'</p>';
+		print $searchform($code);
+	}
+	print '</section>';
 	print '</main></body></html>';
 	$db->close();
 	exit;
@@ -249,6 +303,8 @@ if ($farm['story'] !== '' || $farm['bio_cert'] !== '' || $farm['url'] !== '') {
 	}
 	print '</section>';
 }
+
+print '<section><div class="muted">'.$esc($langs->transnoentities('TracePublicFormHelp')).'</div>'.$searchform('').'</section>';
 
 print '<footer>'.$esc($langs->transnoentities('TracePublicFooter')).'</footer>';
 print '</main></body></html>';

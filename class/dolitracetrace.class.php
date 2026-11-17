@@ -1104,6 +1104,16 @@ class DoliTraceTrace
 	{
 		global $conf;
 
+		return self::publicPageUrl().'?u='.urlencode($uuid).((int) $conf->entity > 1 ? '&entity='.((int) $conf->entity) : '');
+	}
+
+	/**
+	 * Address of the public page, without parameters (action of the form for the website of the farm)
+	 *
+	 * @return	string
+	 */
+	public static function publicPageUrl(): string
+	{
 		$base = rtrim(getDolGlobalString('DOLITRACE_PUBLIC_URL'), '/');
 		if ($base !== '') {
 			$path = dol_buildpath('/dolitrace/public/trace.php', 1);
@@ -1114,7 +1124,7 @@ class DoliTraceTrace
 		} else {
 			$url = dol_buildpath('/dolitrace/public/trace.php', 2);
 		}
-		return $url.'?u='.urlencode($uuid).((int) $conf->entity > 1 ? '&entity='.((int) $conf->entity) : '');
+		return $url;
 	}
 
 	/**
@@ -1204,6 +1214,43 @@ class DoliTraceTrace
 	}
 
 	/**
+	 * Harvests published that match a code typed on the public page or in the form of the website of the farm: the
+	 * short code (first 8 characters of the UUID), the whole UUID or the lot printed on the label. One line per lot:
+	 * the harvests of the same lot are on the same page.
+	 *
+	 * @param	string		$code			Code typed
+	 * @param	int			$farmid			Only the harvests of this farm (third party), 0 for all
+	 * @param	Translate	$outputlangs	Language
+	 * @return	array<int,array<string,mixed>>	Lines with uuid, date, product, batch
+	 */
+	public function findPublic(string $code, int $farmid, Translate $outputlangs): array
+	{
+		$code = trim($code);
+		if (!getDolGlobalInt('DOLITRACE_PUBLIC_ENABLED') || $code === '' || dol_strlen($code) > 64) {
+			return array();
+		}
+		$conditions = array("h.batch_number = '".$this->db->escape($code)."'");
+		if (preg_match('/^[0-9a-fA-F]{8}$/', $code)) {
+			$conditions[] = "h.uuid LIKE '".$this->db->escape(strtolower($code))."-%'";
+		} elseif (preg_match('/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/', $code)) {
+			$conditions[] = "h.uuid = '".$this->db->escape(strtolower($code))."'";
+		}
+		$outputlangs->loadLangs(array('dolifarm@dolifarm', 'dolitrace@dolitrace'));
+		$where = "(".implode(' OR ', $conditions).")".($farmid > 0 ? " AND cp.fk_soc = ".((int) $farmid) : '');
+		$lines = array();
+		foreach ($this->getPublicHarvests($where) as $obj) {
+			$key = ((int) $obj->fk_product_out > 0 && (string) $obj->batch_number !== '' ? $obj->fk_product_out.'|'.$obj->batch_number.'|'.$obj->fk_soc : 'h'.$obj->rowid);
+			if (!isset($lines[$key])) {
+				$lines[$key] = array(
+					'uuid' => (string) $obj->uuid, 'date' => $this->db->jdate($obj->date_harvest), 'batch' => (string) $obj->batch_number,
+					'product' => (string) ($obj->product_label ?: $outputlangs->transnoentities((string) $obj->crop_label)),
+				);
+			}
+		}
+		return array_values($lines);
+	}
+
+	/**
 	 * Validated harvests of the current entity for the public page
 	 *
 	 * @param	string	$where	SQL condition
@@ -1216,11 +1263,12 @@ class DoliTraceTrace
 		$prefix = $this->db->prefix();
 		$sql = "SELECT h.rowid, h.uuid, h.date_harvest, h.fk_product_out, h.batch_number, h.bio_status, h.note_public,";
 		$sql .= " cp.rowid as cp_id, cp.season, cp.date_start as cp_start, cp.fk_soc, cp.fk_plot, c.label as crop_label, c.eppo_code as crop_eppo,";
-		$sql .= " pl.label as plot_label, pl.cadastral_comune, pl.geo_lat, pl.geo_lon";
+		$sql .= " pl.label as plot_label, pl.cadastral_comune, pl.geo_lat, pl.geo_lon, p.label as product_label";
 		$sql .= " FROM ".$prefix."dolitrace_harvest as h";
 		$sql .= " INNER JOIN ".$prefix."dolitrace_cropplan as cp ON cp.rowid = h.fk_cropplan";
 		$sql .= " LEFT JOIN ".$prefix."dolifarm_crops as c ON c.rowid = cp.fk_crop";
 		$sql .= " LEFT JOIN ".$prefix."dolifarm_plot as pl ON pl.rowid = cp.fk_plot";
+		$sql .= " LEFT JOIN ".$prefix."product as p ON p.rowid = h.fk_product_out";
 		$sql .= " WHERE h.status = 1 AND h.entity = ".((int) $conf->entity)." AND (".$where.")";
 		$sql .= " ORDER BY h.date_harvest, h.rowid";
 		$sql .= $this->db->plimit(50);

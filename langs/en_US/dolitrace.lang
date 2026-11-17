@@ -741,3 +741,17 @@ TracePublicProduct = The product
 TracePublicFarm = The farm
 TracePublicCertificate = Organic certificate no. %s, control body %s
 TracePublicFooter = Data recorded by the farm in its field register.
+
+TracePublicEmbed = Traceability form for the website of the farm
+TracePublicEmbedHelp = Copy this HTML code into a page of the website of the farm: the visitor types the short code or the lot printed on the label and the public page of the product opens in a new tab. The form takes the style of the website (CSS class dolitrace-form); the texts are in the language of this setup and can be changed in the code
+TracePublicEmbedDisabled = To get the code for the website, first enable "Publish the traceability page" and save.
+TracePublicEmbedFarm = Farm
+TracePublicEmbedAllFarms = All the farms
+TracePublicEmbedCode = HTML code
+TracePublicEmbedCopy = Copy the code
+TracePublicEmbedCopied = Code copied
+TracePublicEmbedPreview = Preview
+TracePublicFormPlaceholder = Code or lot on the label
+TracePublicFormButton = Search
+TracePublicFormHelp = Type the 8-character code or the lot printed on the label, or scan the QR code.
+TracePublicChoose = More products match the code: choose the one on your label.
