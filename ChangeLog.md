@@ -1,8 +1,8 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-## 1.3.3 (in sviluppo)
+## 1.3.3 (2026-11-17)
 
-Condizioni meteo da doliField 0.3.0 (solo con doliField attivo).
+Condizioni meteo da doliField 0.3.0 (solo con doliField attivo). Basta il `git pull`, senza riattivare il modulo: nessuna colonna nuova.
 
 - Registrazioni dei trattamenti su superfici: la scheda in bozza mostra le condizioni meteo dell'appezzamento del piano di produzione nel periodo del trattamento (temperatura, umidità, vento, pioggia durante e nelle ore dopo, fonte) con il pulsante "Usa nella registrazione"; alla convalida, se il campo Condizioni meteo è vuoto, vi si copia il testo, che entra nell'hash della registrazione.
 - Avvisi meteo sui trattamenti fitosanitari in bozza: vento, pioggia durante e dopo il trattamento e temperatura oltre le soglie della configurazione di doliField.
