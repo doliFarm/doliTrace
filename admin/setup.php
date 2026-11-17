@@ -102,6 +102,26 @@ $item->fieldAttr['type'] = 'number';
 $item->fieldAttr['min'] = '0';
 $item->helpText = $langs->transnoentities('DOLITRACE_MOA_MAX_CONSECUTIVEHelp');
 
+// Public traceability page opened by the QR code on the label
+dol_include_once('/dolitrace/class/dolitracetrace.class.php');
+$formSetup->newItem('TracePublicSetup')->setAsTitle();
+
+$item = $formSetup->newItem('DOLITRACE_PUBLIC_ENABLED');
+$item->setAsYesNo();
+$item->helpText = $langs->transnoentities('DOLITRACE_PUBLIC_ENABLEDHelp');
+
+$item = $formSetup->newItem('DOLITRACE_PUBLIC_URL');
+$item->setAsUrl();
+$item->helpText = $langs->transnoentities('DOLITRACE_PUBLIC_URLHelp', dol_buildpath('/dolitrace/public/trace.php', 2));
+
+$item = $formSetup->newItem('DOLITRACE_PUBLIC_TREATMENT_LIST');
+$item->setAsYesNo();
+$item->helpText = $langs->transnoentities('DOLITRACE_PUBLIC_TREATMENT_LISTHelp');
+
+$item = $formSetup->newItem('DOLITRACE_PUBLIC_MAP');
+$item->setAsYesNo();
+$item->helpText = $langs->transnoentities('DOLITRACE_PUBLIC_MAPHelp');
+
 // The objects of doliTrace have no numbering or document models to choose: no other section
 
 

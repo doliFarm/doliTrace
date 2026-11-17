@@ -445,18 +445,24 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
     if (!empty($object->uuid)) {
         dol_include_once('/dolitrace/class/dolitracetrace.class.php');
         $tracelink = dol_buildpath('/dolitrace/dolitrace_trace.php', 2).'?uuid='.urlencode($object->uuid);
+        $qrlink = DoliTraceTrace::qrUrl($object->uuid);
         print '<div class="underbanner clearboth"></div>';
         print '<table class="border centpercent tableforfield" id="dolitrace-harvest-trace">';
         print '<tr><td class="titlefield">'.$langs->trans('TraceUuid').'</td><td class="wordbreak"><span class="fa fa-fingerprint opacitymedium paddingright"></span>'.dol_escape_htmltag($object->uuid).'</td></tr>';
         print '<tr><td>'.$langs->trans('TraceShortCode').'</td><td><strong>'.dol_escape_htmltag(DoliTraceTrace::shortCode($object->uuid)).'</strong></td></tr>';
         print '<tr><td>'.$langs->trans('TraceQrCode').'</td><td>';
         require_once DOL_DOCUMENT_ROOT.'/includes/tecnickcom/tcpdf/tcpdf_barcodes_2d.php';
-        $barcodeobj = new TCPDF2DBarcode($tracelink, 'QRCODE,M');
+        $barcodeobj = new TCPDF2DBarcode($qrlink, 'QRCODE,M');
         $pngdata = $barcodeobj->getBarcodePngData(3, 3, array(0, 0, 0));
         if ($pngdata) {
             print '<img src="data:image/png;base64,'.base64_encode($pngdata).'" alt="QR" title="'.dol_escape_htmltag($langs->trans('TraceQrCodeHelp')).'" style="border: 1px solid #eee; padding: 4px; background: white;">';
         }
         print '<br><a href="'.dol_escape_htmltag($tracelink).'"><span class="fa fa-route paddingright"></span>'.$langs->trans('TraceTitle').'</a>';
+        if (getDolGlobalInt('DOLITRACE_PUBLIC_ENABLED')) {
+            print ' &nbsp; <a href="'.dol_escape_htmltag($qrlink).'" target="_blank" rel="noopener"><span class="fa fa-globe paddingright"></span>'.$langs->trans('TracePublicLink').'</a>';
+        } else {
+            print '<br><span class="opacitymedium small">'.$langs->trans('TracePublicDisabled').'</span>';
+        }
         print '</td></tr>';
         print '</table>';
     }
@@ -495,6 +501,11 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
                 print dolGetButtonAction('', $langs->trans('Modify'), 'default', $_SERVER["PHP_SELF"].'?id='.$object->id.'&action=edit&token='.newToken(), '', $permissiontoadd);
             }
             
+            // Labels with the QR code of the harvest
+            if (!empty($object->uuid) && $object->status == $object::STATUS_VALIDATED) {
+                print dolGetButtonAction('', $langs->trans('TraceLabels'), 'default', dol_buildpath('/dolitrace/dolitraceharvest_labels.php', 1).'?id='.$object->id, '', $permissiontoread);
+            }
+
             // Reopen (Set to Draft)
             if ($object->status == $object::STATUS_VALIDATED && $permissiontoadd) {
                  print dolGetButtonAction('', $langs->trans('SetToDraft'), 'default', $_SERVER["PHP_SELF"].'?id='.$object->id.'&action=setdraft&token='.newToken(), '', $permissiontoadd);

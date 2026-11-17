@@ -1,5 +1,15 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.4.0 (in sviluppo)
+
+Tracciabilità, fase T2: pagina pubblica dal QR in etichetta. Dopo il `git pull` va riattivato il modulo (campi aggiuntivi "Storia").
+
+- Pagina pubblica `public/trace.php?u=<UUID>`, senza login, leggera e per telefono, in italiano, inglese o francese secondo il browser. Mostra le sole raccolte convalidate: prodotto e foto, azienda (nome commerciale, logo, comune, sito, certificato bio), data di raccolta, lotto, codice breve, coltura, appezzamento e comune, stato bio, riepilogo dei trattamenti (numero, ammessi in bio, giorni dall'ultimo trattamento alla raccolta), note pubbliche della raccolta. Se il lotto viene da più raccolte della stessa azienda, le mostra tutte. Mai clienti, prezzi, quantità, operatori, note private, dati catastali o del fascicolo. Risposta identica (404) per UUID inesistente, raccolta non convalidata o pagina non attiva; nessun cookie.
+- Setup di doliTrace, sezione "Pagina pubblica di tracciabilità": attivazione (spenta per default), indirizzo pubblico di Dolibarr per i QR, elenco dei trattamenti con data e sostanza attiva (spento: solo riepilogo), mappa OpenStreetMap dell'appezzamento (spenta: solo nome e comune).
+- Campi aggiuntivi "Storia (pagina pubblica)" su soggetti terzi e prodotti, pubblicati nella pagina.
+- Scheda della raccolta: il QR apre la pagina pubblica quando è attiva (altrimenti la pagina interna), con il collegamento "Pagina pubblica"; nuovo pulsante "Etichette QR" sulle raccolte convalidate.
+- Etichette QR in PDF su fogli A4 adesivi (3 x 8 da 70 x 37 mm, 2 x 5 da 105 x 57 mm, 2 x 4 da 105 x 74 mm): prodotto, lotto, data di raccolta, azienda, codice breve; si possono saltare le etichette già usate del primo foglio.
+
 ## 1.3.3 (2026-11-17)
 
 Condizioni meteo da doliField 0.3.0 (solo con doliField attivo). Basta il `git pull`, senza riattivare il modulo: nessuna colonna nuova.

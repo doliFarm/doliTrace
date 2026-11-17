@@ -875,6 +875,17 @@ class modDolitrace extends DolibarrModules
 			return -1; // Do not activate module if error 'not allowed' returned when loading module SQL queries (the _load_table run sql with run_sql with the error allowed parameter set to 'default')
 		}
 
+		// Stories of the farm and of the product, shown on the public traceability page
+		include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
+		$extrafields = new ExtraFields($this->db);
+		foreach (array('thirdparty', 'product') as $elementtype) {
+			$result = $extrafields->addExtraField('dolitrace_public_story', 'DolitracePublicStory', 'text', 1100, '', $elementtype, 0, 0, '', '', 1, '', '3', 'DolitracePublicStoryHelp', '', '', 'dolitrace@dolitrace', 'isModEnabled("dolitrace")');
+			if ($result < 0) {
+				$this->error = $extrafields->error;
+				return -1;
+			}
+		}
+
 		// Create extrafields during init
 		//include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
 		//$extrafields = new ExtraFields($this->db);

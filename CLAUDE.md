@@ -48,6 +48,7 @@ Modulo esterno Dolibarr per la tracciabilità agricola: piani colturali (piani d
 - Pagine nella radice: `dolitrace<oggetto>_{list,card,agenda,contact,document,note}.php`, più `dolitracecropplan_harvests.php` e `dolitracecropplan_operations.php`.
 - `core/triggers/`: validazione del piano e movimenti di magazzino delle raccolte.
 - `lib/`: intestazioni delle schede. `admin/`: setup ed extrafields. `ajax/`: endpoint. `pwa/`: app per il campo.
+- Tracciabilità: `dolitrace_trace.php` (pagina interna) e `class/dolitracetrace.class.php`; `public/trace.php` è la pagina pubblica senza login aperta dal QR (`NOLOGIN`, `NOSESSION`, solo raccolte convalidate, solo i dati scelti nel setup `DOLITRACE_PUBLIC_*`); `dolitraceharvest_labels.php` crea le etichette QR in PDF.
 - `langs/{it_IT,en_US,fr_FR}/dolitrace.lang`: le chiavi sono in inglese; il testo italiano va solo nei valori.
 
 ## Database e SQL
