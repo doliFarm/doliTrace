@@ -133,10 +133,10 @@ class DoliTraceCropplan extends CommonObject
      */
     public $fields = array(
         "rowid" => array("type" => "int", "label" => "TechnicalID", "enabled" => "1", 'position' => 10, 'notnull' => 1, "visible" => "0",),
-        "ref" => array("type" => "varchar(128)", "label" => "Ref", "enabled" => "1", 'position' => 15, 'notnull' => 0, "visible" => "5", "csslist" => "tdoverflowmax150", "showoncombobox" => "1",),
+        "ref" => array("type" => "varchar(128)", "label" => "Ref", 'searchall' => 1, "enabled" => "1", 'position' => 15, 'notnull' => 0, "visible" => "5", "csslist" => "tdoverflowmax150", "showoncombobox" => "1",),
         "entity" => array("type" => "integer", "label" => "Entity", "enabled" => "1", 'position' => 16, 'notnull' => 1, "visible" => 0, 'default' => 1),
         "uuid" => array("type" => "varchar(36)", "label" => "Uuid", "enabled" => "1", 'position' => 20, 'notnull' => 0, "visible" => "5",),
-        "label" => array("type" => "varchar(255)", "label" => "Label", "enabled" => "1", 'position' => 25, 'notnull' => 0, "visible" => "1", "alwayseditable" => "1", "css" => "minwidth300", "cssview" => "wordbreak", "csslist" => "tdoverflowmax150",),
+        "label" => array("type" => "varchar(255)", "label" => "Label", 'searchall' => 1, "enabled" => "1", 'position' => 25, 'notnull' => 0, "visible" => "1", "alwayseditable" => "1", "css" => "minwidth300", "cssview" => "wordbreak", "csslist" => "tdoverflowmax150",),
         
         "fk_soc" => array("type" => "integer:Societe:societe/class/societe.class.php:1", "label" => "ThirdParty", "picto" => "company", "enabled" => "1", 'position' => 30, 'notnull' => 1, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx", "csslist" => "tdoverflowmax150",),
         "fk_dossier" => array("type" => "integer:DoliFarmFarmDossier:dolifarm/class/dolifarmfarmdossier.class.php:1", "label" => "FarmDossier", "enabled" => "1", "position" => 32, "notnull" => 1, "visible" => "1", "index" => 1,),
