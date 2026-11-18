@@ -2,6 +2,10 @@
 
 ## 1.5.4 (in sviluppo)
 
+- App di campo 1.4.0: **meteo di doliField sul telefono**, scaricato con gli altri dati e consultabile senza rete.
+  - Scheda dell'appezzamento: previsione dei prossimi 3 giorni (minima e massima, pioggia, vento) e finestre adatte ai trattamenti nelle 48 ore, secondo le soglie di doliField; fonte e ora della previsione, con un avviso se i dati hanno più di un giorno.
+  - Moduli di operazione e trattamento: meteo previsto all'ora indicata (temperatura, vento, pioggia durante e nelle ore dopo). Per i trattamenti fitosanitari, gli avvisi di vento, pioggia e temperatura oltre le soglie, già sul telefono.
+  - Il registro continua a riportare il meteo copiato alla convalida per l'ora della registrazione, con il dato migliore disponibile in quel momento (stazione, rianalisi ERA5-Land, previsione).
 - App di campo 1.3.1: si chiama **doliFarm** (nome sotto l'icona e nel titolo) e si apre con una pagina con il logo di doliFarm, il nome dell'app e la versione. Un tocco la chiude prima. Su Android il nome cambia quando Chrome aggiorna l'app installata; su iPhone serve reinstallarla (Condividi > Aggiungi alla schermata Home).
 
 ## 1.5.3 (2026-11-18)

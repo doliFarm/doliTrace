@@ -20,7 +20,7 @@
  * Change VERSION at every change of the files of the app.
  */
 
-const VERSION = 'dolitrace-field-1.3.1';
+const VERSION = 'dolitrace-field-1.4.0';
 const FILES = [
 	'./',
 	'./index.html',
@@ -33,6 +33,7 @@ const FILES = [
 	'./assets/js/queue.js',
 	'./assets/js/photos.js',
 	'./assets/js/treatment.js',
+	'./assets/js/weather.js',
 	'./assets/vendor/jsqr/jsQR.js',
 	'./assets/img/icon-192.png',
 	'./assets/img/icon-512.png',

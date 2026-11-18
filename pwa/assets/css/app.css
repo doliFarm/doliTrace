@@ -573,3 +573,29 @@ details.warnings summary {
 	font-size: 14px;
 	color: var(--muted);
 }
+
+/* Weather of the plot and of the forms */
+.weather-days {
+	width: 100%;
+	border-collapse: collapse;
+	margin: 4px 0 8px;
+}
+
+.weather-days td {
+	padding: 4px 4px;
+	border-bottom: 1px solid var(--line);
+	white-space: nowrap;
+}
+
+.weather-days td.num {
+	text-align: right;
+}
+
+.weather-icon {
+	width: 28px;
+	font-size: 20px;
+}
+
+.weather-form .item-sub {
+	margin-top: 4px;
+}
