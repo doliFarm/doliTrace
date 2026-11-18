@@ -1,6 +1,6 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-## 1.5.10 (in sviluppo)
+## 1.5.10 (2026-11-18)
 
 - Piano di produzione nuovo: il controllo di unicità del codice di tracciabilità (UUID) interrogava la tabella senza prefisso ed era sempre saltato (errore "Table ... dolitrace_cropplan doesn't exist" nel log).
 
