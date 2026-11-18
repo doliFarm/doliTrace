@@ -335,8 +335,13 @@ class DoliTraceCropplan extends CommonObject
                 $candidate_uuid = dol_hash(uniqid(mt_rand(), true), 'md5');
                 
                 // B. Verifica esistenza nel DB
-                $sql_check = "SELECT rowid FROM " . $this->table_element . " WHERE uuid = '" . $this->db->escape($candidate_uuid) . "'";
+                $sql_check = "SELECT rowid FROM " . $this->db->prefix() . $this->table_element . " WHERE uuid = '" . $this->db->escape($candidate_uuid) . "'";
                 $res_check = $this->db->query($sql_check);
+                if (!$res_check) {
+                    // Without the check the plan is not created: an error of the database is not a free code
+                    $this->error = $this->db->lasterror();
+                    return -1;
+                }
                 
                 if ($this->db->num_rows($res_check) == 0) {
                     // C. Trovato! È unico.
