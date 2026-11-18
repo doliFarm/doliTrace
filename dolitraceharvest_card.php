@@ -123,7 +123,7 @@ if ((string) $object->qty_unit !== '' && !isset($object->fields['qty_unit']['arr
 	$object->fields['qty_unit']['arrayofkeyval'][$object->qty_unit] = $object->qty_unit;
 }
 
-$enablepermissioncheck = getDolGlobalInt('DOLITRACE_ENABLE_PERMISSION_CHECK');
+$enablepermissioncheck = 1; // Always: the constant of ModuleBuilder, never set, left the pages open to every user
 if ($enablepermissioncheck) {
     $permissiontoread = $user->hasRight('dolitrace', 'dolitraceharvest', 'read');
     $permissiontoadd = $user->hasRight('dolitrace', 'dolitraceharvest', 'write'); 

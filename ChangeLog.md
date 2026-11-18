@@ -1,5 +1,13 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.5.1 (2026-11-18)
+
+Correzioni di sicurezza e dell'app di campo. Dopo l'aggiornamento non serve riattivare il modulo.
+
+- Sicurezza: liste e schede di piani di produzione, operazioni e raccolte (scheda, note, documenti, contatti, agenda) non controllavano i permessi di doliTrace: il controllo generato da ModuleBuilder era legato alla costante `DOLITRACE_ENABLE_PERMISSION_CHECK`, mai impostata, e senza di essa ogni utente collegato poteva leggere, modificare, convalidare e cancellare. Ora i permessi di lettura, scrittura e cancellazione valgono sempre (restano i filtri per azienda). Verificare che gli utenti che usano queste pagine abbiano i permessi di doliTrace.
+- App di campo 1.1.1: quantità della raccolta e superficie dell'operazione in un campo di testo con la virgola o il punto come separatore decimale; in alcuni browser il campo numerico scartava la virgola e 12,5 diventava 125 senza avviso. Un valore non valido dà l'errore del campo.
+- App di campo: le unità con simboli (mm³, µl) comparivano con il codice HTML (`mm&sup3;`).
+
 ## 1.5.0 (2026-11-18)
 
 App di campo (PWA) per il telefono: consultazione senza rete, QR dei cartelli, registrazione di operazioni e raccolte come bozze. Dopo l'aggiornamento **riattivare doliTrace** (nuova tabella, nuovo permesso, nuova voce di menu) e assegnare il permesso "Usare l'app di campo" a chi registra dal telefono. L'app richiede https.

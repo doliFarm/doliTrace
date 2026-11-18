@@ -140,8 +140,7 @@ if ($id > 0 || !empty($ref)) {
 
 // Permissions
 // (There are several ways to check permission.)
-// Set $enablepermissioncheck to 1 to enable a minimum low level of checks
-$enablepermissioncheck = getDolGlobalInt('DOLITRACE_ENABLE_PERMISSION_CHECK');
+$enablepermissioncheck = 1; // Always: the constant of ModuleBuilder, never set, left the pages open to every user
 if ($enablepermissioncheck) {
 	$permissiontoread = $user->hasRight('dolitrace', 'dolitraceoperation', 'read');
 	$permissiontoadd  = $user->hasRight('dolitrace', 'dolitraceoperation', 'write'); // Used by the include of actions_addupdatedelete.inc.php and actions_linkedfiles.inc.php
