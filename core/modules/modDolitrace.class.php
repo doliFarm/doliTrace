@@ -79,7 +79,7 @@ class modDolitrace extends DolibarrModules
 		$this->editor_squarred_logo = '';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@dolitrace'
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = '1.5.7';
+		$this->version = '1.5.8';
 		// Url to the file with your last numberversion of this module
 		//$this->url_last_version = 'http://www.example.com/versionmodule.txt';
 
@@ -774,7 +774,7 @@ class modDolitrace extends DolibarrModules
 			'leftmenu' => 'dolitrace_pwa',
 			'url' => '/dolitrace/dolitrace_pwa.php',
 			'langs' => 'dolitrace@dolitrace',
-			'position' => 9001,	// One position for each module (unique key of llx_menu)
+			'position' => 9021,	// After "Help me": Dolibarr looks for the parent only among the entries with a lower position; one position for each module (unique key of llx_menu)
 			'enabled' => 'isModEnabled("dolitrace") && isModEnabled("dolifarm")',
 			'perms' => '$user->hasRight("dolitrace", "dolitracepwa", "use") || $user->hasRight("dolitrace", "dolitraceoperation", "write") || $user->hasRight("dolitrace", "dolitraceharvest", "write")',
 			'target' => '',
