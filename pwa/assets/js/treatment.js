@@ -74,6 +74,10 @@ export function treatmentWarnings(T, ctx, d) {
 	if (kind === KIND_PLANTPROTECTION && operator && operator.license_end && operator.license_end < day) {
 		warnings.push(t('TWLicense', fmtDate(operator.license_end)));
 	}
+	// Licence number missing in the card of the operator (data of doliTrace 1.5.9 or later)
+	if (kind === KIND_PLANTPROTECTION && operator && operator.license === false) {
+		warnings.push(t('TWNoLicense'));
+	}
 	const machine = (ctx.machines || []).find((m) => m.id === Number(d.machine_id));
 	if (machine && machine.check_end && machine.check_end < day) {
 		warnings.push(t('TWMachine', fmtDate(machine.check_end)));
@@ -242,7 +246,8 @@ export function treatmentFields(ui, T, ctx, d) {
 	const list = h('div.products');
 	let current = () => ({});
 
-	const operators = (T.operators || []).filter((o) => !o.farm_id || o.farm_id === plan.farm_id || o.user_id === ctx.userId);
+	// Operators: contacts of the farm of the plan
+	const operators = (T.operators || []).filter((o) => o.farm_id === plan.farm_id);
 	const mine = operators.find((o) => o.user_id === ctx.userId);
 	const kindSelect = select('kind', [
 		{ value: KIND_PLANTPROTECTION, label: t('Treatment') },
@@ -424,10 +429,10 @@ export function treatmentFields(ui, T, ctx, d) {
 	const machines = ctx.machines || [];
 	const fields = [
 		formRow(t('TreatmentKind'), kindSelect, true),
-		formRow(t('DateStart'), h('input.search', { type: 'datetime-local', name: 'date', value: d.date || nowLocal(), required: true }), true),
+		formRow(t('DateStart'), h('input.search', { type: 'datetime-local', name: 'date', value: d.date || (ctx.defaultDate ? ctx.defaultDate : nowLocal()), required: true }), true),
 		formRow(t('DateEnd'), h('input.search', { type: 'datetime-local', name: 'date_end', value: d.date_end || '' })),
 		formRow(t('TreatedArea'), h('input.search', { type: 'text', name: 'area_ha', inputmode: 'decimal', autocomplete: 'off', value: d.area_ha || (plot && plot.area_ha ? String(plot.area_ha).replace('.', ',') : '') })),
-		formRow(t('Bbch'), h('input.search', { type: 'text', name: 'bbch', maxlength: 3, inputmode: 'numeric', pattern: '[0-9]{1,3}', value: d.bbch || '' })),
+		formRow(t('Bbch'), ctx.bbch ? ctx.bbch('bbch', d.bbch, 3) : h('input.search', { type: 'text', name: 'bbch', maxlength: 3, inputmode: 'numeric', pattern: '[0-9]{1,3}', value: d.bbch || '' })),
 		operators.length ? formRow(t('Operator'), select('operator_id', operators.map((o) => ({ value: o.id, label: o.label })), d.operator_id || (mine ? mine.id : ''), t('NoOperator'))) : null,
 		machines.length ? formRow(t('Machine'), select('machine_id', machines.map((m) => ({ value: m.id, label: [m.label, m.ref].filter(Boolean).join(' - ') })), d.machine_id, t('None'))) : null,
 		formRow(t('WaterVolume'), h('input.search', { type: 'text', name: 'water_volume', inputmode: 'decimal', autocomplete: 'off', value: d.water_volume ? String(d.water_volume).replace('.', ',') : '' })),

@@ -416,3 +416,20 @@ function dolitraceTreatmentQtyInBasis($object, $basis)
 	}
 	return $qty;
 }
+
+/**
+ * Print the scripts that keep in the form of a treatment only the dossiers, crop plans, operators and machines of the
+ * chosen farm (the class and the trigger of doliFarm check them again on save)
+ *
+ * @return	void
+ */
+function dolitraceTreatmentFarmFilters()
+{
+	if (!dol_include_once('/dolifarm/lib/dolifarm_fields.lib.php') || !function_exists('dolifarmPrintThirdpartyFilter')) {
+		return;
+	}
+	dolifarmPrintThirdpartyFilter('fk_dossier', 'dolifarm_farmdossier', 'dolifarmfarmdossier');
+	dolifarmPrintThirdpartyFilter('fk_cropplan', 'dolitrace_cropplan', 'dolitracecropplan', false);
+	dolifarmPrintThirdpartyFilter('fk_operator', 'dolifarm_operator', 'dolifarmoperator');
+	dolifarmPrintThirdpartyFilter('fk_machine', 'dolifarm_machine', 'dolifarmmachine', false);
+}

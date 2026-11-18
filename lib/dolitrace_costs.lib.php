@@ -269,3 +269,49 @@ function dolitraceCropPlanSyncCosts($db, $cropplanid)
 	}
 	return 1;
 }
+
+/**
+ * Production plans of an operation, a harvest or a treatment record, as saved in the database
+ *
+ * @param	DoliDB	$db			Database handler
+ * @param	string	$element	dolitraceoperation, dolitraceharvest or dolitracetreatment
+ * @param	int		$id			Id of the record
+ * @return	int[]				Ids of the production plans
+ */
+function dolitraceRecordCropPlans($db, $element, $id)
+{
+	$ids = array();
+	if ((int) $id <= 0) {
+		return $ids;
+	}
+	$prefix = $db->prefix();
+	if ($element == 'dolitracetreatment') {
+		$sql = "SELECT fk_cropplan FROM ".$prefix."dolitrace_treatment WHERE rowid = ".((int) $id)." AND fk_cropplan > 0";
+		$sql .= " UNION SELECT fk_cropplan FROM ".$prefix."dolitrace_treatment_target WHERE fk_treatment = ".((int) $id)." AND fk_cropplan > 0";
+	} else {
+		$sql = "SELECT fk_cropplan FROM ".$prefix.($element == 'dolitraceharvest' ? "dolitrace_harvest" : "dolitrace_operation")." WHERE rowid = ".((int) $id)." AND fk_cropplan > 0";
+	}
+	$resql = $db->query($sql);
+	while ($resql && ($obj = $db->fetch_object($resql))) {
+		$ids[(int) $obj->fk_cropplan] = (int) $obj->fk_cropplan;
+	}
+	return array_values($ids);
+}
+
+/**
+ * Save again the actual costs of the production plans of a record after a change: the plans it had before (moved or
+ * deleted record) and the ones it has now. The triggers of a deletion run before the record is deleted, and the rows
+ * of the treatments have no triggers: the classes call this after the change.
+ *
+ * @param	DoliDB	$db			Database handler
+ * @param	string	$element	dolitraceoperation, dolitraceharvest or dolitracetreatment
+ * @param	int		$id			Id of the record
+ * @param	int[]	$before		Production plans before the change (dolitraceRecordCropPlans())
+ * @return	void
+ */
+function dolitraceSyncRecordCosts($db, $element, $id, array $before = array())
+{
+	foreach (array_unique(array_merge($before, dolitraceRecordCropPlans($db, $element, (int) $id))) as $planid) {
+		dolitraceCropPlanSyncCosts($db, (int) $planid);
+	}
+}

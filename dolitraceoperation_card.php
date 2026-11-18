@@ -300,6 +300,8 @@ if ($action == 'create') {
     }
     // Common attributes
     include DOL_DOCUMENT_ROOT.'/core/tpl/commonfields_add.tpl.php';
+    // Machines of the farm of the plan
+    dolitraceOperationMachineFilter($db);
 
     // Other attributes
     include DOL_DOCUMENT_ROOT.'/core/tpl/extrafields_add.tpl.php';
@@ -342,8 +344,14 @@ if (($id || $ref) && $action == 'edit') {
 
     print '<table class="border centpercent tableforfieldedit">'."\n";
 
+    // Code typed before the BBCH dictionary: kept in the list
+    if ((string) $object->fk_pheno_stage !== '' && !isset($object->fields['fk_pheno_stage']['arrayofkeyval'][(string) $object->fk_pheno_stage])) {
+        $object->fields['fk_pheno_stage']['arrayofkeyval'][(string) $object->fk_pheno_stage] = (string) $object->fk_pheno_stage;
+    }
     // Common attributes
     include DOL_DOCUMENT_ROOT.'/core/tpl/commonfields_edit.tpl.php';
+    // Machines of the farm of the plan
+    dolitraceOperationMachineFilter($db);
 
     // Other attributes
     include DOL_DOCUMENT_ROOT.'/core/tpl/extrafields_edit.tpl.php';

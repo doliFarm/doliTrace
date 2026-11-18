@@ -563,6 +563,9 @@ if ($action == 'create') {
 
 	print '</table>'."\n";
 
+	// Dossier, crop plan, operator and machine of the chosen farm
+	dolitraceTreatmentFarmFilters();
+
 	print dol_get_fiche_end();
 
 	print $form->buttonsSaveCancel("Create");
@@ -609,6 +612,9 @@ if (($id || $ref) && $action == 'edit') {
 	include DOL_DOCUMENT_ROOT.'/core/tpl/extrafields_edit.tpl.php';
 
 	print '</table>';
+
+	// Dossier, crop plan, operator and machine of the chosen farm
+	dolitraceTreatmentFarmFilters();
 
 	print dol_get_fiche_end();
 

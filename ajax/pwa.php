@@ -90,6 +90,16 @@ if (!$res) {
  * @var User $user
  */
 dol_include_once('/dolitrace/lib/dolitrace_pwa.lib.php');
+dol_include_once('/dolifarm/lib/dolifarm_farm.lib.php');
+
+// Language of the phone (it, en, fr) sent by the app, else the one of the user: messages and labels in the same
+// language as the app
+$phonelangs = array('it' => 'it_IT', 'en' => 'en_US', 'fr' => 'fr_FR');
+$phonelang = $phonelangs[GETPOST('lang', 'aZ09')] ?? '';
+if ($phonelang !== '' && $phonelang !== $langs->defaultlang) {
+	$langs = new Translate('', $conf);
+	$langs->setDefaultLang($phonelang);
+}
 
 $langs->loadLangs(array('main', 'dolitrace@dolitrace', 'dolifarm@dolifarm'));
 
@@ -129,6 +139,7 @@ if ($action == 'session') {
 		'ok' => true, 'api' => DOLITRACE_PWA_API, 'server_time' => dolitracePwaDate(dol_now(), true),
 		'user' => array('id' => (int) $user->id, 'login' => (string) $user->login, 'name' => $user->getFullName($langs), 'lang' => (string) $langs->defaultlang),
 		'entity' => (int) $conf->entity, 'company' => (string) $mysoc->name, 'logout_url' => DOL_URL_ROOT.'/user/logout.php',
+		'single_farm' => (function_exists('dolifarmSingleFarmSocid') && dolifarmSingleFarmSocid() > 0),
 		'rights' => array('operation' => $rights['operation'], 'harvest' => $rights['harvest'], 'treatment' => $rights['treatment']),
 		'limits' => array('photos' => DOLITRACE_PWA_MAXPHOTOS, 'photo_size' => DOLITRACE_PWA_PHOTOSIZE),
 		'token' => ($token !== '' ? $token : newToken()),

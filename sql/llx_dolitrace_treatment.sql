@@ -45,7 +45,11 @@ CREATE TABLE IF NOT EXISTS llx_dolitrace_treatment(
 	justification_type		varchar(32),						-- organic: llx_dolitrace_c_justification
 	justification_ref		varchar(255),						-- organic: reference of the document of the need
 	water_volume			double(24,8),						-- l/ha
-	weather					varchar(255),
+	weather					varchar(255),						-- weather of the plot (doliField) or typed
+	weather_obs_date		datetime,							-- weather observed in the field: time of the reading
+	weather_obs_temp		double(24,8),						-- degrees C
+	weather_obs_wind		double(24,8),						-- m/s
+	weather_obs_rh			double(24,8),						-- relative humidity, percent
 	version					integer DEFAULT 1 NOT NULL,
 	fk_previous				integer,
 	late					smallint DEFAULT 0,

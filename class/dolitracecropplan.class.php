@@ -28,6 +28,7 @@ require_once DOL_DOCUMENT_ROOT.'/core/class/commonobject.class.php';
 //require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 //require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 dol_include_once('/dolifarm/lib/dolifarm.lib.php');
+dol_include_once('/dolitrace/lib/dolitrace_period.lib.php');
 
 
 /**
@@ -345,6 +346,9 @@ class DoliTraceCropplan extends CommonObject
                 // Se num_rows > 0, il ciclo si ripete e ne genera un altro
             }
         }
+        if ($this->checkPeriod() < 0) {
+            return -1;
+        }
         // Draft: provisional ref unique until the id is known, then "(PROV<id>)" as the core does (the ref is a unique key)
         $provisional = false;
         if (empty($this->ref) || $this->ref == '(PROV)') {
@@ -595,7 +599,50 @@ class DoliTraceCropplan extends CommonObject
      */
     public function update(User $user, $notrigger = 0)
     {
+        if ($this->checkPeriod() < 0) {
+            return -1;
+        }
         return $this->updateCommon($user, $notrigger);
+    }
+
+    /**
+     * Check the period of the plan: end not before the start, operations, treatments and harvests inside it
+     *
+     * @return  int     <0 if KO, >0 if OK
+     */
+    public function checkPeriod()
+    {
+        global $langs;
+
+        $start = dolitracePeriodDay($this->date_start, false);
+        $end = dolitracePeriodDay($this->date_end, false);
+        if ($start !== '' && $end !== '' && $end < $start) {
+            $langs->load('dolitrace@dolitrace');
+            $this->error = $langs->trans('ErrorCropPlanDateEnd');
+            return -1;
+        }
+        // Dossier and plot of the farm of the plan
+        $prefix = $this->db->prefix();
+        foreach (array('fk_dossier' => array('dolifarm_farmdossier', 'FarmDossier'), 'fk_plot' => array('dolifarm_plot', 'Fkplot')) as $field => $link) {
+            if (empty($this->$field) || empty($this->fk_soc)) {
+                continue;
+            }
+            $resql = $this->db->query("SELECT fk_soc FROM ".$prefix.$link[0]." WHERE rowid = ".((int) $this->$field));
+            $obj = ($resql ? $this->db->fetch_object($resql) : null);
+            if ($obj && (int) $obj->fk_soc > 0 && (int) $obj->fk_soc != (int) $this->fk_soc) {
+                $langs->loadLangs(array('dolitrace@dolitrace', 'dolifarm@dolifarm'));
+                $this->error = $langs->trans('ErrorCropPlanOtherFarm', $langs->transnoentitiesnoconv($link[1]));
+                return -1;
+            }
+        }
+        if ($this->id > 0) {
+            $error = dolitracePlanRecordsOutsideError($this->db, (int) $this->id, $start, $end);
+            if ($error !== '') {
+                $this->error = $error;
+                return -1;
+            }
+        }
+        return 1;
     }
 
     /**

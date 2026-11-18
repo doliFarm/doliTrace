@@ -23,5 +23,7 @@ CREATE TABLE IF NOT EXISTS llx_dolitrace_pwa_receipt(
 	fk_object		integer NOT NULL,
 	fk_user			integer NOT NULL,
 	date_client		datetime,							-- when the record was made on the phone
-	datec			datetime NOT NULL
+	datec			datetime NOT NULL,
+	data_json		text,								-- data sent by the phone (API 2), to change the draft from the app
+	revision		varchar(64)							-- identifier of the last change sent by the phone
 ) ENGINE=innodb;
