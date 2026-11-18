@@ -996,14 +996,14 @@ class DoliTraceTreatment extends CommonObject
 		// Rename directory if dir was a temporary ref
 		if (!$error && preg_match('/^[\(]?PROV/i', $oldref)) {
 			// Now we rename also files into index
-			$sql = 'UPDATE '.$this->db->prefix()."ecm_files set filename = CONCAT('".$this->db->escape($this->newref)."', SUBSTR(filename, ".(strlen($oldref) + 1).")), filepath = 'dolitracetreatment/".$this->db->escape($this->newref)."'";
-			$sql .= " WHERE filename LIKE '".$this->db->escape($oldref)."%' AND filepath = 'dolitracetreatment/".$this->db->escape($oldref)."' and entity = ".((int) $conf->entity);
+			$sql = 'UPDATE '.$this->db->prefix()."ecm_files set filename = CONCAT('".$this->db->escape($this->newref)."', SUBSTR(filename, ".(strlen($oldref) + 1).")), filepath = CONCAT(SUBSTR(filepath, 1, LENGTH(filepath) - ".strlen($oldref)."), '".$this->db->escape($this->newref)."')";
+			$sql .= " WHERE filename LIKE '".$this->db->escape($oldref)."%' AND filepath IN ('dolitrace/dolitracetreatment/".$this->db->escape($oldref)."', 'dolitracetreatment/".$this->db->escape($oldref)."') and entity = ".((int) $conf->entity);
 			if (!$this->db->query($sql)) {
 				$error++;
 				$this->error = $this->db->lasterror();
 			}
-			$sql = 'UPDATE '.$this->db->prefix()."ecm_files set filepath = 'dolitracetreatment/".$this->db->escape($this->newref)."'";
-			$sql .= " WHERE filepath = 'dolitracetreatment/".$this->db->escape($oldref)."' and entity = ".((int) $conf->entity);
+			$sql = 'UPDATE '.$this->db->prefix()."ecm_files set filepath = CONCAT(SUBSTR(filepath, 1, LENGTH(filepath) - ".strlen($oldref)."), '".$this->db->escape($this->newref)."')";
+			$sql .= " WHERE filepath IN ('dolitrace/dolitracetreatment/".$this->db->escape($oldref)."', 'dolitracetreatment/".$this->db->escape($oldref)."') and entity = ".((int) $conf->entity);
 			if (!$error && !$this->db->query($sql)) {
 				$error++;
 				$this->error = $this->db->lasterror();

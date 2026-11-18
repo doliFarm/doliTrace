@@ -35,6 +35,10 @@ define('DOLITRACE_PWA_API', 1);
 define('DOLITRACE_PWA_MAXBATCH', 50);
 /** Last operations and harvests kept by the phone for each crop plan */
 define('DOLITRACE_PWA_LASTRECORDS', 10);
+/** Photos of a record sent by the app */
+define('DOLITRACE_PWA_MAXPHOTOS', 5);
+/** Size of a photo (the app reduces them under 1 MB) */
+define('DOLITRACE_PWA_PHOTOSIZE', 4194304);
 
 /**
  * What the user can do with the field app
@@ -264,13 +268,13 @@ function dolitracePwaResult($clientid, $error, $message = '', $more = array())
  *
  * @param	DoliDB	$db			Database handler
  * @param	string	$clientid	Identifier
- * @return	array{element:string,id:int}|null
+ * @return	array{element:string,id:int,user:int}|null
  */
 function dolitracePwaReceipt($db, $clientid)
 {
 	global $conf;
 
-	$sql = "SELECT element, fk_object FROM ".$db->prefix()."dolitrace_pwa_receipt";
+	$sql = "SELECT element, fk_object, fk_user FROM ".$db->prefix()."dolitrace_pwa_receipt";
 	$sql .= " WHERE entity = ".((int) $conf->entity)." AND client_id = '".$db->escape($clientid)."'";
 	$resql = $db->query($sql);
 	if (!$resql) {
@@ -279,7 +283,114 @@ function dolitracePwaReceipt($db, $clientid)
 	}
 	$obj = $db->fetch_object($resql);
 	$db->free($resql);
-	return ($obj ? array('element' => (string) $obj->element, 'id' => (int) $obj->fk_object) : null);
+	return ($obj ? array('element' => (string) $obj->element, 'id' => (int) $obj->fk_object, 'user' => (int) $obj->fk_user) : null);
+}
+
+/**
+ * Photo of a record sent by the app: added to the documents of the draft (tab Documents)
+ *
+ * POST multipart: record (identifier of the record on the phone), photo_id (identifier of the photo), created_at,
+ * photo (JPEG). Only on a record sent from the app by the same user; the same photo sent again is not added twice.
+ *
+ * @param	DoliDB		$db		Database handler
+ * @param	User		$user	User
+ * @param	Translate	$langs	Language
+ * @return	array<string,mixed>	Result (dolitracePwaResult), client_id = photo_id
+ */
+function dolitracePwaPhoto($db, $user, $langs)
+{
+	global $conf;
+
+	require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+
+	$photoid = GETPOST('photo_id', 'alphanohtml');
+	$recordid = GETPOST('record', 'alphanohtml');
+	if (!preg_match('/^[A-Za-z0-9_-]{8,64}$/', $photoid) || !preg_match('/^[A-Za-z0-9_-]{8,64}$/', $recordid)) {
+		return dolitracePwaResult('', 'client_id', $langs->transnoentities('PwaErrorClientId'));
+	}
+
+	// Sent again: already in the documents
+	$done = dolitracePwaReceipt($db, $photoid);
+	if ($done) {
+		if (strpos($done['element'], 'photo_') !== 0) {
+			return dolitracePwaResult($photoid, 'client_id', $langs->transnoentities('PwaErrorClientId'));
+		}
+		return dolitracePwaResult($photoid, '', '', array('duplicate' => true));
+	}
+
+	// The record: sent from the app by the same user
+	$receipt = dolitracePwaReceipt($db, $recordid);
+	if (!$receipt || !in_array($receipt['element'], array('operation', 'harvest')) || $receipt['user'] != (int) $user->id) {
+		return dolitracePwaResult($photoid, 'record', $langs->transnoentities('PwaErrorPhotoRecord'));
+	}
+	$kind = $receipt['element'];
+	$rights = dolitracePwaRights($user);
+	if (empty($rights[$kind])) {
+		return dolitracePwaResult($photoid, 'forbidden', $langs->transnoentities('PwaErrorForbidden'));
+	}
+	$class = ($kind == 'harvest' ? 'DoliTraceHarvest' : 'DoliTraceOperation');
+	$object = new $class($db);
+	if ($object->fetch($receipt['id']) <= 0 || (int) $object->status == $class::STATUS_CANCELED) {
+		return dolitracePwaResult($photoid, 'record', $langs->transnoentities('PwaErrorPhotoRecord'));
+	}
+
+	// The file: a JPEG made by the app
+	$file = (isset($_FILES['photo']) && is_array($_FILES['photo']) ? $_FILES['photo'] : null);
+	if (!$file || is_array($file['name']) || !empty($file['error']) || empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
+		return dolitracePwaResult($photoid, 'file', $langs->transnoentities('PwaErrorPhotoFile'));
+	}
+	if ((int) $file['size'] > DOLITRACE_PWA_PHOTOSIZE) {
+		return dolitracePwaResult($photoid, 'size', $langs->transnoentities('PwaErrorPhotoSize', dol_print_size(DOLITRACE_PWA_PHOTOSIZE)));
+	}
+	$info = @getimagesize($file['tmp_name']);
+	if (!is_array($info) || $info[2] !== IMAGETYPE_JPEG) {
+		return dolitracePwaResult($photoid, 'file', $langs->transnoentities('PwaErrorPhotoFile'));
+	}
+
+	// At most DOLITRACE_PWA_MAXPHOTOS photos for a record
+	$sql = "SELECT COUNT(rowid) as nb FROM ".$db->prefix()."dolitrace_pwa_receipt";
+	$sql .= " WHERE entity = ".((int) $conf->entity)." AND element = 'photo_".$db->escape($kind)."' AND fk_object = ".((int) $object->id);
+	$resql = $db->query($sql);
+	$obj = ($resql ? $db->fetch_object($resql) : null);
+	if (!$obj) {
+		dol_syslog(__FUNCTION__.' '.$db->lasterror(), LOG_ERR);
+		return dolitracePwaResult($photoid, 'create', $langs->transnoentities('Error'));
+	}
+	if ((int) $obj->nb >= DOLITRACE_PWA_MAXPHOTOS) {
+		return dolitracePwaResult($photoid, 'max', $langs->transnoentities('PwaErrorPhotoMax', DOLITRACE_PWA_MAXPHOTOS));
+	}
+
+	// Drafts made before doliTrace 1.5.3 have no ref, the name of the directory of their documents
+	$object->setProvisionalRef();
+	$made = dolitracePwaParseDate(GETPOST('created_at', 'alphanohtml'));
+
+	// Receipt first (unique identifier): two sendings of the same photo at the same time add it once
+	$db->begin();
+	$sql = "INSERT INTO ".$db->prefix()."dolitrace_pwa_receipt (entity, client_id, element, fk_object, fk_user, date_client, datec)";
+	$sql .= " VALUES (".((int) $conf->entity).", '".$db->escape($photoid)."', 'photo_".$db->escape($kind)."', ".((int) $object->id).", ".((int) $user->id).",";
+	$sql .= " ".($made ? "'".$db->idate($made)."'" : "NULL").", '".$db->idate(dol_now())."')";
+	if (!$db->query($sql)) {
+		$db->rollback();
+		$done = dolitracePwaReceipt($db, $photoid);
+		if ($done && strpos($done['element'], 'photo_') === 0) {
+			return dolitracePwaResult($photoid, '', '', array('duplicate' => true));
+		}
+		dol_syslog(__FUNCTION__.' '.$db->lasterror(), LOG_ERR);
+		return dolitracePwaResult($photoid, 'create', $langs->transnoentities('Error'));
+	}
+	$dir = (empty($conf->dolitrace->multidir_output[$conf->entity]) ? $conf->dolitrace->dir_output : $conf->dolitrace->multidir_output[$conf->entity]);
+	$dir .= '/dolitrace'.$kind.'/'.get_exdir(0, 0, 0, 1, $object);
+	$_FILES['photo']['name'] = 'photo_'.dol_print_date($made ? $made : dol_now(), '%Y%m%d_%H%M', 'tzuserrel').'_'.substr(str_replace('-', '', $photoid), 0, 8).'.jpg';
+	$result = dol_add_file_process($dir, 0, 1, 'photo', '', null, '', 1, $object);
+	// Messages of the page of documents: not for the app
+	unset($_SESSION['dol_events']);
+	if ($result <= 0) {
+		$db->rollback();
+		dol_syslog(__FUNCTION__.' '.$kind.' '.$object->id.' '.$dir, LOG_ERR);
+		return dolitracePwaResult($photoid, 'file', $langs->transnoentities('PwaErrorPhotoFile'));
+	}
+	$db->commit();
+	return dolitracePwaResult($photoid, '', '', array('duplicate' => false, 'file' => $_FILES['photo']['name'], 'ref' => (string) $object->ref, 'url' => dol_buildpath('/dolitrace/dolitrace'.$kind.'_document.php', 2).'?id='.((int) $object->id)));
 }
 
 /**

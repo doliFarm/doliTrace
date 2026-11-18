@@ -429,6 +429,25 @@ class DoliTraceOperation extends CommonObject
 	}
 
 	/**
+	 * Draft without ref: (PROVid), like the other objects of Dolibarr, so that its documents have their own directory
+	 * (the ref is the name of the directory; validate() gives the final ref and renames the directory)
+	 *
+	 * @return	void
+	 */
+	public function setProvisionalRef()
+	{
+		if (trim((string) $this->ref) !== '' || empty($this->id)) {
+			return;
+		}
+		$ref = '(PROV'.((int) $this->id).')';
+		if ($this->db->query("UPDATE ".$this->db->prefix().$this->table_element." SET ref = '".$this->db->escape($ref)."' WHERE rowid = ".((int) $this->id)." AND (ref IS NULL OR ref = '')")) {
+			$this->ref = $ref;
+		} else {
+			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
+		}
+	}
+
+	/**
 	 * Create object into database
 	 *
 	 * @param	User		$user		User that creates
@@ -452,6 +471,9 @@ class DoliTraceOperation extends CommonObject
 		}
 		$this->fillCosts();
 		$result = $this->createCommon($user, $notrigger);
+		if ($result > 0) {
+			$this->setProvisionalRef();
+		}
 
 		// uncomment lines below if you want to validate object after creation
 		// if ($result > 0) {
@@ -498,7 +520,7 @@ class DoliTraceOperation extends CommonObject
 
 		// Clear fields
 		if (property_exists($object, 'ref')) {
-			$object->ref = empty($this->fields['ref']['default']) ? "Copy_Of_".$object->ref : $this->fields['ref']['default'];
+			$object->ref = ''; // The copy is a draft: (PROVid) at creation, the final ref at validation
 		}
 		if (property_exists($object, 'label')) {
 			$object->label = empty($this->fields['label']['default']) ? $langs->trans("CopyOf")." ".$object->label : $this->fields['label']['default'];
@@ -1235,15 +1257,15 @@ class DoliTraceOperation extends CommonObject
 			// Rename directory if dir was a temporary ref
 			if (preg_match('/^[\(]?PROV/i', $this->ref)) {
 				// Now we rename also files into index
-				$sql = 'UPDATE '.$this->db->prefix()."ecm_files set filename = CONCAT('".$this->db->escape($this->newref)."', SUBSTR(filename, ".(strlen($this->ref) + 1).")), filepath = 'dolitraceoperation/".$this->db->escape($this->newref)."'";
-				$sql .= " WHERE filename LIKE '".$this->db->escape($this->ref)."%' AND filepath = 'dolitraceoperation/".$this->db->escape($this->ref)."' and entity = ".$conf->entity;
+				$sql = 'UPDATE '.$this->db->prefix()."ecm_files set filename = CONCAT('".$this->db->escape($this->newref)."', SUBSTR(filename, ".(strlen($this->ref) + 1).")), filepath = CONCAT(SUBSTR(filepath, 1, LENGTH(filepath) - ".strlen($this->ref)."), '".$this->db->escape($this->newref)."')";
+				$sql .= " WHERE filename LIKE '".$this->db->escape($this->ref)."%' AND filepath IN ('dolitrace/dolitraceoperation/".$this->db->escape($this->ref)."', 'dolitraceoperation/".$this->db->escape($this->ref)."') and entity = ".$conf->entity;
 				$resql = $this->db->query($sql);
 				if (!$resql) {
 					$error++;
 					$this->error = $this->db->lasterror();
 				}
-				$sql = 'UPDATE '.$this->db->prefix()."ecm_files set filepath = 'dolitraceoperation/".$this->db->escape($this->newref)."'";
-				$sql .= " WHERE filepath = 'dolitraceoperation/".$this->db->escape($this->ref)."' and entity = ".$conf->entity;
+				$sql = 'UPDATE '.$this->db->prefix()."ecm_files set filepath = CONCAT(SUBSTR(filepath, 1, LENGTH(filepath) - ".strlen($this->ref)."), '".$this->db->escape($this->newref)."')";
+				$sql .= " WHERE filepath IN ('dolitrace/dolitraceoperation/".$this->db->escape($this->ref)."', 'dolitraceoperation/".$this->db->escape($this->ref)."') and entity = ".$conf->entity;
 				$resql = $this->db->query($sql);
 				if (!$resql) {
 					$error++;

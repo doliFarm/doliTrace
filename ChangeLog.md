@@ -1,5 +1,14 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.5.3 (in sviluppo)
+
+Foto dall'app di campo. Dopo l'aggiornamento **riattivare doliTrace**: lo script `sql/update_dolitrace_draft_ref.sql` sistema le bozze e l'indice dei documenti esistenti.
+
+- App di campo 1.2.0: fino a 5 foto per operazione o raccolta, dalla fotocamera o dalla galleria. Le foto vengono ridotte sul telefono (lato lungo 1600 px, JPEG sotto 1 MB) e restano nel telefono finché non vengono inviate. Si inviano dopo la loro registrazione e arrivano nella scheda Documenti della bozza. Inviata due volte, una foto non si duplica. Con foto in attesa non si possono cancellare i dati del telefono.
+- Server: nuova chiamata `photo` dell'endpoint dell'app. Accetta solo JPEG fino a 4 MB, solo su registrazioni inviate dall'app dallo stesso utente, al massimo 5 per registrazione.
+- Bozze di operazioni e raccolte: ricevono il riferimento provvisorio `(PROVid)` alla creazione, come gli altri oggetti di Dolibarr. Prima restavano senza riferimento e i loro documenti finivano in una cartella comune. Anche la copia di una registrazione nasce come bozza `(PROVid)` e non più come "Copy_Of_...".
+- Convalida di piani di produzione, operazioni, raccolte e trattamenti: l'indice dei documenti (`ecm_files`) restava sul percorso `(PROVid)` e i file non comparivano più nella scheda Documenti. Il modello di ModuleBuilder cercava il percorso senza la cartella del modulo. Ora l'indice segue la cartella rinominata.
+
 ## 1.5.2 (2026-11-18)
 
 Help per ruolo (richiede doliFarm 1.5.9 per la separazione; con una versione precedente compaiono i testi per gli utenti). Dopo l'aggiornamento non serve riattivare il modulo.

@@ -24,6 +24,8 @@
  * GET  ?action=data             data kept offline by the phone (plots, open production plans, last records, ...)
  * POST ?action=send&token=...   body JSON {"records": [{client_id, kind, created_at, data}]}: drafts of operations and
  *                               harvests, one result for each record (sent again: the record already created)
+ * POST ?action=photo&token=...  multipart {record, photo_id, created_at, photo}: a photo (JPEG) of a record sent before,
+ *                               added to the documents of the draft (sent again: not added twice)
  *
  * Without a session Dolibarr answers with its login page (HTML, not JSON): the app asks to log in again.
  */
@@ -126,6 +128,7 @@ if ($action == 'session') {
 		'ok' => true, 'api' => DOLITRACE_PWA_API, 'server_time' => dolitracePwaDate(dol_now(), true),
 		'user' => array('id' => (int) $user->id, 'login' => (string) $user->login, 'name' => $user->getFullName($langs), 'lang' => (string) $langs->defaultlang),
 		'entity' => (int) $conf->entity, 'rights' => array('operation' => $rights['operation'], 'harvest' => $rights['harvest']),
+		'limits' => array('photos' => DOLITRACE_PWA_MAXPHOTOS, 'photo_size' => DOLITRACE_PWA_PHOTOSIZE),
 		'token' => ($token !== '' ? $token : newToken()),
 	));
 }
@@ -153,6 +156,17 @@ if ($action == 'send') {
 		$results[] = dolitracePwaCreate($db, $user, $langs, $record);
 	}
 	dolitracePwaOut(array('ok' => true, 'api' => DOLITRACE_PWA_API, 'results' => $results));
+}
+
+if ($action == 'photo') {
+	if (empty($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] != 'POST') {
+		dolitracePwaOut(array('ok' => false, 'error' => 'method', 'message' => 'POST'), 405);
+	}
+	$token = GETPOST('token', 'alpha');
+	if ($token === '' || !hash_equals(currentToken(), $token)) {
+		dolitracePwaOut(array('ok' => false, 'error' => 'token', 'message' => $langs->transnoentities('PwaErrorToken')), 403);
+	}
+	dolitracePwaOut(array('ok' => true, 'api' => DOLITRACE_PWA_API, 'result' => dolitracePwaPhoto($db, $user, $langs)));
 }
 
 dolitracePwaOut(array('ok' => false, 'error' => 'action', 'message' => $langs->transnoentities('PwaErrorValue', 'action')), 400);

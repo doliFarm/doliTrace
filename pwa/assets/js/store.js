@@ -16,11 +16,12 @@
 
 /**
  * Data kept on the phone (IndexedDB): "kv" for the session and the data of the server, "queue" for the records
- * waiting to be sent (phase P2). The data stay on the phone for days without network.
+ * waiting to be sent (phase P2), "photos" for their photos (phase P3). The data stay on the phone for days without
+ * network.
  */
 
 const DB_NAME = 'dolitrace-field';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise = null;
 
@@ -40,6 +41,9 @@ function openDb() {
 				}
 				if (!db.objectStoreNames.contains('queue')) {
 					db.createObjectStore('queue', { keyPath: 'client_id' });
+				}
+				if (!db.objectStoreNames.contains('photos')) {
+					db.createObjectStore('photos', { keyPath: 'photo_id' });
 				}
 			};
 			request.onsuccess = () => resolve(request.result);
@@ -76,3 +80,7 @@ export const queueAll = () => run('queue', 'readonly', (s) => s.getAll());
 export const queuePut = (record) => run('queue', 'readwrite', (s) => s.put(record));
 export const queueDelete = (clientId) => run('queue', 'readwrite', (s) => s.delete(clientId));
 export const queueCount = () => run('queue', 'readonly', (s) => s.count());
+
+export const photoAll = () => run('photos', 'readonly', (s) => s.getAll());
+export const photoPut = (photo) => run('photos', 'readwrite', (s) => s.put(photo));
+export const photoDelete = (photoId) => run('photos', 'readwrite', (s) => s.delete(photoId));

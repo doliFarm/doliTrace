@@ -23,8 +23,9 @@ import { kvGet, kvSet, kvClear } from './store.js';
 import { API_VERSION, LOGIN_URL, OfflineError, LoginError, ApiError, getSession, getData } from './api.js';
 import { t, setLang, fmtDate, fmtNumber } from './i18n.js';
 import { newClientId, saveRecord, loadQueue, removeRecord, loadSent, sendQueue } from './queue.js';
+import { MAX_PHOTOS, reducePhoto, newPhoto, loadPhotos, removePhoto, savePhotos, deletePhotosOf, sendPhotos } from './photos.js';
 
-export const APP_VERSION = '1.1.1';
+export const APP_VERSION = '1.2.0';
 
 /** Days without update after which the app warns (Safari deletes the data of the apps not used for about 7 days) */
 const OLD_DATA_DAYS = 5;
@@ -36,6 +37,7 @@ const state = {
 	data: null,		// answer of action=data
 	syncedAt: null,	// ISO date of the last update
 	queue: [],		// records waiting to be sent
+	photos: [],		// photos waiting to be sent
 	sent: [],		// records sent recently
 	syncing: false,
 	problem: '',	// login, forbidden, api, otheruser, or a message
@@ -186,8 +188,13 @@ async function loadLocal() {
 
 async function reloadQueue() {
 	state.queue = await loadQueue();
+	state.photos = await loadPhotos();
 	state.sent = await loadSent();
 }
+
+/** Something waits on the phone: records or photos */
+const waiting = () => state.queue.length + state.photos.length;
+const photosOf = (recordId) => state.photos.filter((p) => p.record_id === recordId);
 
 /**
  * Send the records waiting on the phone, then update the data from the server. Without network or without session
@@ -206,10 +213,11 @@ async function sync(manual = false) {
 		// Another user on the same phone: the records of the previous one must be sent first (with his login),
 		// then his data are deleted
 		const others = state.queue.filter((r) => r.user_id !== session.user.id);
-		if (others.length) {
+		const otherPhotos = state.photos.filter((p) => p.user_id !== session.user.id);
+		if (others.length || otherPhotos.length) {
 			state.problem = 'otheruser';
-			state.otherUser = others[0].user_name || ('#' + others[0].user_id);
-			state.otherCount = others.length;
+			state.otherUser = others.length ? (others[0].user_name || ('#' + others[0].user_id)) : ('#' + otherPhotos[0].user_id);
+			state.otherCount = others.length + otherPhotos.length;
 			return;
 		}
 		if (state.session && state.session.user && state.session.user.id !== session.user.id) {
@@ -227,6 +235,18 @@ async function sync(manual = false) {
 			}
 			if (result.errors) {
 				toast(t('SentErrors', result.errors));
+			}
+		}
+		// Photos after their records: the photos of a record still in the queue wait for it
+		if (state.photos.length) {
+			const result = await sendPhotos(session, new Set(state.queue.map((r) => r.client_id)), manual);
+			session = result.session;
+			await reloadQueue();
+			if (result.sent) {
+				toast(t('PhotosSentOk', result.sent));
+			}
+			if (result.errors) {
+				toast(t('PhotosSentErrors', result.errors));
 			}
 		}
 		const data = await getData();
@@ -299,7 +319,15 @@ function renderStatus() {
 		const cls = errors ? 'div.note.error.queue' : (oldest !== null && oldest >= OLD_QUEUE_DAYS ? 'div.note.warn.queue' : 'div.note.info.queue');
 		notes.push(h(cls, null,
 			h('a', { href: '#/queue' }, t('QueueCount', state.queue.length)),
+			state.photos.length ? ' · ' + t('PhotosCount', state.photos.length) : '',
 			oldest ? ' · ' + t('QueueOldest', oldest) : '',
+			errors ? ' · ' + t('QueueErrors', errors) : '',
+		));
+	} else if (state.photos.length) {
+		// Records sent, photos still on the phone
+		const errors = state.photos.filter((p) => p.status === 'error').length;
+		notes.push(h(errors ? 'div.note.error.queue' : 'div.note.info.queue', null,
+			h('a', { href: '#/queue' }, t('PhotosWaiting', state.photos.length)),
 			errors ? ' · ' + t('QueueErrors', errors) : '',
 		));
 	}
@@ -355,8 +383,8 @@ function footer() {
 		h('button.link', {
 			type: 'button',
 			onclick: async () => {
-				if (state.queue.length) {
-					toast(t('ClearBlocked', state.queue.length));
+				if (waiting()) {
+					toast(t('ClearBlocked', waiting()));
 					return;
 				}
 				if (window.confirm(t('ClearConfirm'))) {
@@ -757,6 +785,57 @@ function viewForm(kind, planId, record) {
 			formRow(t('Note'), h('textarea.search', { name: 'note', rows: 3, maxlength: 2000 }, d.note || '')),
 		];
 	}
+	// Photos: reduced when added, saved with the record, sent after it
+	const photos = record ? photosOf(record.client_id).map((p) => Object.assign({}, p)) : [];
+	const urls = [];
+	const photoList = h('div.photos');
+	const photoNote = h('div.item-sub');
+	const fileInput = h('input.visually-hidden', { type: 'file', accept: 'image/*', multiple: true });
+	const addLabel = h('span', null, t('AddPhoto'));
+	const addButton = h('label.btn', null, addLabel, fileInput);
+	const drawPhotos = () => {
+		urls.splice(0).forEach((u) => URL.revokeObjectURL(u));
+		photoList.replaceChildren(...photos.map((p, i) => {
+			const url = URL.createObjectURL(p.blob);
+			urls.push(url);
+			return h('div.photo', null,
+				h('img', { src: url, alt: t('Photo') + ' ' + (i + 1) }),
+				h('button.photo-remove', {
+					type: 'button',
+					title: t('RemovePhoto'),
+					'aria-label': t('RemovePhoto'),
+					onclick: () => {
+						photos.splice(i, 1);
+						drawPhotos();
+					},
+				}, '×'),
+				p.status === 'error' ? h('div.photo-error', null, p.message || p.error) : null,
+			);
+		}));
+		addButton.hidden = photos.length >= MAX_PHOTOS;
+		photoNote.textContent = t('PhotosHelp', photos.length, MAX_PHOTOS);
+	};
+	fileInput.addEventListener('change', async (e) => {
+		const files = Array.from(e.target.files || []);
+		e.target.value = '';
+		const room = MAX_PHOTOS - photos.length;
+		if (files.length > room) {
+			toast(t('PhotosMax', MAX_PHOTOS));
+		}
+		addLabel.textContent = t('PhotoProcessing');
+		for (const file of files.slice(0, Math.max(0, room))) {
+			try {
+				photos.push(Object.assign(newPhoto(await reducePhoto(file)), { created_at: nowLocal() }));
+			} catch (err) {
+				toast(t('PhotoError'));
+			}
+		}
+		addLabel.textContent = t('AddPhoto');
+		drawPhotos();
+	});
+	drawPhotos();
+	const photoBox = h('div.form-row', null, h('span.form-label', null, t('Photos')), photoList, addButton, photoNote);
+
 	const form = h('form.form', {
 		onsubmit: async (e) => {
 			e.preventDefault();
@@ -789,6 +868,7 @@ function viewForm(kind, planId, record) {
 			});
 			saved.summary = recordSummary(saved);
 			await saveRecord(saved);
+			await savePhotos(saved, photos);
 			await reloadQueue();
 			toast(navigator.onLine ? t('SavedSending') : t('SavedOnPhone'));
 			location.hash = plot ? '#/plot/' + plot.id : '#/queue';
@@ -799,6 +879,7 @@ function viewForm(kind, planId, record) {
 	},
 	error,
 	fields,
+	photoBox,
 	h('div.buttons', null,
 		h('button.btn.primary', { type: 'submit' }, t('Save')),
 		record ? h('button.btn.danger', { type: 'button', onclick: () => deleteRecord(record) }, t('Delete')) : null,
@@ -810,6 +891,7 @@ function viewForm(kind, planId, record) {
 		h('p.empty', null, t('DraftOnly')),
 		form,
 	);
+	cleanup = () => urls.splice(0).forEach((u) => URL.revokeObjectURL(u));
 }
 
 async function deleteRecord(record) {
@@ -817,9 +899,48 @@ async function deleteRecord(record) {
 		return;
 	}
 	await removeRecord(record.client_id);
+	await deletePhotosOf(record.client_id);
 	await reloadQueue();
 	renderStatus();
 	location.hash = '#/queue';
+}
+
+/**
+ * Photos of records already sent, still on the phone: waiting, or refused by the server (they can be deleted)
+ *
+ * @param {boolean} online
+ * @returns {HTMLElement[]|null}
+ */
+function photosOfSent(online) {
+	const inQueue = new Set(state.queue.map((r) => r.client_id));
+	const list = state.photos.filter((p) => !inQueue.has(p.record_id));
+	if (!list.length) {
+		return null;
+	}
+	const record = (p) => state.sent.find((s) => s.client_id === p.record_id);
+	return [
+		h('h2', null, t('PhotosWaiting', list.length)),
+		state.queue.length ? null : h('div.buttons', null, h('button.btn.primary', { type: 'button', disabled: !online || state.syncing, onclick: () => sync(true) }, state.syncing ? t('Sending') : t('SendNow'))),
+		h('div.list', null, list.map((p) => {
+			const sent = record(p);
+			return h('div.item', null,
+				h('div.item-title', null, t('Photo'), sent ? ' · ' + (sent.ref || ('#' + sent.id)) + (sent.label ? ' · ' + sent.label : '') : ''),
+				h('div.item-sub', null, fmtDate(p.created_at), p.status === 'error' ? '' : ' · ' + t('Pending')),
+				p.status === 'error' ? h('div.note.error', null, t('ErrorLabel', p.message || p.error), ' ',
+					h('button.btn.small.danger', {
+						type: 'button',
+						onclick: async () => {
+							if (window.confirm(t('DeletePhotoConfirm'))) {
+								await removePhoto(p.photo_id);
+								await reloadQueue();
+								renderStatus();
+								viewQueue();
+							}
+						},
+					}, t('Delete'))) : null,
+			);
+		})),
+	];
 }
 
 function viewQueue() {
@@ -834,11 +955,13 @@ function viewQueue() {
 				online ? null : h('p.empty', null, t('SendWhenOnline')),
 				h('div.list', null, state.queue.map((r) => h('a.item', { href: '#/edit/' + encodeURIComponent(r.client_id) },
 					h('div.item-title', null, recordSummary(r)),
-					h('div.item-sub', null, t('SavedAt', fmtDate(isoLocal(r.saved_at || r.created_at))), r.status === 'error' ? '' : ' · ' + t('Pending')),
+					h('div.item-sub', null, t('SavedAt', fmtDate(isoLocal(r.saved_at || r.created_at))), r.status === 'error' ? '' : ' · ' + t('Pending'),
+						photosOf(r.client_id).length ? ' · ' + t('PhotosCount', photosOf(r.client_id).length) : ''),
 					r.status === 'error' ? h('div.note.error', null, t('ErrorLabel', r.message || r.error)) : null,
 				))),
 			]
-			: h('p.empty', null, t('QueueEmpty')),
+			: (state.photos.length ? null : h('p.empty', null, t('QueueEmpty'))),
+		photosOfSent(online),
 		state.sent.length ? [
 			h('h2', null, t('RecentSent')),
 			h('ul.records', null, state.sent.map((s) => h('li', null,
@@ -929,13 +1052,13 @@ async function start() {
 	// Records waiting: try again every minute while the app is open (the network may come back without the
 	// "online" event, e.g. a weak signal in the field)
 	setInterval(() => {
-		if (navigator.onLine && !state.syncing && state.queue.some((r) => r.status !== 'error')) {
+		if (navigator.onLine && !state.syncing && (state.queue.some((r) => r.status !== 'error') || state.photos.some((p) => p.status !== 'error'))) {
 			sync();
 		}
 	}, 60000);
 	// Back to the app (iPhone suspends it): send and update
 	document.addEventListener('visibilitychange', () => {
-		if (document.visibilityState === 'visible' && navigator.onLine && state.queue.length) {
+		if (document.visibilityState === 'visible' && navigator.onLine && waiting()) {
 			sync();
 		}
 	});
