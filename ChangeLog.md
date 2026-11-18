@@ -1,5 +1,9 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.5.10 (2026-11-18)
+
+- Piano di produzione nuovo: il controllo di unicità del codice di tracciabilità (UUID) interrogava la tabella senza prefisso ed era sempre saltato (errore "Table ... dolitrace_cropplan doesn't exist" nel log).
+
 ## 1.5.9 (2026-11-18)
 
 Regole di coerenza, meteo rilevato in campo, correzioni dei costi e app di campo 1.7.0. Dopo l'aggiornamento **riattivare doliTrace** (colonne di `llx_dolitrace_pwa_receipt`, colonne del meteo rilevato di operazioni e trattamenti, dizionario delle fasi fenologiche); richiede doliFarm 1.5.14.
