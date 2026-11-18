@@ -1,6 +1,6 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-## 1.5.1 (in sviluppo)
+## 1.5.1 (2026-11-18)
 
 Correzioni di sicurezza e dell'app di campo. Dopo l'aggiornamento non serve riattivare il modulo.
 
