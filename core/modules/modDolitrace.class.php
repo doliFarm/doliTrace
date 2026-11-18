@@ -416,6 +416,11 @@ class modDolitrace extends DolibarrModules
 		$this->rights[$r][4] = 'dolitracepwa';
 		$this->rights[$r][5] = 'use';
 		$r++;
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', (5 * 10) + 1 + 1);
+		$this->rights[$r][1] = 'Use the field app: create drafts of treatments and fertilizations (they enter the register only when the office validates them)';
+		$this->rights[$r][4] = 'dolitracepwa';
+		$this->rights[$r][5] = 'treatment';
+		$r++;
 
 		/* END MODULEBUILDER PERMISSIONS */
 

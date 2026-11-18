@@ -489,3 +489,40 @@ select.search {
 	color: var(--error-text);
 	font-size: 12px;
 }
+
+/* Treatments (phase P3) */
+.product-line {
+	border-left: 4px solid var(--accent);
+}
+
+.product-line .card-title {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+label.check {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: -4px 0 8px;
+	font-size: 15px;
+	color: var(--muted);
+}
+
+label.check input {
+	width: 22px;
+	height: 22px;
+}
+
+.note.warn ul,
+details.warnings ul {
+	margin: 4px 0 0;
+	padding-left: 20px;
+}
+
+details.warnings summary {
+	cursor: pointer;
+	list-style: none;
+}

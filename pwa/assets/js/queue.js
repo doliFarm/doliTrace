@@ -19,7 +19,7 @@
  * drafts when the network and the session are there. Each record has an identifier made by the phone: sent twice,
  * the server returns the draft already created (no duplicates).
  *
- * Record: {client_id, kind: operation|harvest, user_id, created_at, data, status: pending|error, error, message}
+ * Record: {client_id, kind: operation|harvest|treatment, user_id, created_at, data, status: pending|error, error, message}
  */
 
 import { queueAll, queuePut, queueDelete, kvGet, kvSet } from './store.js';
@@ -65,13 +65,14 @@ export const loadSent = async () => (await kvGet('sent')) || [];
  *
  * @param {Object} session Answer of action=session (token, user)
  * @param {boolean} withErrors Also the records refused before (asked by the user after a correction)
- * @returns {Promise<{session: Object, sent: number, errors: number}>} The session may be renewed (new token)
+ * @returns {Promise<{session: Object, sent: number, errors: number, warned: number}>} The session may be renewed (new token)
  */
 export async function sendQueue(session, withErrors) {
 	const all = await loadQueue();
 	const todo = all.filter((r) => r.user_id === session.user.id && (withErrors || r.status !== 'error'));
 	let sent = 0;
 	let errors = 0;
+	let warned = 0;
 	const done = await loadSent();
 	for (let i = 0; i < todo.length; i += BATCH) {
 		const batch = todo.slice(i, i + BATCH);
@@ -95,8 +96,11 @@ export async function sendQueue(session, withErrors) {
 			}
 			if (result.ok) {
 				await queueDelete(record.client_id);
-				done.unshift({ client_id: record.client_id, kind: record.kind, id: result.id, ref: result.ref, url: result.url, label: record.summary || '', sent_at: new Date().toISOString() });
+				// Treatments: warnings of the register computed by the server
+				const warnings = Array.isArray(result.warnings) ? result.warnings : [];
+				done.unshift({ client_id: record.client_id, kind: record.kind, id: result.id, ref: result.ref, url: result.url, label: record.summary || '', warnings, sent_at: new Date().toISOString() });
 				sent++;
+				warned += (warnings.length ? 1 : 0);
 			} else {
 				await queuePut(Object.assign({}, record, { status: 'error', error: result.error, message: result.message }));
 				errors++;
@@ -104,5 +108,5 @@ export async function sendQueue(session, withErrors) {
 		}
 	}
 	await kvSet('sent', done.slice(0, KEEP_SENT));
-	return { session, sent, errors };
+	return { session, sent, errors, warned };
 }

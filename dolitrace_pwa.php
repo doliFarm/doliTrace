@@ -81,7 +81,7 @@ print load_fiche_titre($langs->trans('PwaTitle'), '', 'fa-mobile-alt');
 print '<div class="fichecenter"><div class="fichehalfleft">';
 print '<p>'.$langs->trans('PwaIntro').'</p>';
 print '<ul>';
-foreach (array('PwaFeaturePlots', 'PwaFeatureQr', 'PwaFeatureNear', 'PwaFeatureOffline') as $key) {
+foreach (array('PwaFeaturePlots', 'PwaFeatureQr', 'PwaFeatureNear', 'PwaFeatureOffline', 'PwaFeatureRecords') as $key) {
 	print '<li>'.$langs->trans($key).'</li>';
 }
 print '</ul>';
@@ -91,6 +91,10 @@ print '<li>'.$langs->trans('PwaInstallAndroid').'</li>';
 print '<li>'.$langs->trans('PwaInstalliPhone').'</li>';
 print '</ul>';
 print '<p class="opacitymedium">'.$langs->trans('PwaPrivacy').'</p>';
+// Permissions: only for the administrators (help by role)
+if (!empty($user->admin)) {
+	print info_admin($langs->trans('PwaPermissionsAdmin'), 0, 0, 'info');
+}
 // Service worker, camera and position need https (localhost excepted)
 if (!preg_match('/^https:/i', $appurl) && !preg_match('/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i', $appurl)) {
 	print info_admin($langs->trans((function_exists('dolifarmHelpKey') ? dolifarmHelpKey('PwaNeedsHttps') : 'PwaNeedsHttps')), 0, 0, 'warning');

@@ -24,8 +24,9 @@ import { API_VERSION, LOGIN_URL, OfflineError, LoginError, ApiError, getSession,
 import { t, setLang, fmtDate, fmtNumber } from './i18n.js';
 import { newClientId, saveRecord, loadQueue, removeRecord, loadSent, sendQueue } from './queue.js';
 import { MAX_PHOTOS, reducePhoto, newPhoto, loadPhotos, removePhoto, savePhotos, deletePhotosOf, sendPhotos } from './photos.js';
+import { treatmentFields, checkTreatment, treatmentSummary } from './treatment.js';
 
-export const APP_VERSION = '1.2.0';
+export const APP_VERSION = '1.3.0';
 
 /** Days without update after which the app warns (Safari deletes the data of the apps not used for about 7 days) */
 const OLD_DATA_DAYS = 5;
@@ -232,6 +233,9 @@ async function sync(manual = false) {
 			await reloadQueue();
 			if (result.sent) {
 				toast(t('SentOk', result.sent));
+			}
+			if (result.warned) {
+				toast(t('SentWithWarnings', result.warned));
 			}
 			if (result.errors) {
 				toast(t('SentErrors', result.errors));
@@ -456,9 +460,10 @@ function planCard(plan) {
 	return h('div.card', null,
 		h('div.card-title', null, [plan.crop, plan.variety].filter(Boolean).join(' - ') || plan.label || plan.ref),
 		h('div.item-sub', null, [plan.ref, plan.season ? t('Season', plan.season) : '', plan.status === 0 ? t('Draft') : t('Validated')].filter(Boolean).join(' · ')),
-		(rights.operation || rights.harvest) ? h('div.buttons', null,
+		(rights.operation || rights.harvest || canTreat()) ? h('div.buttons', null,
 			rights.operation ? h('a.btn.primary', { href: '#/new/operation/' + plan.id }, '+ ' + t('NewOperation')) : null,
 			rights.harvest ? h('a.btn.primary', { href: '#/new/harvest/' + plan.id }, '+ ' + t('NewHarvest')) : null,
+			canTreat() ? h('a.btn.primary', { href: '#/new/treatment/' + plan.id }, '+ ' + t('NewTreatment')) : null,
 		) : null,
 		waiting.length ? h('div.note.info', null, h('strong', null, t('WaitingHere', waiting.length)), h('ul.records', null, waiting.map((r) => h('li', null, h('a', { href: '#/edit/' + encodeURIComponent(r.client_id) }, recordSummary(r)), r.status === 'error' ? h('span.badge.err', null, t('Error')) : null)))) : null,
 		safety.length
@@ -659,6 +664,9 @@ function viewNear() {
 const planById = (id) => ((state.data && state.data.cropplans) || []).find((p) => p.id === Number(id)) || null;
 const plotById = (id) => plots().find((p) => p.id === Number(id)) || null;
 const typeLabel = (code) => (((state.data && state.data.operation_types) || []).find((x) => x.code === code) || {}).label || code;
+/** Drafts of treatments: permission of the server, and its data downloaded (doliTrace 1.5.3 or later) */
+const canTreat = () => Boolean(state.session && state.session.rights && state.session.rights.treatment && state.data && state.data.treatment);
+const formTitle = (kind) => (kind === 'harvest' ? t('NewHarvest') : (kind === 'treatment' ? t('NewTreatment') : t('NewOperation')));
 
 /** One line describing a record of the queue */
 function recordSummary(r) {
@@ -668,7 +676,7 @@ function recordSummary(r) {
 	const where = plot ? (plot.label || plot.ref) : (plan ? plan.ref : '');
 	const what = (r.kind === 'harvest'
 		? t('HarvestOf', fmtNumber(Number(d.qty) || 0) + ' ' + (d.unit || ''))
-		: typeLabel(d.type)) + (d.label ? ' - ' + d.label : '');
+		: (r.kind === 'treatment' ? treatmentSummary(state.data && state.data.treatment, d) : typeLabel(d.type))) + (d.label ? ' - ' + d.label : '');
 	return [fmtDate(d.date), what, where].filter(Boolean).join(' · ');
 }
 
@@ -694,6 +702,9 @@ function decimalValue(text) {
 
 function checkRecord(kind, d) {
 	const limit = isoLocal(new Date(Date.now() + 86400000).toISOString());
+	if (kind === 'treatment') {
+		return checkTreatment(d, limit);
+	}
 	if (kind === 'operation') {
 		if (!d.type) {
 			return t('Required', t('OperationType'));
@@ -758,10 +769,25 @@ function viewForm(kind, planId, record) {
 		return;
 	}
 	const plot = plotById(plan.plot_id);
-	document.title = kind === 'harvest' ? t('NewHarvest') : t('NewOperation');
+	document.title = formTitle(kind);
 	const error = h('div.note.error', { hidden: !(record && record.message) }, record && record.message ? record.message : '');
 	let fields;
-	if (kind === 'operation') {
+	let treatment = null;
+	if (kind === 'treatment') {
+		if (!canTreat()) {
+			show(backLink(), h('p.empty', null, t('TreatmentNotAvailable')));
+			return;
+		}
+		const T = state.data.treatment;
+		treatment = treatmentFields({ h, select, formRow, decimalValue, nowLocal }, T, {
+			plan,
+			plot,
+			machines: ((state.data && state.data.machines) || []).filter((m) => !m.farm_id || m.farm_id === plan.farm_id),
+			organic: (T.organic_plots || []).includes(plan.plot_id),
+			userId: state.session.user.id,
+		}, d);
+		fields = treatment.fields;
+	} else if (kind === 'operation') {
 		const machines = ((state.data && state.data.machines) || []).filter((m) => !m.farm_id || m.farm_id === plan.farm_id);
 		fields = [
 			formRow(t('OperationType'), select('type', ((state.data && state.data.operation_types) || []).map((x) => ({ value: x.code, label: x.label })), d.type, t('Choose')), true),
@@ -785,6 +811,17 @@ function viewForm(kind, planId, record) {
 			formRow(t('Note'), h('textarea.search', { name: 'note', rows: 3, maxlength: 2000 }, d.note || '')),
 		];
 	}
+	/** Values of the form as data of the record */
+	const readForm = (values) => {
+		const data = { cropplan_id: plan.id };
+		for (const [k, v] of Object.entries(values)) {
+			if (v !== '') {
+				data[k] = (['duration_min', 'machine_id', 'operator_id', 'kind'].includes(k) ? parseInt(v, 10) : (['qty', 'area_ha', 'water_volume'].includes(k) ? decimalValue(v) : v));
+			}
+		}
+		return data;
+	};
+
 	// Photos: reduced when added, saved with the record, sent after it
 	const photos = record ? photosOf(record.client_id).map((p) => Object.assign({}, p)) : [];
 	const urls = [];
@@ -843,11 +880,9 @@ function viewForm(kind, planId, record) {
 			new FormData(form).forEach((v, k) => {
 				values[k] = String(v).trim();
 			});
-			const data = { cropplan_id: plan.id };
-			for (const [k, v] of Object.entries(values)) {
-				if (v !== '') {
-					data[k] = (['duration_min', 'machine_id'].includes(k) ? parseInt(v, 10) : (['qty', 'area_ha'].includes(k) ? decimalValue(v) : v));
-				}
+			const data = readForm(values);
+			if (treatment) {
+				data.products = treatment.products();
 			}
 			const problem = checkRecord(kind, data);
 			if (problem) {
@@ -884,9 +919,22 @@ function viewForm(kind, planId, record) {
 		h('button.btn.primary', { type: 'submit' }, t('Save')),
 		record ? h('button.btn.danger', { type: 'button', onclick: () => deleteRecord(record) }, t('Delete')) : null,
 	));
+	if (treatment) {
+		// Warnings and quantities follow the header (date, surface, water, operator, machine)
+		const header = () => {
+			const values = {};
+			new FormData(form).forEach((v, k) => {
+				values[k] = String(v).trim();
+			});
+			return readForm(values);
+		};
+		treatment.setReader(header);
+		form.addEventListener('input', () => treatment.refresh());
+		form.addEventListener('change', () => treatment.refresh());
+	}
 	show(
 		backLink(),
-		h('h1', null, kind === 'harvest' ? t('NewHarvest') : t('NewOperation')),
+		h('h1', null, formTitle(kind)),
 		h('div.item-sub', null, [plot ? (plot.label || plot.ref) : '', [plan.crop, plan.variety].filter(Boolean).join(' - '), plan.ref].filter(Boolean).join(' · ')),
 		h('p.empty', null, t('DraftOnly')),
 		form,
@@ -966,9 +1014,14 @@ function viewQueue() {
 			h('h2', null, t('RecentSent')),
 			h('ul.records', null, state.sent.map((s) => h('li', null,
 				h('span.date', null, fmtDate(isoLocal(s.sent_at))), ' ',
-				s.kind === 'harvest' ? t('Harvest') : t('Operation'), ' ',
+				s.kind === 'harvest' ? t('Harvest') : (s.kind === 'treatment' ? t('Treatment') : t('Operation')), ' ',
 				h('a', { href: s.url, target: '_blank', rel: 'noopener' }, s.ref || ('#' + s.id)),
 				s.label ? ' · ' + s.label : '',
+				// Warnings of the register for a treatment: to see before the validation in the office
+				(s.warnings || []).length ? h('details.warnings', null,
+					h('summary', null, h('span.badge.warn', null, t('WarningsCount', s.warnings.length))),
+					h('ul', null, s.warnings.map((w) => h('li', null, w))),
+				) : null,
 			))),
 		] : null,
 	);
@@ -979,7 +1032,7 @@ function viewQueue() {
 function route() {
 	const hash = location.hash || '#/';
 	const m = /^#\/plot\/(\d+)$/.exec(hash);
-	const n = /^#\/new\/(operation|harvest)\/(\d+)$/.exec(hash);
+	const n = /^#\/new\/(operation|harvest|treatment)\/(\d+)$/.exec(hash);
 	const e = /^#\/edit\/(.+)$/.exec(hash);
 	if (m) {
 		viewPlot(Number(m[1]));
@@ -1009,7 +1062,12 @@ function registerServiceWorker() {
 	if (!('serviceWorker' in navigator)) {
 		return;
 	}
+	const ready = (worker) => statusBar.appendChild(h('div.note.ok', null, t('UpdateReady'), ' ', h('button.btn.small', { type: 'button', onclick: () => worker.postMessage('skipWaiting') }, t('Reload'))));
 	navigator.serviceWorker.register('service-worker.js').then((reg) => {
+		// New version installed before this opening (another page of the app was open)
+		if (reg.waiting && navigator.serviceWorker.controller) {
+			ready(reg.waiting);
+		}
 		reg.addEventListener('updatefound', () => {
 			const worker = reg.installing;
 			if (!worker) {
@@ -1017,7 +1075,7 @@ function registerServiceWorker() {
 			}
 			worker.addEventListener('statechange', () => {
 				if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-					statusBar.appendChild(h('div.note.ok', null, t('UpdateReady'), ' ', h('button.btn.small', { type: 'button', onclick: () => worker.postMessage('skipWaiting') }, t('Reload'))));
+					ready(worker);
 				}
 			});
 		});
