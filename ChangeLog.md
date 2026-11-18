@@ -1,5 +1,9 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.5.4 (in sviluppo)
+
+- App di campo 1.3.1: si chiama **doliFarm** (nome sotto l'icona e nel titolo) e si apre con una pagina con il logo di doliFarm, il nome dell'app e la versione. Un tocco la chiude prima. Su Android il nome cambia quando Chrome aggiorna l'app installata; su iPhone serve reinstallarla (Condividi > Aggiungi alla schermata Home).
+
 ## 1.5.3 (2026-11-18)
 
 Trattamenti e foto dall'app di campo. Dopo l'aggiornamento **riattivare doliTrace**: registra il nuovo permesso e lo script `sql/update_dolitrace_draft_ref.sql` sistema le bozze e l'indice dei documenti esistenti. Poi assegnare "Usare l'app di campo: bozze di trattamenti" a chi registra i trattamenti dal telefono.

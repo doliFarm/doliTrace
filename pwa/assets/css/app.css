@@ -526,3 +526,50 @@ details.warnings summary {
 	cursor: pointer;
 	list-style: none;
 }
+
+/* Opening page with the logo of doliFarm */
+.splash {
+	position: fixed;
+	inset: 0;
+	z-index: 10;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	padding: 16px;
+	background: var(--bg);
+	color: var(--text);
+	text-align: center;
+	transition: opacity 0.4s ease;
+}
+
+.splash.hide {
+	opacity: 0;
+	pointer-events: none;
+}
+
+.splash-logo {
+	padding: 16px;
+	border-radius: 24px;
+	background: #ffffff;
+	box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+}
+
+.splash-logo img {
+	display: block;
+	width: 160px;
+	height: 160px;
+}
+
+.splash-title {
+	margin-top: 12px;
+	font-size: 22px;
+	font-weight: 600;
+	color: var(--accent);
+}
+
+.splash-sub {
+	font-size: 14px;
+	color: var(--muted);
+}

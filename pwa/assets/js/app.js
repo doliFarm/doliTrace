@@ -26,7 +26,7 @@ import { newClientId, saveRecord, loadQueue, removeRecord, loadSent, sendQueue }
 import { MAX_PHOTOS, reducePhoto, newPhoto, loadPhotos, removePhoto, savePhotos, deletePhotosOf, sendPhotos } from './photos.js';
 import { treatmentFields, checkTreatment, treatmentSummary } from './treatment.js';
 
-export const APP_VERSION = '1.3.0';
+export const APP_VERSION = '1.3.1';
 
 /** Days without update after which the app warns (Safari deletes the data of the apps not used for about 7 days) */
 const OLD_DATA_DAYS = 5;
@@ -1089,7 +1089,31 @@ function registerServiceWorker() {
 	});
 }
 
+/**
+ * Opening page with the logo of doliFarm: at least 1.5 s, then it fades (a tap closes it before)
+ *
+ * @param {number} shownAt Time the page was shown
+ */
+function hideSplash(shownAt) {
+	const splash = document.getElementById('splash');
+	if (!splash) {
+		return;
+	}
+	const close = () => {
+		splash.classList.add('hide');
+		setTimeout(() => splash.remove(), 500);
+	};
+	splash.addEventListener('click', close, { once: true });
+	setTimeout(close, Math.max(0, 1500 - (Date.now() - shownAt)));
+}
+
 async function start() {
+	const shownAt = Date.now();
+	const splashTitle = document.querySelector('.splash-title');
+	if (splashTitle) {
+		splashTitle.textContent = t('SplashTitle');
+		document.getElementById('splash-version').textContent = t('Version', APP_VERSION);
+	}
 	await loadLocal();
 	renderStatus();
 	// Opened from the address of a sign (?ref=...)
@@ -1101,6 +1125,7 @@ async function start() {
 		}
 	}
 	route();
+	hideSplash(shownAt);
 	window.addEventListener('hashchange', route);
 	window.addEventListener('online', () => {
 		renderStatus();

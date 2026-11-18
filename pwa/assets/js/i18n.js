@@ -21,7 +21,7 @@
 
 const TEXTS = {
 	it: {
-		AppTitle: 'App di campo',
+		AppTitle: 'doliFarm - App di campo',
 		Plots: 'Appezzamenti',
 		SearchPlot: 'Cerca appezzamento, azienda o coltura',
 		ScanQr: 'Leggi QR',
@@ -180,9 +180,10 @@ const TEXTS = {
 		TWDoseMax: "%1: dose effettiva %2 oltre la dose massima del prodotto (%3).",
 		TWLotStock: "Lotto %1: giacenza %2 al %3, meno della quantità da usare.",
 		NoOperator: "-- nessuno --",
+		SplashTitle: "App di campo",
 	},
 	en: {
-		AppTitle: 'Field app',
+		AppTitle: 'doliFarm - Field app',
 		Plots: 'Plots',
 		SearchPlot: 'Search plot, farm or crop',
 		ScanQr: 'Scan QR',
@@ -341,9 +342,10 @@ const TEXTS = {
 		TWDoseMax: "%1: actual dose %2 above the maximum dose of the product (%3).",
 		TWLotStock: "Lot %1: stock %2 as of %3, less than the quantity to use.",
 		NoOperator: "-- none --",
+		SplashTitle: "Field app",
 	},
 	fr: {
-		AppTitle: 'Application de terrain',
+		AppTitle: 'doliFarm - Application de terrain',
 		Plots: 'Parcelles',
 		SearchPlot: 'Chercher une parcelle, une exploitation ou une culture',
 		ScanQr: 'Lire le QR',
@@ -502,6 +504,7 @@ const TEXTS = {
 		TWDoseMax: "%1 : dose réelle %2 au-delà de la dose maximale du produit (%3).",
 		TWLotStock: "Lot %1 : stock %2 au %3, inférieur à la quantité à utiliser.",
 		NoOperator: "-- aucun --",
+		SplashTitle: "Application de terrain",
 	},
 };
 
