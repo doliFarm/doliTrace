@@ -27,7 +27,7 @@ import { MAX_PHOTOS, reducePhoto, newPhoto, loadPhotos, removePhoto, savePhotos,
 import { treatmentFields, checkTreatment, treatmentSummary } from './treatment.js';
 import { weatherCard, formWeather } from './weather.js';
 
-export const APP_VERSION = '1.6.0';
+export const APP_VERSION = '1.6.1';
 
 /** Days without update after which the app warns (Safari deletes the data of the apps not used for about 7 days) */
 const OLD_DATA_DAYS = 5;
@@ -1268,8 +1268,23 @@ function registerServiceWorker() {
 	if (!('serviceWorker' in navigator)) {
 		return;
 	}
-	const ready = (worker) => statusBar.appendChild(h('div.note.ok', null, t('UpdateReady'), ' ', h('button.btn.small', { type: 'button', onclick: () => worker.postMessage('skipWaiting') }, t('Reload'))));
+	let readyNote = null;
+	const ready = (worker) => {
+		if (readyNote) {
+			readyNote.remove();
+		}
+		readyNote = h('div.note.ok', null, t('UpdateReady'), ' ', h('button.btn.small', { type: 'button', onclick: () => worker.postMessage('skipWaiting') }, t('Reload')));
+		statusBar.appendChild(readyNote);
+	};
 	navigator.serviceWorker.register('service-worker.js').then((reg) => {
+		// Back to the app left open in the background: look for a new version (at most every 10 minutes)
+		let checkedAt = Date.now();
+		document.addEventListener('visibilitychange', () => {
+			if (document.visibilityState === 'visible' && navigator.onLine && Date.now() - checkedAt > 600000) {
+				checkedAt = Date.now();
+				reg.update().catch(() => {});
+			}
+		});
 		// New version installed before this opening (another page of the app was open)
 		if (reg.waiting && navigator.serviceWorker.controller) {
 			ready(reg.waiting);

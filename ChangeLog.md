@@ -1,5 +1,13 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.5.7 (2026-11-18)
+
+App di campo 1.6.1 e menu. Dopo l'aggiornamento **riattivare doliTrace** (menu); richiede doliFarm 1.5.11.
+
+- "App di campo" sotto "Aiutami", nella stessa sezione in fondo al menu a sinistra.
+- App di campo 1.6.1: quando torna in primo piano con la rete (al massimo ogni 10 minuti) cerca una nuova versione, senza doverla chiudere e riaprire; il messaggio "Nuova versione dell'app pronta" compare una volta sola.
+- Installazione su Android: con "Installa" Android 15 e 16 possono bloccare l'app ("App non sicura bloccata... versione precedente di Android"), anche da Chrome; è un problema noto di Chrome. Le istruzioni indicano menu ⋮ → "Aggiungi a schermata Home" → "Crea scorciatoia".
+
 ## 1.5.6 (2026-11-18)
 
 App di campo 1.6.0. Dopo l'aggiornamento non serve riattivare il modulo: l'app si aggiorna aprendola con la rete.

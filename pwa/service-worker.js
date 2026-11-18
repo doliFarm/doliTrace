@@ -20,7 +20,7 @@
  * Change VERSION at every change of the files of the app.
  */
 
-const VERSION = 'dolitrace-field-1.6.0';
+const VERSION = 'dolitrace-field-1.6.1';
 const FILES = [
 	'./',
 	'./index.html',
