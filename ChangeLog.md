@@ -1,6 +1,6 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-## 1.5.2 (in sviluppo)
+## 1.5.2 (2026-11-18)
 
 Help per ruolo (richiede doliFarm 1.5.9 per la separazione; con una versione precedente compaiono i testi per gli utenti). Dopo l'aggiornamento non serve riattivare il modulo.
 
