@@ -609,7 +609,7 @@ function dolitracePwaCreate($db, $user, $langs, $record)
 		}
 		if ($existing) {
 			// Header of the draft from the phone, lines made again after the update
-			foreach (array('kind', 'date_start', 'date_end', 'fk_operator', 'fk_machine', 'water_volume') as $field) {
+			foreach (array('kind', 'date_start', 'date_end', 'fk_operator', 'fk_machine', 'water_volume', 'weather_obs_date', 'weather_obs_temp', 'weather_obs_wind', 'weather_obs_rh') as $field) {
 				$existing->$field = $object->$field;
 			}
 			$existing->context['pwa'] = $object->context['pwa'];
@@ -654,6 +654,7 @@ function dolitracePwaCreate($db, $user, $langs, $record)
 		$object->area_ha = ($area > 0 && $area < 100000 ? $area : null);
 		$bbch = $text('bbch', 2);
 		$object->fk_pheno_stage = ($bbch !== '' ? $bbch : null);
+		dolitracePwaWeatherObs($object, $data);
 		$object->fk_user_operator = (int) $user->id;
 		$object->status = DoliTraceOperation::STATUS_DRAFT;
 	} else {
@@ -1050,10 +1051,32 @@ function dolitracePwaTreatmentObject($db, $user, $langs, $clientid, $data, $plan
 	$object->fk_operator = ($operator > 0 ? $operator : null);
 	$object->fk_machine = ($machine > 0 ? $machine : null);
 	$object->water_volume = ($water > 0 ? $water : null);
+	dolitracePwaWeatherObs($object, $data);
 	$object->note_private = $note;
 	$object->status = DoliTraceTreatment::STATUS_DRAFT;
 	$object->context['pwa'] = array('products' => $products, 'area_ha' => ($area > 0 ? $area : null), 'bbch' => $bbch);
 	return $object;
+}
+
+/**
+ * Weather observed in the field sent by the phone (weather_obs: {date, temp, wind, rh}); checked by the record
+ *
+ * @param	object					$object		Operation or treatment
+ * @param	array<string,mixed>		$data		Data of the phone
+ * @return	void
+ */
+function dolitracePwaWeatherObs($object, array $data): void
+{
+	$obs = (is_array($data['weather_obs'] ?? null) ? $data['weather_obs'] : array());
+	$value = function ($key) use ($obs) {
+		$v = $obs[$key] ?? null;
+		return (is_scalar($v) && trim((string) $v) !== '' ? trim((string) $v) : null);
+	};
+	$date = $value('date');
+	$object->weather_obs_date = ($date !== null ? dolitracePwaParseDate($date) : null);
+	$object->weather_obs_temp = $value('temp');
+	$object->weather_obs_wind = $value('wind');
+	$object->weather_obs_rh = $value('rh');
 }
 
 /**

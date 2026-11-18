@@ -42,7 +42,7 @@ class DoliTraceTreatmentExport
 	public static $csvColumns = array(
 		'record', 'ref', 'version', 'status', 'kind', 'technical_type', 'farm_cuaa', 'farm_name',
 		'date_start', 'date_end', 'reason', 'operator_name', 'operator_license', 'operator_license_end',
-		'contractor_name', 'contractor_vat', 'machine', 'machine_check_end', 'machine_check_date', 'machine_cert_ref', 'water_volume', 'weather', 'application_method', 'justification_type', 'justification_ref', 'late',
+		'contractor_name', 'contractor_vat', 'machine', 'machine_check_end', 'machine_check_date', 'machine_cert_ref', 'water_volume', 'weather', 'weather_obs_date', 'weather_obs_temp', 'weather_obs_wind', 'weather_obs_rh', 'application_method', 'justification_type', 'justification_ref', 'late',
 		'target_type', 'plot_ref', 'location_ref', 'pcg_ref', 'zone_zvn', 'bio_status', 'crop_eppo', 'crop_label', 'bbch', 'building_ref', 'seed_batch', 'treated_qty', 'treated_unit',
 		'product_type', 'product_ref', 'product_label', 'reg_number', 'fert_type', 'fert_group', 'n_content', 'p2o5_content', 'k2o_content', 'cu_content', 'efficiency', 'dry_matter', 'density',
 		'adversity_eppo', 'adversity_label', 'dose', 'dose_unit', 'dose_unit_label', 'qty_total', 'qty_unit', 'qty_agea', 'qty_agea_unit', 'qty_agea_basis', 'n_applied', 'cu_applied', 'batch',
@@ -291,6 +291,13 @@ class DoliTraceTreatmentExport
 			) : null,
 			'water_volume_l_ha' => $content['water_volume'],
 			'weather' => $content['weather'],
+			// Weather observed in the field (1.5.9), in the fingerprint only when filled
+			'weather_observed' => isset($content['weather_obs_date']) ? array(
+				'date' => $this->dateIso($record->weather_obs_date, true),
+				'temp_c' => $content['weather_obs_temp'] ?? '',
+				'wind_ms' => $content['weather_obs_wind'] ?? '',
+				'rh_pct' => $content['weather_obs_rh'] ?? '',
+			) : null,
 			'late' => (int) $record->late,
 			'date_valid' => $this->dateIso($record->date_valid, true),
 			'cancel_reason' => (string) $record->cancel_reason,
@@ -799,6 +806,8 @@ class DoliTraceTreatmentExport
 			'machine' => $data['machine']['ref'], 'machine_check_end' => $data['machine']['check_end'],
 			'machine_check_date' => $data['machine']['check_date'], 'machine_cert_ref' => $data['machine']['cert_ref'],
 			'water_volume' => $data['water_volume_l_ha'], 'weather' => $data['weather'],
+			'weather_obs_date' => $data['weather_observed'] ? $data['weather_observed']['date'] : '', 'weather_obs_temp' => $data['weather_observed'] ? $data['weather_observed']['temp_c'] : '',
+			'weather_obs_wind' => $data['weather_observed'] ? $data['weather_observed']['wind_ms'] : '', 'weather_obs_rh' => $data['weather_observed'] ? $data['weather_observed']['rh_pct'] : '',
 			'application_method' => $data['application_method'] ? $data['application_method']['code'] : '', 'late' => $data['late'],
 			'justification_type' => $data['justification'] ? $data['justification']['type'] : '', 'justification_ref' => $data['justification'] ? $data['justification']['ref'] : '',
 			'content_hash' => $data['content_hash'],

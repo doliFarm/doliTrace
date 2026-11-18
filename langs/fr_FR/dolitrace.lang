@@ -826,3 +826,16 @@ BbchStage93 = Début de la chute des feuilles
 BbchStage95 = Moitié des feuilles tombées ou jaunies
 BbchStage97 = Fin de la chute des feuilles, plante en repos ou morte
 BbchStage99 = Produit récolté
+# Météo relevée au champ (1.5.9)
+WeatherObs = Météo relevée au champ
+WeatherObsDate = Heure du relevé météo
+WeatherObsHelp = Météo mesurée au champ au moment de l'intervention (anémomètre, thermomètre, station de l'exploitation). Vide = début de l'intervention. Différente de la météo du modèle proposée par doliField.
+WeatherObsTemp = Température relevée (°C)
+WeatherObsWind = Vent relevé (m/s)
+WeatherObsRh = Humidité relevée (%%)
+WeatherObsWindShort = vent %s m/s
+WeatherObsRhShort = humidité %s %%
+ErrorWeatherObsValue = %s : valeur hors de l'intervalle admis (de %s à %s)
+ErrorWeatherObsDate = L'heure du relevé météo (%s) doit être proche de l'intervention : de 12 heures avant le début à 12 heures après la fin, pas dans le futur
+WarningWeatherObsWind = Vent relevé au champ %s m/s, au-dessus du seuil de %s m/s : risque de dérive
+WarningWeatherObsTemp = Température relevée au champ %s °C, au-dessus du seuil de %s °C

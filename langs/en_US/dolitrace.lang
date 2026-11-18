@@ -850,3 +850,16 @@ BbchStage93 = Leaf fall begins
 BbchStage95 = Half of the leaves fallen or yellowed
 BbchStage97 = End of leaf fall, plant dormant or dead
 BbchStage99 = Harvested product
+# Weather observed in the field (1.5.9)
+WeatherObs = Weather observed in the field
+WeatherObsDate = Time of the weather reading
+WeatherObsHelp = Weather measured in the field at the time of the work (anemometer, thermometer, farm station). Empty = start of the work. Not the weather of the model proposed by doliField.
+WeatherObsTemp = Observed temperature (°C)
+WeatherObsWind = Observed wind (m/s)
+WeatherObsRh = Observed humidity (%%)
+WeatherObsWindShort = wind %s m/s
+WeatherObsRhShort = humidity %s%%
+ErrorWeatherObsValue = %s: value outside the allowed range (from %s to %s)
+ErrorWeatherObsDate = The time of the weather reading (%s) must be near the work: from 12 hours before the start to 12 hours after the end, not in the future
+WarningWeatherObsWind = Wind observed in the field %s m/s, over the threshold of %s m/s: drift risk
+WarningWeatherObsTemp = Temperature observed in the field %s °C, over the threshold of %s °C

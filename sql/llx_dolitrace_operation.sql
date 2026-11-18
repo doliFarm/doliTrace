@@ -25,6 +25,10 @@ CREATE TABLE IF NOT EXISTS llx_dolitrace_operation(
 	fk_operation_type varchar(32) NOT NULL, 
 	label varchar(255), 
 	weather_cond varchar(128), 
+	weather_obs_date datetime,		-- weather observed in the field: time of the reading
+	weather_obs_temp double(24,8),	-- degrees C
+	weather_obs_wind double(24,8),	-- m/s
+	weather_obs_rh double(24,8),	-- relative humidity, percent
 	fk_pheno_stage varchar(64), 
 	fk_adversity varchar(64), 
 	fk_machine int, 

@@ -861,3 +861,16 @@ BbchStage93 = Inizio caduta delle foglie
 BbchStage95 = Metà delle foglie cadute o ingiallite
 BbchStage97 = Fine caduta delle foglie, pianta in riposo o morta
 BbchStage99 = Prodotto raccolto
+# Meteo rilevato in campo (1.5.9)
+WeatherObs = Meteo rilevato in campo
+WeatherObsDate = Ora della rilevazione del meteo
+WeatherObsHelp = Meteo misurato in campo al momento dell'intervento (anemometro, termometro, stazione aziendale). Vuoto = inizio dell'intervento. Diverso dal meteo del modello proposto da doliField.
+WeatherObsTemp = Temperatura rilevata (°C)
+WeatherObsWind = Vento rilevato (m/s)
+WeatherObsRh = Umidità rilevata (%%)
+WeatherObsWindShort = vento %s m/s
+WeatherObsRhShort = umidità %s%%
+ErrorWeatherObsValue = %s: valore fuori dall'intervallo ammesso (da %s a %s)
+ErrorWeatherObsDate = L'ora della rilevazione del meteo (%s) deve essere vicina all'intervento: da 12 ore prima dell'inizio a 12 ore dopo la fine, non nel futuro
+WarningWeatherObsWind = Vento rilevato in campo %s m/s, oltre la soglia di %s m/s: rischio di deriva
+WarningWeatherObsTemp = Temperatura rilevata in campo %s °C, oltre la soglia di %s °C

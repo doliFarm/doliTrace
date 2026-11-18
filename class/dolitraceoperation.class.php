@@ -29,6 +29,7 @@ dol_include_once('/dolitrace/lib/dolitrace_inspection.lib.php');
 dol_include_once('/dolifarm/lib/dolifarm_help.lib.php'); // Help texts by role (doliFarm >= 1.5.9)
 dol_include_once('/dolitrace/lib/dolitrace_weather.lib.php');
 dol_include_once('/dolitrace/lib/dolitrace_period.lib.php');
+dol_include_once('/dolitrace/lib/dolitrace_costs.lib.php');
 //require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 //require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 
@@ -173,6 +174,11 @@ class DoliTraceOperation extends CommonObject
 		
 		"label" => array("type" => "varchar(255)", "label" => "Label", 'searchall' => 1, "enabled" => "1", 'position' => 40, 'notnull' => 0, "visible" => "1", "alwayseditable" => "1", "css" => "minwidth300", "cssview" => "wordbreak", "csslist" => "tdoverflowmax150",),
 		"weather_cond" => array("type" => "varchar(128)", "label" => "Weathercond", "help" => "OperationWeatherHelp", "enabled" => "1", 'position' => 45, 'notnull' => 0, "visible" => "-1",),
+		// Weather observed in the field (1.5.9)
+		'weather_obs_date' => array('type' => 'datetime', 'label' => 'WeatherObsDate', 'help' => 'WeatherObsHelp', 'enabled' => 1, 'position' => 46, 'notnull' => 0, 'visible' => -1),
+		'weather_obs_temp' => array('type' => 'double(24,8)', 'label' => 'WeatherObsTemp', 'enabled' => 1, 'position' => 47, 'notnull' => 0, 'visible' => -1, 'css' => 'maxwidth75'),
+		'weather_obs_wind' => array('type' => 'double(24,8)', 'label' => 'WeatherObsWind', 'enabled' => 1, 'position' => 48, 'notnull' => 0, 'visible' => -1, 'css' => 'maxwidth75'),
+		'weather_obs_rh' => array('type' => 'double(24,8)', 'label' => 'WeatherObsRh', 'enabled' => 1, 'position' => 49, 'notnull' => 0, 'visible' => -1, 'css' => 'maxwidth75'),
 		"fk_pheno_stage" => array("type" => "varchar(64)", "label" => "OperationBbch", "help" => "OperationBbchHelp", "enabled" => "1", 'position' => 50, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
 		"fk_adversity" => array("type" => "varchar(64)", "label" => "Fkadversity", "enabled" => "1", 'position' => 55, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
 		"fk_machine" => array("type" => "int", "label" => "Fkmachine", "enabled" => "1", 'position' => 60, 'notnull' => 0, "visible" => "-1", "css" => "maxwidth500 widthcentpercentminusxx",),
@@ -227,6 +233,14 @@ class DoliTraceOperation extends CommonObject
 	public $fk_operation_type;
 	public $label;
 	public $weather_cond;
+	/** @var int|string|null Time of the weather observed in the field */
+	public $weather_obs_date;
+	/** @var float|string|null Temperature observed, degrees C */
+	public $weather_obs_temp;
+	/** @var float|string|null Wind observed, m/s */
+	public $weather_obs_wind;
+	/** @var float|string|null Relative humidity observed, percent */
+	public $weather_obs_rh;
 	public $fk_pheno_stage;
 	public $fk_adversity;
 	public $fk_machine;
@@ -731,6 +745,7 @@ class DoliTraceOperation extends CommonObject
 		if ($this->checkData() < 0) {
 			return -1;
 		}
+		$this->clearAutoCosts();
 		$this->fillCosts();
 		// Seed already taken out: a change of product, lot, quantity or crop plan puts it back and takes it out again
 		$old = null;
@@ -740,7 +755,12 @@ class DoliTraceOperation extends CommonObject
 				$old = null;
 			}
 		}
+		$plans = dolitraceRecordCropPlans($this->db, $this->element, (int) $this->id);
 		$result = $this->updateCommon($user, $notrigger);
+		if ($result > 0) {
+			// Costs of the plan before and after (operation moved to another plan)
+			dolitraceSyncRecordCosts($this->db, $this->element, (int) $this->id, $plans);
+		}
 		if ($result > 0 && $this->status == self::STATUS_VALIDATED) {
 			if ($old) {
 				$old->reverseStock($user);
@@ -987,6 +1007,58 @@ class DoliTraceOperation extends CommonObject
 	}
 
 	/**
+	 * Before an update: empty the costs computed automatically when the data they come from changed (area, type, date,
+	 * production plan, product, quantity), so that fillCosts() computes them again. A cost is automatic when it is the
+	 * one fillCosts() gives for the record as saved; a cost written by the user, or changed in this update, is kept.
+	 *
+	 * @return	int		Number of values emptied
+	 */
+	public function clearAutoCosts()
+	{
+		if ($this->id <= 0) {
+			return 0;
+		}
+		$old = new self($this->db);
+		if ($old->fetch($this->id) <= 0) {
+			return 0;
+		}
+		$time = function ($value) {
+			return (empty($value) ? 0 : (is_numeric($value) ? (int) $value : (int) dol_stringtotime($value)));
+		};
+		$same = function ($a, $b) {
+			return (($a === null || $a === '') ? (($b === null || $b === '') ? true : false) : (($b === null || $b === '') ? false : price2num((float) $a, 'MT') == price2num((float) $b, 'MT')));
+		};
+		$ratechanged = (!$same($old->area_ha, $this->area_ha) || (string) $old->fk_operation_type !== (string) $this->fk_operation_type
+			|| (int) $old->fk_cropplan != (int) $this->fk_cropplan || dol_print_date($time($old->date_op), '%Y-%m-%d') !== dol_print_date($time($this->date_op), '%Y-%m-%d'));
+		$materialchanged = ((int) $old->fk_product != (int) $this->fk_product || !$same($old->qty_used, $this->qty_used));
+		if (!$ratechanged && !$materialchanged) {
+			return 0;
+		}
+		// Costs that fillCosts() gives for the record as saved
+		$calc = clone $old;
+		foreach (array('cost_manpower', 'cost_energy', 'cost_service', 'cost_material', 'duration_min') as $field) {
+			$calc->$field = null;
+		}
+		$calc->fillCosts(true);
+		$fields = ($ratechanged ? array('cost_manpower', 'cost_energy', 'cost_service') : array());
+		if ($materialchanged) {
+			$fields[] = 'cost_material';
+		}
+		$cleared = 0;
+		foreach ($fields as $field) {
+			if ($old->$field !== null && $old->$field !== '' && $same($old->$field, $calc->$field) && $same($old->$field, $this->$field)) {
+				$this->$field = null;
+				$cleared++;
+			}
+		}
+		if ($ratechanged && $old->duration_min !== null && $calc->duration_min !== null && (int) $old->duration_min == (int) $calc->duration_min && (int) $this->duration_min == (int) $old->duration_min) {
+			$this->duration_min = null;
+			$cleared++;
+		}
+		return $cleared;
+	}
+
+	/**
 	 * Total cost of the operation
 	 *
 	 * @return	float
@@ -1024,6 +1096,12 @@ class DoliTraceOperation extends CommonObject
 		$period = dolitraceRecordPeriodError($this->db, (int) $this->fk_cropplan, $start, $end, true);
 		if ($period !== '') {
 			$this->error = $period;
+			return -1;
+		}
+		// Weather observed in the field near the operation
+		$obs = dolitraceWeatherObsCheck($this, $start, $end);
+		if ($obs !== '') {
+			$this->error = $obs;
 			return -1;
 		}
 		// Machine of the farm of the plan
@@ -1167,10 +1245,13 @@ class DoliTraceOperation extends CommonObject
 		if (dolitraceFrozenCheck($this) < 0) {
 			return -1;
 		}
+		$plans = dolitraceRecordCropPlans($this->db, $this->element, (int) $this->id);
 		$result = $this->deleteCommon($user, $notrigger);
 		if ($result > 0) {
 			// The seed taken out goes back to the warehouse
 			$this->reverseStock($user);
+			// Costs of the plan without the operation (the trigger runs before the deletion)
+			dolitraceSyncRecordCosts($this->db, $this->element, (int) $this->id, $plans);
 		}
 		return $result;
 	}

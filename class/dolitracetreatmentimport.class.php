@@ -99,7 +99,7 @@ class DoliTraceTreatmentImport
 	{
 		$example = array(
 			'record' => '1', 'kind' => 'plant_protection', 'technical_type' => 'surfaces', 'date_start' => '2026-04-10 08:30',
-			'operator_license' => 'PAN-0000', 'machine' => 'MAC-001', 'water_volume' => '500', 'weather' => 'Sereno', 'application_method' => 'PPP_ATOMIZER',
+			'operator_license' => 'PAN-0000', 'machine' => 'MAC-001', 'water_volume' => '500', 'weather' => 'Sereno', 'weather_obs_date' => '2026-04-10 08:15', 'weather_obs_temp' => '16.5', 'weather_obs_wind' => '1.8', 'weather_obs_rh' => '65', 'application_method' => 'PPP_ATOMIZER',
 			'target_type' => 'plot', 'plot_ref' => 'APPEZ-0001', 'crop_eppo' => 'TRZDU', 'bbch' => '31', 'treated_qty' => '1.5', 'treated_unit' => 'HA',
 			'product_type' => 'plant_protection_product', 'reg_number' => '12345', 'adversity_eppo' => 'PLASVI', 'dose' => '2.5', 'dose_unit' => 'KG_HA', 'batch' => 'L2026-01',
 		);
@@ -275,6 +275,20 @@ class DoliTraceTreatmentImport
 		}
 		$object->reason = $value($head, 'reason');
 		$object->weather = $value($head, 'weather');
+		// Weather observed in the field (1.5.9): checked when the record is created
+		if ($value($head, 'weather_obs_date') !== '') {
+			$object->weather_obs_date = $this->parseDate($value($head, 'weather_obs_date'));
+			if (!$object->weather_obs_date) {
+				$result['errors'][] = $langs->transnoentities('ErrorTreatmentImportValue', 'weather_obs_date', $value($head, 'weather_obs_date'));
+			}
+		}
+		foreach (array('weather_obs_temp', 'weather_obs_wind', 'weather_obs_rh') as $field) {
+			$object->$field = ($value($head, $field) !== '' ? $this->parseNumber($value($head, $field)) : null);
+			if ($object->$field === false) {
+				$result['errors'][] = $langs->transnoentities('ErrorTreatmentImportValue', $field, $value($head, $field));
+				$object->$field = null;
+			}
+		}
 		$object->water_volume = $this->parseNumber($value($head, 'water_volume'));
 		if ($object->water_volume === false) {
 			$result['errors'][] = $langs->transnoentities('ErrorTreatmentImportValue', 'water_volume', $value($head, 'water_volume'));

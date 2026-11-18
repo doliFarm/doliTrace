@@ -1107,14 +1107,108 @@ function decimalValue(text) {
 	return (/^\d+([.,]\d+)?$/.test(value) ? Number(value.replace(',', '.')) : NaN);
 }
 
+/**
+ * Number typed in a field of the weather observed (comma or point, sign for the temperature)
+ *
+ * @param {string} text Text
+ * @return {?number} null when empty, NaN when it is not a number
+ */
+function obsNumber(text) {
+	const value = String(text ?? '').trim().replace(/\s/g, '');
+	if (value === '') {
+		return null;
+	}
+	return (/^-?\d+([.,]\d+)?$/.test(value) ? Number(value.replace(',', '.')) : NaN);
+}
+
+/**
+ * Check of the weather observed in the field: values in their range, reading near the record and not in the future
+ *
+ * @param {object} d Data of the record
+ * @return {string} Problem, '' if none
+ */
+function checkWeatherObs(d) {
+	const o = d.weather_obs;
+	if (!o) {
+		return '';
+	}
+	const ranges = { temp: [-30, 55, 'WeatherObsTemp'], wind: [0, 60, 'WeatherObsWind'], rh: [0, 100, 'WeatherObsRh'] };
+	for (const [key, [min, max, label]] of Object.entries(ranges)) {
+		if (o[key] !== undefined && !(o[key] >= min && o[key] <= max)) {
+			return t('InvalidValue', t(label));
+		}
+	}
+	if (o.date && d.date) {
+		const at = new Date(o.date).getTime();
+		const start = new Date(d.date).getTime();
+		const end = new Date(d.date_end || d.date).getTime();
+		if (at < start - 12 * 3600000 || at > end + 12 * 3600000 || at > Date.now() + 3600000) {
+			return t('WeatherObsDateFar');
+		}
+	}
+	return '';
+}
+
+/**
+ * Box of the weather observed in the field: temperature, wind, humidity and time of the reading (all optional);
+ * warnings over the thresholds of doliField for the treatments of plant protection
+ *
+ * @param {object} d Data of the record
+ * @return {{box: HTMLElement, refresh: function(object, boolean): void}}
+ */
+function weatherObsBox(d) {
+	const o = d.weather_obs || {};
+	const fmt = (v) => fmtNumber(v, 1);
+	const input = (name, value) => h('input.search', { type: 'text', inputmode: 'decimal', autocomplete: 'off', name, value: value ?? '' });
+	const dateInput = h('input.search', { type: 'datetime-local', name: 'obs_date', value: o.date || '' });
+	const warn = h('div.note.warn', { hidden: true });
+	const box = h('div.form-row.weather-obs', null,
+		h('span.form-label', null, t('WeatherObs')),
+		h('div.item-sub', null, t('WeatherObsHelp')),
+		h('div.obs-grid', null,
+			formRow(t('WeatherObsTemp'), input('obs_temp', o.temp)),
+			formRow(t('WeatherObsWind'), input('obs_wind', o.wind)),
+			formRow(t('WeatherObsRh'), input('obs_rh', o.rh)),
+		),
+		formRow(t('WeatherObsTime'), h('div.obs-time', null, dateInput,
+			h('button.btn', {
+				type: 'button',
+				onclick: () => {
+					dateInput.value = isoLocal(new Date().toISOString());
+					dateInput.dispatchEvent(new Event('input', { bubbles: true }));
+				},
+			}, t('WeatherObsNow')))),
+		warn,
+	);
+	const refresh = (values, plantProtection) => {
+		const limit = (state.data && state.data.weather && state.data.weather.thresholds) || { wind: 5, temp: 30 };
+		const wind = obsNumber(values.obs_wind);
+		const temp = obsNumber(values.obs_temp);
+		const messages = [];
+		if (plantProtection && wind !== null && wind > limit.wind) {
+			messages.push(t('WarnObsWind', fmt(wind), fmt(limit.wind)));
+		}
+		if (plantProtection && temp !== null && temp > limit.temp) {
+			messages.push(t('WarnObsTemp', fmt(temp), fmt(limit.temp)));
+		}
+		warn.textContent = messages.join(' ');
+		warn.hidden = !messages.length;
+	};
+	return { box, refresh };
+}
+
 function checkRecord(kind, d, plan) {
 	const limit = isoLocal(new Date(Date.now() + 86400000).toISOString());
 	const period = checkPlanPeriod(plan, d);
+	const observed = (kind !== 'harvest' ? checkWeatherObs(d) : '');
 	if (kind === 'treatment') {
-		return checkTreatment(d, limit) || period;
+		return checkTreatment(d, limit) || period || observed;
 	}
 	if (period && d.date) {
 		return period;
+	}
+	if (observed) {
+		return observed;
 	}
 	if (kind === 'operation') {
 		if (!d.type) {
@@ -1261,16 +1355,29 @@ function viewForm(kind, planId, record) {
 	/** Values of the form as data of the record */
 	const readForm = (values) => {
 		const data = { cropplan_id: plan.id };
+		const obs = {};
 		for (const [k, v] of Object.entries(values)) {
+			// Weather observed in the field: sent only with at least one value
+			if (k.startsWith('obs_')) {
+				if (v !== '') {
+					obs[k.slice(4)] = (k === 'obs_date' ? v : obsNumber(v));
+				}
+				continue;
+			}
 			if (v !== '') {
 				data[k] = (['duration_min', 'machine_id', 'operator_id', 'kind'].includes(k) ? parseInt(v, 10) : (['qty', 'area_ha', 'water_volume'].includes(k) ? decimalValue(v) : v));
 			}
+		}
+		if (['temp', 'wind', 'rh'].some((k) => obs[k] !== undefined)) {
+			data.weather_obs = obs;
 		}
 		return data;
 	};
 
 	// Weather expected at the hour of the record (operations and treatments; warnings for plant protection)
 	const weather = (kind !== 'harvest' && plot) ? formWeather(h, state.data && state.data.weather, plot.id) : null;
+	// Weather observed in the field (thermometer, anemometer), saved with the record
+	const observed = (kind !== 'harvest') ? weatherObsBox(d) : null;
 
 	// Photos: reduced when added, saved with the record, sent after it
 	const photos = record ? photosOf(record.client_id).map((p) => Object.assign({}, p)) : [];
@@ -1375,6 +1482,7 @@ function viewForm(kind, planId, record) {
 	error,
 	fields,
 	weather ? weather.box : null,
+	observed ? observed.box : null,
 	photoBox,
 	h('div.buttons', null,
 		h('button.btn.primary', { type: 'submit' }, t('Save')),
@@ -1433,6 +1541,18 @@ function viewForm(kind, planId, record) {
 		syncDates(e);
 	});
 	syncDates(null);
+	if (observed) {
+		const refreshObserved = () => {
+			const values = {};
+			new FormData(form).forEach((v, k) => {
+				values[k] = String(v).trim();
+			});
+			observed.refresh(values, kind === 'treatment' && values.kind === '1');
+		};
+		form.addEventListener('input', refreshObserved);
+		form.addEventListener('change', refreshObserved);
+		refreshObserved();
+	}
 	if (weather) {
 		const refreshWeather = () => {
 			const values = {};

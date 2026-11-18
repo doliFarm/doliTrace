@@ -87,3 +87,132 @@ function dolitraceWeatherWarnings(?array $conditions): array
 	}
 	return DoliFieldWeather::conditionWarnings($conditions);
 }
+
+/**
+ * Number of a field of the weather observed (typed with comma or point), null if empty
+ *
+ * @param	mixed	$value	Value
+ * @return	?float
+ */
+function dolitraceWeatherObsNumber($value): ?float
+{
+	if ($value === null || $value === '') {
+		return null;
+	}
+	if (is_string($value)) {
+		$value = str_replace(',', '.', trim($value));
+		if ($value === '' || !is_numeric($value)) {
+			return null;
+		}
+	}
+	return (float) $value;
+}
+
+/**
+ * Check the weather observed in the field of a record and complete it: without a time of the reading the start of the
+ * record; without values no time
+ *
+ * @param	object		$object		Record (properties weather_obs_date, weather_obs_temp, weather_obs_wind, weather_obs_rh)
+ * @param	mixed		$start		Start of the record (timestamp or string)
+ * @param	mixed		$end		End of the record (timestamp or string, empty = start)
+ * @return	string					Error, '' if OK
+ */
+function dolitraceWeatherObsCheck($object, $start, $end): string
+{
+	global $langs;
+
+	$langs->load('dolitrace@dolitrace');
+	$time = function ($value) {
+		if ($value === null || $value === '') {
+			return null;
+		}
+		return (is_numeric($value) ? (int) $value : (int) dol_stringtotime($value));
+	};
+	$limits = array('weather_obs_temp' => array(-30, 55, 'WeatherObsTemp'), 'weather_obs_wind' => array(0, 60, 'WeatherObsWind'), 'weather_obs_rh' => array(0, 100, 'WeatherObsRh'));
+	$values = 0;
+	foreach ($limits as $field => $limit) {
+		if (is_string($object->$field) && trim($object->$field) !== '' && !is_numeric(str_replace(',', '.', trim($object->$field)))) {
+			return $langs->transnoentities('ErrorWeatherObsValue', $langs->transnoentities($limit[2]), $limit[0], $limit[1]);
+		}
+		$value = dolitraceWeatherObsNumber($object->$field);
+		if ($value !== null && ($value < $limit[0] || $value > $limit[1])) {
+			return $langs->transnoentities('ErrorWeatherObsValue', $langs->transnoentities($limit[2]), $limit[0], $limit[1]);
+		}
+		$object->$field = $value;
+		$values += ($value !== null ? 1 : 0);
+	}
+	$start = $time($start);
+	$end = $time($end);
+	$obsdate = $time($object->weather_obs_date);
+	if (!$values) {
+		$object->weather_obs_date = null;
+		return '';
+	}
+	if (empty($obsdate)) {
+		$obsdate = $start;
+	}
+	// Reading near the record: from 12 hours before the start to 12 hours after the end, not in the future
+	if (!empty($start) && !empty($obsdate)) {
+		$last = (!empty($end) ? $end : $start) + 12 * 3600;
+		if ($obsdate < $start - 12 * 3600 || $obsdate > $last || $obsdate > dol_now() + 3600) {
+			return $langs->transnoentities('ErrorWeatherObsDate', dol_print_date($obsdate, 'dayhour', 'tzuserrel'));
+		}
+	}
+	$object->weather_obs_date = $obsdate;
+	return '';
+}
+
+/**
+ * Warnings on the weather observed in the field with a treatment of plant protection: wind and temperature over the
+ * thresholds of doliField (5 m/s and 30 degrees C without doliField)
+ *
+ * @param	object	$object		Record
+ * @return	string[]			Translated warnings
+ */
+function dolitraceWeatherObsWarnings($object): array
+{
+	global $langs;
+
+	$langs->load('dolitrace@dolitrace');
+	$limit = (dolitraceWeatherAvailable() ? DoliFieldWeather::thresholds() : array('wind' => 5.0, 'temp' => 30.0));
+	$warnings = array();
+	$wind = dolitraceWeatherObsNumber($object->weather_obs_wind ?? null);
+	if ($wind !== null && $wind > $limit['wind']) {
+		$warnings[] = $langs->transnoentities('WarningWeatherObsWind', price($wind, 0, $langs, 0, 0, 1), price($limit['wind'], 0, $langs, 0, 0, 1));
+	}
+	$temp = dolitraceWeatherObsNumber($object->weather_obs_temp ?? null);
+	if ($temp !== null && $temp > $limit['temp']) {
+		$warnings[] = $langs->transnoentities('WarningWeatherObsTemp', price($temp, 0, $langs, 0, 0, 1), price($limit['temp'], 0, $langs, 0, 0, 1));
+	}
+	return $warnings;
+}
+
+/**
+ * Short text of the weather observed in the field ("12/05/2026 08:30: 18 °C, wind 2.5 m/s, RH 60%")
+ *
+ * @param	object	$object		Record
+ * @return	string				'' without values
+ */
+function dolitraceWeatherObsText($object): string
+{
+	global $langs;
+
+	$langs->load('dolitrace@dolitrace');
+	$parts = array();
+	$temp = dolitraceWeatherObsNumber($object->weather_obs_temp ?? null);
+	$wind = dolitraceWeatherObsNumber($object->weather_obs_wind ?? null);
+	$rh = dolitraceWeatherObsNumber($object->weather_obs_rh ?? null);
+	if ($temp !== null) {
+		$parts[] = price($temp, 0, $langs, 0, 0, 1).' °C';
+	}
+	if ($wind !== null) {
+		$parts[] = $langs->transnoentities('WeatherObsWindShort', price($wind, 0, $langs, 0, 0, 1));
+	}
+	if ($rh !== null) {
+		$parts[] = $langs->transnoentities('WeatherObsRhShort', price($rh, 0, $langs, 0, 0, 0));
+	}
+	if (!count($parts)) {
+		return '';
+	}
+	return (!empty($object->weather_obs_date) ? dol_print_date($object->weather_obs_date, 'dayhour', 'tzuserrel').': ' : '').implode(', ', $parts);
+}

@@ -775,3 +775,22 @@ details.warnings summary {
 	flex: none;
 	border-radius: 12px;
 }
+
+/* Weather observed in the field (1.7.0) */
+.weather-obs .obs-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 8px;
+}
+.weather-obs .obs-grid .form-label {
+	font-size: 0.85em;
+}
+.weather-obs .obs-time {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+.weather-obs .obs-time input {
+	flex: 1;
+	min-width: 0;
+}

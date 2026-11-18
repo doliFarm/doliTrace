@@ -30,6 +30,7 @@ dol_include_once('/dolifarm/lib/dolifarm_help.lib.php'); // Help texts by role (
 dol_include_once('/dolitrace/lib/dolitrace_treatment.lib.php');
 dol_include_once('/dolitrace/lib/dolitrace_weather.lib.php');
 dol_include_once('/dolitrace/lib/dolitrace_period.lib.php');
+dol_include_once('/dolitrace/lib/dolitrace_costs.lib.php');
 //require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 //require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 
@@ -175,6 +176,11 @@ class DoliTraceTreatment extends CommonObject
 		'machine_cert_ref' => array('type' => 'varchar(64)', 'label' => 'TreatmentMachineCertRef', 'enabled' => 1, 'position' => 64, 'notnull' => 0, 'visible' => -5, 'noteditable' => 1),
 		'water_volume' => array('type' => 'double(24,8)', 'label' => 'TreatmentWaterVolume', 'enabled' => 1, 'position' => 65, 'notnull' => 0, 'visible' => -1, 'css' => 'maxwidth100', 'help' => 'TreatmentWaterVolumeHelp'),
 		'weather' => array('type' => 'varchar(255)', 'label' => 'TreatmentWeather', 'enabled' => 1, 'position' => 66, 'notnull' => 0, 'visible' => -1, 'css' => 'minwidth300', 'help' => 'TreatmentWeatherHelp'),
+		// Weather observed in the field (1.5.9)
+		'weather_obs_date' => array('type' => 'datetime', 'label' => 'WeatherObsDate', 'help' => 'WeatherObsHelp', 'enabled' => 1, 'position' => 66, 'notnull' => 0, 'visible' => -1),
+		'weather_obs_temp' => array('type' => 'double(24,8)', 'label' => 'WeatherObsTemp', 'enabled' => 1, 'position' => 66, 'notnull' => 0, 'visible' => -1, 'css' => 'maxwidth75'),
+		'weather_obs_wind' => array('type' => 'double(24,8)', 'label' => 'WeatherObsWind', 'enabled' => 1, 'position' => 66, 'notnull' => 0, 'visible' => -1, 'css' => 'maxwidth75'),
+		'weather_obs_rh' => array('type' => 'double(24,8)', 'label' => 'WeatherObsRh', 'enabled' => 1, 'position' => 66, 'notnull' => 0, 'visible' => -1, 'css' => 'maxwidth75'),
 		'application_method' => array('type' => 'sellist:dolitrace_c_application_method:label:code::active=1', 'label' => 'TreatmentApplicationMethod', 'enabled' => 1, 'position' => 67, 'notnull' => 0, 'visible' => -1, 'css' => 'maxwidth500 widthcentpercentminusxx', 'help' => 'TreatmentApplicationMethodHelp'),
 		'justification_type' => array('type' => 'sellist:dolitrace_c_justification:label:code::active=1', 'label' => 'TreatmentJustificationType', 'enabled' => 1, 'position' => 68, 'notnull' => 0, 'visible' => -1, 'css' => 'maxwidth300', 'help' => 'TreatmentJustificationTypeHelp'),
 		'justification_ref' => array('type' => 'varchar(255)', 'label' => 'TreatmentJustificationRef', 'enabled' => 1, 'position' => 69, 'notnull' => 0, 'visible' => -1, 'css' => 'minwidth300', 'help' => 'TreatmentJustificationRefHelp'),
@@ -331,6 +337,14 @@ class DoliTraceTreatment extends CommonObject
 	 * @var ?string
 	 */
 	public $weather;
+	/** @var int|string|null Time of the weather observed in the field */
+	public $weather_obs_date;
+	/** @var float|string|null Temperature observed, degrees C */
+	public $weather_obs_temp;
+	/** @var float|string|null Wind observed, m/s */
+	public $weather_obs_wind;
+	/** @var float|string|null Relative humidity observed, percent */
+	public $weather_obs_rh;
 
 	/**
 	 * @var int
@@ -467,6 +481,11 @@ class DoliTraceTreatment extends CommonObject
 			$this->version = 1;
 		}
 		if ($this->setFromCropPlan() < 0) {
+			return -1;
+		}
+		// Weather observed in the field near the treatment
+		$this->error = dolitraceWeatherObsCheck($this, $this->date_start, $this->date_end);
+		if ($this->error !== '') {
 			return -1;
 		}
 		// Registers frozen by a closed inspection of the organic control body
@@ -836,9 +855,18 @@ class DoliTraceTreatment extends CommonObject
 		if ($this->setFromCropPlan() < 0) {
 			return -1;
 		}
+		$this->error = dolitraceWeatherObsCheck($this, $this->date_start, $this->date_end);
+		if ($this->error !== '') {
+			return -1;
+		}
+		$plans = dolitraceRecordCropPlans($this->db, $this->element, (int) $this->id);
 		$result = $this->updateCommon($user, $notrigger);
 		if ($result > 0 && ($this->syncCropPlanTarget($user) < 0 || $this->fetchLines() < 0 || $this->updateAutoQuantities($user) < 0)) {
 			return -1;
+		}
+		if ($result > 0) {
+			// Costs of the plans before and after, with the areas and the quantities saved above
+			dolitraceSyncRecordCosts($this->db, $this->element, (int) $this->id, $plans);
 		}
 		return $result;
 	}
@@ -860,7 +888,13 @@ class DoliTraceTreatment extends CommonObject
 			$this->error = 'ErrorTreatmentOnlyDraftDeleted';
 			return -1;
 		}
-		return $this->deleteCommon($user, $notrigger);
+		$plans = dolitraceRecordCropPlans($this->db, $this->element, (int) $this->id);
+		$result = $this->deleteCommon($user, $notrigger);
+		if ($result > 0) {
+			// Costs of the plans without the record (the trigger runs before the deletion)
+			dolitraceSyncRecordCosts($this->db, $this->element, (int) $this->id, $plans);
+		}
+		return $result;
 	}
 
 
@@ -1497,6 +1531,10 @@ class DoliTraceTreatment extends CommonObject
 		if ($this->kind == self::KIND_PLANTPROTECTION && $this->status == self::STATUS_DRAFT) {
 			$warnings = array_merge($warnings, dolitraceWeatherWarnings($this->getWeatherConditions()));
 		}
+		// Weather observed in the field over the thresholds
+		if ($this->kind == self::KIND_PLANTPROTECTION) {
+			$warnings = array_merge($warnings, dolitraceWeatherObsWarnings($this));
+		}
 
 		// Organic production: products not allowed on organic areas, copper over 7 years
 		if ($this->technical_type == self::TECHNICAL_SURFACES) {
@@ -2012,7 +2050,8 @@ class DoliTraceTreatment extends CommonObject
 			'products' => array(),
 		);
 		// Data added for the AGEA field notebook: in the fingerprint only when filled in, so the fingerprints of the older records do not change
-		foreach (array('machine_check_date' => $date($this->machine_check_date), 'machine_cert_ref' => (string) $this->machine_cert_ref, 'application_method' => (string) $this->application_method, 'justification_type' => (string) $this->justification_type, 'justification_ref' => (string) $this->justification_ref) as $key => $value) {
+		foreach (array('machine_check_date' => $date($this->machine_check_date), 'machine_cert_ref' => (string) $this->machine_cert_ref, 'application_method' => (string) $this->application_method, 'justification_type' => (string) $this->justification_type, 'justification_ref' => (string) $this->justification_ref,
+			'weather_obs_date' => $datetime($this->weather_obs_date), 'weather_obs_temp' => $num($this->weather_obs_temp), 'weather_obs_wind' => $num($this->weather_obs_wind), 'weather_obs_rh' => $num($this->weather_obs_rh)) as $key => $value) {
 			if ($value !== '') {
 				$content[$key] = $value;
 			}
@@ -2177,7 +2216,7 @@ class DoliTraceTreatment extends CommonObject
 		$this->db->begin();
 		$new = new self($this->db);
 		foreach (array('entity', 'kind', 'technical_type', 'fk_soc', 'fk_dossier', 'fk_cropplan', 'date_start', 'date_end', 'reason', 'fk_operator', 'fk_soc_contractor', 'contractor_mode',
-			'contractor_signed', 'date_contractor_signed', 'delegation_ref', 'fk_machine', 'application_method', 'justification_type', 'justification_ref', 'water_volume', 'weather', 'note_public', 'note_private') as $key) {
+			'contractor_signed', 'date_contractor_signed', 'delegation_ref', 'fk_machine', 'application_method', 'justification_type', 'justification_ref', 'water_volume', 'weather', 'weather_obs_date', 'weather_obs_temp', 'weather_obs_wind', 'weather_obs_rh', 'note_public', 'note_private') as $key) {
 			$new->$key = $this->$key;
 		}
 		$new->ref = '(PROV)';
@@ -3079,7 +3118,13 @@ abstract class DoliTraceTreatmentRow extends CommonObjectLine
 		if (!$this->parentIsDraft()) {
 			return -1;
 		}
-		return $this->createCommon($user, 1);
+		$plans = dolitraceRecordCropPlans($this->db, 'dolitracetreatment', (int) $this->fk_treatment);
+		$result = $this->createCommon($user, 1);
+		if ($result > 0) {
+			// Costs of the plans of the record (the rows have no triggers)
+			dolitraceSyncRecordCosts($this->db, 'dolitracetreatment', (int) $this->fk_treatment, $plans);
+		}
+		return $result;
 	}
 
 	/**
@@ -3105,7 +3150,13 @@ abstract class DoliTraceTreatmentRow extends CommonObjectLine
 		if (!$this->parentIsDraft()) {
 			return -1;
 		}
-		return $this->updateCommon($user, 1);
+		$plans = dolitraceRecordCropPlans($this->db, 'dolitracetreatment', (int) $this->fk_treatment);
+		$result = $this->updateCommon($user, 1);
+		if ($result > 0) {
+			// Costs of the plans of the record (the rows have no triggers)
+			dolitraceSyncRecordCosts($this->db, 'dolitracetreatment', (int) $this->fk_treatment, $plans);
+		}
+		return $result;
 	}
 
 	/**
@@ -3120,7 +3171,13 @@ abstract class DoliTraceTreatmentRow extends CommonObjectLine
 		if (!$this->parentIsDraft()) {
 			return -1;
 		}
-		return $this->deleteCommon($user, 1);
+		$plans = dolitraceRecordCropPlans($this->db, 'dolitracetreatment', (int) $this->fk_treatment);
+		$result = $this->deleteCommon($user, 1);
+		if ($result > 0) {
+			// Costs of the plans of the record (the rows have no triggers)
+			dolitraceSyncRecordCosts($this->db, 'dolitracetreatment', (int) $this->fk_treatment, $plans);
+		}
+		return $result;
 	}
 
 	/**
