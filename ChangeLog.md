@@ -1,5 +1,14 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.5.6 (2026-11-18)
+
+App di campo 1.6.0. Dopo l'aggiornamento non serve riattivare il modulo: l'app si aggiorna aprendola con la rete.
+
+- Scheda dell'appezzamento: scorrendo a sinistra o a destra (o con i tasti ‹ › in alto) si passa all'appezzamento successivo o precedente, nell'ordine dell'elenco e con la ricerca attiva; "Indietro" torna all'elenco.
+- Piani di produzione dell'appezzamento uno alla volta ("Piano 1 di 3"): scorrendo sul piano o con i tasti ‹ › si passa agli altri piani dello stesso appezzamento.
+- Pagina **Info** (icona in alto a destra): utente, azienda, server e ultimo aggiornamento, uscita da Dolibarr e cancellazione dei dati del telefono; indicazioni sulla privacy; spazio per le personalizzazioni (nessuna per ora); informazioni e contatti di doliFarm, versione e licenza.
+- La risposta di sessione dell'API dell'app riporta anche il nome dell'azienda e l'indirizzo di logout.
+
 ## 1.5.5 (2026-11-18)
 
 Menu e app di campo 1.4.1. Dopo l'aggiornamento **riattivare doliTrace** (menu); richiede doliFarm 1.5.10.

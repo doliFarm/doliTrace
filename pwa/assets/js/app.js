@@ -27,7 +27,7 @@ import { MAX_PHOTOS, reducePhoto, newPhoto, loadPhotos, removePhoto, savePhotos,
 import { treatmentFields, checkTreatment, treatmentSummary } from './treatment.js';
 import { weatherCard, formWeather } from './weather.js';
 
-export const APP_VERSION = '1.4.1';
+export const APP_VERSION = '1.6.0';
 
 /** Days without update after which the app warns (Safari deletes the data of the apps not used for about 7 days) */
 const OLD_DATA_DAYS = 5;
@@ -45,6 +45,7 @@ const state = {
 	problem: '',	// login, forbidden, api, otheruser, or a message
 	toast: '',
 	search: '',
+	planIndex: {},	// plan shown in the card of each plot (id of the plot => position in its plans)
 };
 
 let cleanup = null;
@@ -144,6 +145,56 @@ function today() {
 function safetyOf(planId) {
 	const day = today();
 	return ((state.data && state.data.safety) || []).filter((s) => s.cropplan_id === planId && s.until >= day);
+}
+
+/** Plots of the list of the home page, with the search typed there */
+function filterPlots(search) {
+	const q = String(search || '').trim().toLowerCase();
+	return plots().filter((p) => !q || [p.ref, p.label, p.farm, p.comune, cropOf(p)].join(' ').toLowerCase().includes(q));
+}
+
+/** Plots to scroll from the card of a plot: the list of the home page, or all the plots when the plot is not in it */
+function plotSequence(id) {
+	const found = filterPlots(state.search);
+	return found.some((p) => p.id === id) ? found : plots();
+}
+
+/**
+ * Horizontal swipe on an element: handler(1) when the finger goes to the left (next), handler(-1) to the right
+ * (previous). Vertical moves scroll the page as usual; a swipe handled by an inner element does not reach the outer ones.
+ */
+function onSwipe(el, handler) {
+	let x0 = null;
+	let y0 = 0;
+	el.addEventListener('touchstart', (e) => {
+		if (e.touches.length !== 1 || e.target.closest('input, select, textarea, video')) {
+			x0 = null;
+			return;
+		}
+		x0 = e.touches[0].clientX;
+		y0 = e.touches[0].clientY;
+	}, { passive: true });
+	el.addEventListener('touchend', (e) => {
+		if (x0 === null) {
+			return;
+		}
+		const dx = e.changedTouches[0].clientX - x0;
+		const dy = e.changedTouches[0].clientY - y0;
+		x0 = null;
+		if (Math.abs(dx) >= 60 && Math.abs(dx) > 2 * Math.abs(dy)) {
+			e.stopPropagation();
+			handler(dx < 0 ? 1 : -1);
+		}
+	});
+}
+
+/** Buttons ‹ text › to go to the previous and the next element (disabled at the ends) */
+function pager(text, index, count, go, prevLabel, nextLabel) {
+	return h('div.pager', null,
+		h('button.btn.small.pager-btn', { type: 'button', 'aria-label': prevLabel, title: prevLabel, disabled: index <= 0, onclick: () => go(-1) }, '‹'),
+		h('span.pager-text', { 'aria-live': 'polite' }, text),
+		h('button.btn.small.pager-btn', { type: 'button', 'aria-label': nextLabel, title: nextLabel, disabled: index >= count - 1, onclick: () => go(1) }, '›'),
+	);
 }
 
 function findPlotByRef(ref) {
@@ -370,8 +421,7 @@ function viewHome() {
 	document.title = t('AppTitle');
 	const list = h('div.list');
 	const fill = () => {
-		const q = state.search.trim().toLowerCase();
-		const found = plots().filter((p) => !q || [p.ref, p.label, p.farm, p.comune, cropOf(p)].join(' ').toLowerCase().includes(q));
+		const found = filterPlots(state.search);
 		list.replaceChildren(...(found.length ? found.map((p) => plotItem(p)) : [h('p.empty', null, plots().length ? t('NoMatch') : t('NoPlots'))]));
 	};
 	const search = h('input.search', {
@@ -398,28 +448,86 @@ function viewHome() {
 	);
 }
 
+/** Delete the data downloaded on this phone (not while records or photos wait to be sent) */
+async function clearData() {
+	if (waiting()) {
+		toast(t('ClearBlocked', waiting()));
+		return;
+	}
+	if (window.confirm(t('ClearConfirm'))) {
+		await kvClear();
+		state.session = null;
+		state.data = null;
+		state.syncedAt = null;
+		toast(t('Cleared'));
+		route();
+	}
+}
+
 function footer() {
 	const user = state.session && state.session.user ? (state.session.user.name || state.session.user.login) : '';
 	return h('div.footer', null,
 		user ? h('div', null, t('User', user)) : null,
 		h('div', null, t('Version', APP_VERSION)),
-		h('button.link', {
-			type: 'button',
-			onclick: async () => {
-				if (waiting()) {
-					toast(t('ClearBlocked', waiting()));
-					return;
-				}
-				if (window.confirm(t('ClearConfirm'))) {
-					await kvClear();
-					state.session = null;
-					state.data = null;
-					state.syncedAt = null;
-					toast(t('Cleared'));
-					route();
-				}
-			},
-		}, t('ClearData')),
+		h('button.link', { type: 'button', onclick: clearData }, t('ClearData')),
+	);
+}
+
+/*
+ * Personal settings of the app, shown in the info page. None for now: each entry will be
+ * { label, control: () => element } with its value saved on the phone (kvSet).
+ */
+const SETTINGS = [];
+
+/** Info page (button on the top right): user, privacy, doliFarm and its contacts, personal settings */
+function viewInfo() {
+	document.title = t('InfoTitle');
+	const session = state.session || {};
+	const user = session.user || null;
+	const logoutUrl = session.logout_url ? new URL(session.logout_url, location.href).href : '';
+	show(
+		backLink(),
+		h('h1', null, t('InfoTitle')),
+		h('div.card', null,
+			h('div.card-title', null, t('InfoUser')),
+			user
+				? [
+					field(t('InfoName'), user.name),
+					field(t('InfoLogin'), user.login),
+					field(t('InfoCompany'), session.company),
+					field(t('InfoServer'), location.host),
+					field(t('InfoSynced'), state.syncedAt ? fmtDate(isoLocal(state.syncedAt)) : t('InfoNever')),
+				]
+				: h('p.empty', null, t('InfoNotLogged')),
+			h('div.buttons', null,
+				user && logoutUrl ? h('a.btn', { href: logoutUrl }, t('InfoLogout')) : null,
+				h('button.btn', { type: 'button', onclick: clearData }, t('ClearData')),
+			),
+			user && logoutUrl ? h('p.item-sub', null, t('InfoLogoutHelp')) : null,
+		),
+		h('div.card', null,
+			h('div.card-title', null, t('InfoPrivacy')),
+			h('ul.info-list', null,
+				['PrivacyData', 'PrivacyServer', 'PrivacyPosition', 'PrivacyCamera', 'PrivacyMaps', 'PrivacyOtherUser'].map((key) => h('li', null, t(key))),
+			),
+		),
+		h('div.card', null,
+			h('div.card-title', null, t('InfoSettings')),
+			SETTINGS.length
+				? SETTINGS.map((s) => formRow(s.label, s.control()))
+				: h('p.empty', null, t('InfoNoSettings')),
+		),
+		h('div.card.info-about', null,
+			h('img', { src: 'assets/img/dolifarm-logo.jpg', alt: 'doliFarm', width: 72, height: 72 }),
+			h('div', null,
+				h('div.card-title', null, t('InfoAbout')),
+				h('p', null, t('InfoAboutText')),
+				field(t('InfoWebsite'), h('a', { href: 'https://dolifarm.com', target: '_blank', rel: 'noopener' }, 'dolifarm.com')),
+				field(t('InfoEmail'), h('a', { href: 'mailto:info@dolifarm.com' }, 'info@dolifarm.com')),
+				field(t('InfoVersion'), APP_VERSION + ' (API ' + API_VERSION + ')'),
+				field(t('InfoLicense'), 'GNU AGPL v3'),
+			),
+		),
 	);
 }
 
@@ -454,8 +562,20 @@ function viewPlot(id) {
 		links.push(h('a.btn', { href: 'https://www.google.com/maps/dir/?api=1&destination=' + plot.lat + ',' + plot.lon, target: '_blank', rel: 'noopener noreferrer' }, t('Navigate')));
 	}
 	const plans = plansOf(plot.id);
-	show(
-		backLink(),
+	// Previous and next plot of the list: buttons ‹ › and horizontal swipe on the page (replace: Back goes to the list)
+	const sequence = plotSequence(plot.id);
+	const index = sequence.findIndex((p) => p.id === plot.id);
+	const goPlot = (dir) => {
+		const next = sequence[index + dir];
+		if (next) {
+			location.replace('#/plot/' + next.id);
+		}
+	};
+	const page = h('div.swipe-page', null,
+		h('div.title-row', null,
+			backLink(),
+			sequence.length > 1 ? pager(t('PlotOf', index + 1, sequence.length), index, sequence.length, goPlot, t('PrevPlot'), t('NextPlot')) : null,
+		),
 		h('h1', null, plot.label || plot.ref),
 		h('div.card', null,
 			field('Ref.', plot.ref),
@@ -466,8 +586,39 @@ function viewPlot(id) {
 		),
 		weatherCard(h, state.data && state.data.weather, plot.id),
 		h('h2', null, t('ProductionPlans')),
-		plans.length ? plans.map(planCard) : h('p.empty', null, t('NoPlan')),
+		plans.length ? planCarousel(plot.id, plans) : h('p.empty', null, t('NoPlan')),
 	);
+	if (sequence.length > 1) {
+		onSwipe(page, goPlot);
+	}
+	show(page);
+}
+
+/** Plans of a plot one at a time: buttons ‹ › and horizontal swipe on the plan (it does not change the plot) */
+function planCarousel(plotId, plans) {
+	if (plans.length === 1) {
+		return planCard(plans[0]);
+	}
+	const box = h('div.plans');
+	const render = (dir) => {
+		const i = Math.min(Math.max(state.planIndex[plotId] || 0, 0), plans.length - 1);
+		state.planIndex[plotId] = i;
+		const card = planCard(plans[i]);
+		if (dir) {
+			card.classList.add(dir > 0 ? 'slide-next' : 'slide-prev');
+		}
+		box.replaceChildren(pager(t('PlanOf', i + 1, plans.length), i, plans.length, go, t('PrevPlan'), t('NextPlan')), card);
+	};
+	const go = (dir) => {
+		const i = (state.planIndex[plotId] || 0) + dir;
+		if (i >= 0 && i < plans.length) {
+			state.planIndex[plotId] = i;
+			render(dir);
+		}
+	};
+	render(0);
+	onSwipe(box, go);
+	return box;
 }
 
 function planCard(plan) {
@@ -1104,6 +1255,8 @@ function route() {
 		viewScan();
 	} else if (hash === '#/near') {
 		viewNear();
+	} else if (hash === '#/info') {
+		viewInfo();
 	} else {
 		viewHome();
 	}
@@ -1166,6 +1319,11 @@ async function start() {
 	if (splashTitle) {
 		splashTitle.textContent = t('SplashTitle');
 		document.getElementById('splash-version').textContent = t('Version', APP_VERSION);
+	}
+	const infoButton = document.getElementById('topbar-info');
+	if (infoButton) {
+		infoButton.setAttribute('aria-label', t('InfoTitle'));
+		infoButton.setAttribute('title', t('InfoTitle'));
 	}
 	await loadLocal();
 	renderStatus();
