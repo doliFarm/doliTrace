@@ -1,6 +1,6 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-## 1.5.9 (in sviluppo)
+## 1.5.9 (2026-11-18)
 
 Regole di coerenza, meteo rilevato in campo, correzioni dei costi e app di campo 1.7.0. Dopo l'aggiornamento **riattivare doliTrace** (colonne di `llx_dolitrace_pwa_receipt`, colonne del meteo rilevato di operazioni e trattamenti, dizionario delle fasi fenologiche); richiede doliFarm 1.5.14.
 
