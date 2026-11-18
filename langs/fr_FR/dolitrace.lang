@@ -170,7 +170,8 @@ OperationStockMovement = Mouvement de stock
 OperationStockTaken = Semis %s : sortie de la semence
 OperationStockReversal = Annulation du semis %s
 OperationStockStillToRegularize = La semence est encore à régulariser : corrigez le stock ou le lot et réessayez
-ErrorTreatmentNoWarehouse = Aucun entrepôt d'intrants pour l'exploitation : l'indiquer dans le dossier de l'exploitation ou dans la configuration de doliFarm
+ErrorTreatmentNoWarehouse = Aucun entrepôt d'intrants pour l'exploitation : l'indiquer dans le dossier de l'exploitation
+ErrorTreatmentNoWarehouseAdmin = Aucun entrepôt d'intrants pour l'exploitation : l'indiquer dans le dossier de l'exploitation ou dans la configuration de doliFarm
 ErrorTreatmentBatchRequired = Le produit est géré par lots : indiquer le lot
 ErrorTreatmentStockMovement = Mouvement de stock échoué
 ErrorTreatmentStockUnit = L'unité du produit %s (%s) ne peut pas être convertie depuis l'unité de l'enregistrement (%s) : kg et t demandent une unité de poids sur le produit, l et m³ une unité de volume (pas de conversion entre poids et volume)
@@ -582,7 +583,8 @@ ErrorHarvestLotSuffixStatus = Le lot %s est un lot de produit %s : une récolte 
 HarvestLotHarvest = 1 récolte
 
 # Units of the harvests
-HarvestUnitHelp = Unité du dictionnaire « Unités » de Dolibarr (Configuration > Dictionnaires), où d'autres unités peuvent être ajoutées. L'unité du produit est proposée : q et t sont convertis en kg, hl en L pour le stock ; une unité non convertible (ex. caisses pour un produit en kg) est refusée à la validation.
+HarvestUnitHelp = L'unité du produit est proposée : q et t sont convertis en kg, hl en L pour le stock ; une unité non convertible (ex. caisses pour un produit en kg) est refusée à la validation.
+HarvestUnitHelpAdmin = L'unité du produit est proposée : q et t sont convertis en kg, hl en L pour le stock ; une unité non convertible (ex. caisses pour un produit en kg) est refusée à la validation. Autres unités dans Configuration > Dictionnaires > Unités.
 ErrorHarvestUnitNotConvertible = La quantité est en « %s » mais le produit est stocké en « %s » : indiquer la quantité dans une unité convertible (même type, poids ou volume) ou changer l'unité du produit.
 
 # Costs of the production plans
@@ -678,7 +680,8 @@ DOLITRACE_PUBLIC_MAPHelp = Montre la position de la parcelle sur une carte OpenS
 DolitracePublicStory = Histoire (page publique)
 DolitracePublicStoryHelp = Texte publié sur la page de traçabilité ouverte par le QR code de l'étiquette (doliTrace)
 TracePublicLink = Page publique
-TracePublicDisabled = Page publique non activée : le QR code ouvre la page interne (configuration de doliTrace)
+TracePublicDisabled = Page publique non activée : le QR code ouvre la page interne
+TracePublicDisabledAdmin = Page publique non activée : le QR code ouvre la page interne (à activer dans la configuration de doliTrace)
 TraceLabels = Étiquettes QR
 TraceLabelsTitle = Étiquettes avec QR code - récolte %s
 TraceLabelsHelp = PDF à imprimer sur des planches A4 d'étiquettes adhésives. Le QR code ouvre la page publique de la récolte, ou la page interne si la page publique n'est pas activée. Les mentions obligatoires de l'étiquette (bio, origine, ...) restent à la charge de l'exploitation
@@ -743,7 +746,8 @@ PwaInstall = Installation
 PwaInstallAndroid = Android (Chrome) : ouvrez l'application, connectez-vous, puis menu ⋮ → « Installer l'application » ou « Ajouter à l'écran d'accueil ».
 PwaInstalliPhone = iPhone (Safari) : ouvrez l'application, connectez-vous, puis Partager → « Sur l'écran d'accueil ». Ouvrez-la au moins une fois par semaine : Safari efface les données des applications non utilisées depuis environ 7 jours.
 PwaPrivacy = Les données téléchargées restent sur le téléphone jusqu'à leur effacement depuis l'application (en bas de la page d'accueil). Si un autre utilisateur se connecte depuis le même téléphone, les données du précédent sont effacées.
-PwaNeedsHttps = L'application de terrain nécessite une adresse https : sans elle, le téléphone ne l'installe pas et n'utilise ni l'appareil photo ni la position.
+PwaNeedsHttps = L'application de terrain ne fonctionne pas sur cette adresse (https nécessaire) : prévenir l'administrateur.
+PwaNeedsHttpsAdmin = L'application de terrain nécessite une adresse https : sans elle, le téléphone ne l'installe pas et n'utilise ni l'appareil photo ni la position.
 PwaOpen = Ouvrir l'application de terrain
 PwaQrHelp = Cadrez-le avec le téléphone pour ouvrir l'application
 PwaErrorForbidden = Vous n'êtes pas autorisé à utiliser l'application de terrain

@@ -39,6 +39,7 @@ dol_include_once('/dolitrace/class/dolitraceharvest.class.php');
 dol_include_once('/dolitrace/class/dolitracecropplan.class.php'); 
 dol_include_once('/dolitrace/lib/dolitrace_harvest.lib.php');
 dol_include_once('/dolitrace/lib/dolitrace_access.lib.php');
+dol_include_once('/dolifarm/lib/dolifarm_help.lib.php'); // Help texts by role (doliFarm >= 1.5.9)
 
 // Load translation files required by the page
 $langs->loadLangs(array("dolitrace@dolitrace", "other"));
@@ -461,7 +462,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
         if (getDolGlobalInt('DOLITRACE_PUBLIC_ENABLED')) {
             print ' &nbsp; <a href="'.dol_escape_htmltag($qrlink).'" target="_blank" rel="noopener"><span class="fa fa-globe paddingright"></span>'.$langs->trans('TracePublicLink').'</a>';
         } else {
-            print '<br><span class="opacitymedium small">'.$langs->trans('TracePublicDisabled').'</span>';
+            print '<br><span class="opacitymedium small">'.$langs->trans((function_exists('dolifarmHelpKey') ? dolifarmHelpKey('TracePublicDisabled') : 'TracePublicDisabled')).'</span>';
         }
         print '</td></tr>';
         print '</table>';
