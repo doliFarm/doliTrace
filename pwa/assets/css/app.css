@@ -599,3 +599,83 @@ details.warnings summary {
 .weather-form .item-sub {
 	margin-top: 4px;
 }
+
+/* Card of a plot: previous / next plot and plan (buttons and horizontal swipe) */
+.swipe-page {
+	min-height: 70vh;
+	touch-action: pan-y;
+}
+.title-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+.pager {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.plans > .pager {
+	justify-content: center;
+	margin-bottom: 8px;
+}
+.pager-btn {
+	min-width: 44px;
+	font-size: 22px;
+	line-height: 1;
+}
+.pager-text {
+	color: var(--muted);
+	font-size: 15px;
+	white-space: nowrap;
+}
+.plans {
+	touch-action: pan-y;
+}
+.slide-next {
+	animation: slide-next 0.18s ease-out;
+}
+.slide-prev {
+	animation: slide-prev 0.18s ease-out;
+}
+@keyframes slide-next {
+	from { transform: translateX(40px); opacity: 0.3; }
+	to { transform: none; opacity: 1; }
+}
+@keyframes slide-prev {
+	from { transform: translateX(-40px); opacity: 0.3; }
+	to { transform: none; opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.slide-next, .slide-prev { animation: none; }
+}
+
+/* Top bar: info button on the right */
+.topbar-info {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 44px;
+	min-height: 44px;
+	margin: -8px -10px -8px auto;
+	color: var(--accent-text);
+}
+
+/* Info page */
+.info-list {
+	margin: 8px 0 0;
+	padding-left: 20px;
+}
+.info-list li {
+	margin-bottom: 6px;
+}
+.info-about {
+	display: flex;
+	gap: 14px;
+	align-items: flex-start;
+}
+.info-about img {
+	flex: none;
+	border-radius: 12px;
+}

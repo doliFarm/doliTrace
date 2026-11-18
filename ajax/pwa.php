@@ -128,7 +128,8 @@ if ($action == 'session') {
 	dolitracePwaOut(array(
 		'ok' => true, 'api' => DOLITRACE_PWA_API, 'server_time' => dolitracePwaDate(dol_now(), true),
 		'user' => array('id' => (int) $user->id, 'login' => (string) $user->login, 'name' => $user->getFullName($langs), 'lang' => (string) $langs->defaultlang),
-		'entity' => (int) $conf->entity, 'rights' => array('operation' => $rights['operation'], 'harvest' => $rights['harvest'], 'treatment' => $rights['treatment']),
+		'entity' => (int) $conf->entity, 'company' => (string) $mysoc->name, 'logout_url' => DOL_URL_ROOT.'/user/logout.php',
+		'rights' => array('operation' => $rights['operation'], 'harvest' => $rights['harvest'], 'treatment' => $rights['treatment']),
 		'limits' => array('photos' => DOLITRACE_PWA_MAXPHOTOS, 'photo_size' => DOLITRACE_PWA_PHOTOSIZE),
 		'token' => ($token !== '' ? $token : newToken()),
 	));
