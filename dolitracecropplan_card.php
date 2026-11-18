@@ -166,8 +166,7 @@ if ($user_selected_soc > 0) {
 // ==============================================================================
 
 // There is several ways to check permission.
-// Set $enablepermissioncheck to 1 to enable a minimum low level of checks
-$enablepermissioncheck = getDolGlobalInt('DOLITRACE_ENABLE_PERMISSION_CHECK');
+$enablepermissioncheck = 1; // Always: the constant of ModuleBuilder, never set, left the pages open to every user
 if ($enablepermissioncheck) {
     $permissiontoread = $user->hasRight('dolitrace', 'dolitracecropplan', 'read');
     $permissiontoadd = $user->hasRight('dolitrace', 'dolitracecropplan', 'write'); // Used by the include of actions_addupdatedelete.inc.php and actions_lineupdown.inc.php

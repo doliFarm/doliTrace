@@ -24,7 +24,7 @@ import { API_VERSION, LOGIN_URL, OfflineError, LoginError, ApiError, getSession,
 import { t, setLang, fmtDate, fmtNumber } from './i18n.js';
 import { newClientId, saveRecord, loadQueue, removeRecord, loadSent, sendQueue } from './queue.js';
 
-export const APP_VERSION = '1.1.0';
+export const APP_VERSION = '1.1.1';
 
 /** Days without update after which the app warns (Safari deletes the data of the apps not used for about 7 days) */
 const OLD_DATA_DAYS = 5;
@@ -652,6 +652,18 @@ const nowLocal = () => isoLocal(new Date().toISOString());
  *
  * @returns {string} Error, empty when valid
  */
+/**
+ * Number typed on the phone, with the comma or the dot as decimal separator (a text field: a field of type number of
+ * some browsers drops the comma and 12,5 becomes 125)
+ *
+ * @param {string} text Text
+ * @return {number} The number, NaN when it is not a number
+ */
+function decimalValue(text) {
+	const value = String(text).trim().replace(/\s/g, '');
+	return (/^\d+([.,]\d+)?$/.test(value) ? Number(value.replace(',', '.')) : NaN);
+}
+
 function checkRecord(kind, d) {
 	const limit = isoLocal(new Date(Date.now() + 86400000).toISOString());
 	if (kind === 'operation') {
@@ -666,6 +678,9 @@ function checkRecord(kind, d) {
 		}
 		if (d.date_end && (d.date_end < d.date || d.date_end > limit)) {
 			return t('EndBeforeStart');
+		}
+		if (d.area_ha !== undefined && !(d.area_ha > 0)) {
+			return t('InvalidValue', t('AreaHa'));
 		}
 		if (d.bbch && !/^\d{1,2}$/.test(d.bbch)) {
 			return t('InvalidValue', 'BBCH');
@@ -726,7 +741,7 @@ function viewForm(kind, planId, record) {
 			formRow(t('DateEnd'), h('input.search', { type: 'datetime-local', name: 'date_end', value: d.date_end || '' })),
 			formRow(t('Label'), h('input.search', { type: 'text', name: 'label', maxlength: 255, value: d.label || '' })),
 			formRow(t('DurationMin'), h('input.search', { type: 'number', name: 'duration_min', min: 0, step: 1, inputmode: 'numeric', value: d.duration_min || '' })),
-			formRow(t('AreaHa'), h('input.search', { type: 'number', name: 'area_ha', min: 0, step: 'any', inputmode: 'decimal', value: d.area_ha || (plot && plot.area_ha ? plot.area_ha : '') })),
+			formRow(t('AreaHa'), h('input.search', { type: 'text', name: 'area_ha', inputmode: 'decimal', autocomplete: 'off', value: d.area_ha || (plot && plot.area_ha ? plot.area_ha : '') })),
 			machines.length ? formRow(t('Machine'), select('machine_id', machines.map((m) => ({ value: m.id, label: [m.label, m.ref].filter(Boolean).join(' - ') })), d.machine_id, t('None'))) : null,
 			formRow(t('Bbch'), h('input.search', { type: 'text', name: 'bbch', maxlength: 2, inputmode: 'numeric', pattern: '[0-9]{1,2}', value: d.bbch || '' })),
 			formRow(t('Note'), h('textarea.search', { name: 'note', rows: 3, maxlength: 2000 }, d.note || '')),
@@ -735,7 +750,7 @@ function viewForm(kind, planId, record) {
 		const units = (state.data && state.data.units) || [];
 		fields = [
 			formRow(t('HarvestDate'), h('input.search', { type: 'date', name: 'date', value: d.date || nowLocal().slice(0, 10), required: true }), true),
-			formRow(t('Quantity'), h('input.search', { type: 'number', name: 'qty', min: 0, step: 'any', inputmode: 'decimal', value: d.qty || '', required: true }), true),
+			formRow(t('Quantity'), h('input.search', { type: 'text', name: 'qty', inputmode: 'decimal', autocomplete: 'off', value: d.qty || '', required: true }), true),
 			formRow(t('Unit'), select('unit', units.map((u) => ({ value: u.code, label: u.label + (u.label !== u.code ? ' (' + u.code + ')' : '') })), d.unit || (units.some((u) => u.code === 'kg') ? 'kg' : '')), true),
 			plan.product ? formRow(t('Product'), h('span.value', null, plan.product)) : null,
 			formRow(t('Label'), h('input.search', { type: 'text', name: 'label', maxlength: 255, value: d.label || '' })),
@@ -752,7 +767,7 @@ function viewForm(kind, planId, record) {
 			const data = { cropplan_id: plan.id };
 			for (const [k, v] of Object.entries(values)) {
 				if (v !== '') {
-					data[k] = (['duration_min', 'machine_id'].includes(k) ? parseInt(v, 10) : (['qty', 'area_ha'].includes(k) ? Number(v.replace(',', '.')) : v));
+					data[k] = (['duration_min', 'machine_id'].includes(k) ? parseInt(v, 10) : (['qty', 'area_ha'].includes(k) ? decimalValue(v) : v));
 				}
 			}
 			const problem = checkRecord(kind, data);

@@ -227,7 +227,7 @@ function dolitracePwaData($db, $user, $langs)
 	}
 	$data['units'] = array();
 	foreach (dolitraceUnitList($db) as $short => $unit) {
-		$data['units'][] = array('code' => (string) $short, 'label' => (string) $unit['label'], 'type' => (string) $unit['type']);
+		$data['units'][] = array('code' => (string) $short, 'label' => html_entity_decode((string) $unit['label'], ENT_QUOTES | ENT_HTML5, 'UTF-8'), 'type' => (string) $unit['type']);
 	}
 	$data['machines'] = array();
 	$sql = "SELECT m.rowid, m.ref, m.label, m.fk_soc FROM ".$prefix."dolifarm_machine as m";

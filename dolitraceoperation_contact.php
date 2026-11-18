@@ -92,8 +92,7 @@ $extrafields->fetch_name_optionals_label($object->table_element);
 include DOL_DOCUMENT_ROOT.'/core/actions_fetchobject.inc.php'; // Must be 'include', not 'include_once'. Include fetch and fetch_thirdparty but not fetch_optionals
 
 // There is several ways to check permission.
-// Set $enablepermissioncheck to 1 to enable a minimum low level of checks
-$enablepermissioncheck = getDolGlobalInt('DOLITRACE_ENABLE_PERMISSION_CHECK');
+$enablepermissioncheck = 1; // Always: the constant of ModuleBuilder, never set, left the pages open to every user
 if ($enablepermissioncheck) {
 	$permissiontoread = $user->hasRight('dolitrace', 'dolitraceoperation', 'read');
 	$permissiontoadd = $user->hasRight('dolitrace', 'dolitraceoperation', 'write');
