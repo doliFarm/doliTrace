@@ -18,8 +18,10 @@
  * Calls to the endpoint of doliTrace (ajax/pwa.php) with the session of Dolibarr
  */
 
+import { getLang } from './i18n.js';
+
 /** Version of the exchange known by this app (api of ajax/pwa.php) */
-export const API_VERSION = 1;
+export const API_VERSION = 2;
 
 const ENDPOINT = new URL('../ajax/pwa.php', self.location.href).href;
 
@@ -44,7 +46,8 @@ export class ApiError extends Error {
  * @returns {Promise<any>} Answer
  */
 async function call(action, options = {}) {
-	let url = ENDPOINT + '?action=' + encodeURIComponent(action);
+	// Language of the app: messages of the server in the same language
+	let url = ENDPOINT + '?action=' + encodeURIComponent(action) + '&lang=' + encodeURIComponent(getLang());
 	if (options.token) {
 		url += '&token=' + encodeURIComponent(options.token);
 	}

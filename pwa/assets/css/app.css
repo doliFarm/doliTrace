@@ -576,24 +576,110 @@ details.warnings summary {
 
 /* Weather of the plot and of the forms */
 .weather-days {
-	width: 100%;
-	border-collapse: collapse;
 	margin: 4px 0 8px;
 }
 
-.weather-days td {
-	padding: 4px 4px;
+.weather-day {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 2px 8px;
+	padding: 5px 0;
 	border-bottom: 1px solid var(--line);
-	white-space: nowrap;
 }
 
-.weather-days td.num {
-	text-align: right;
+.weather-date {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.weather-values {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 2px 12px;
+	margin-left: auto;
+	font-variant-numeric: tabular-nums;
+}
+
+.weather-values span {
+	white-space: nowrap;
 }
 
 .weather-icon {
 	width: 28px;
 	font-size: 20px;
+	text-align: center;
+}
+
+/* Home page: plots / production plans */
+.tabs {
+	display: flex;
+	gap: 4px;
+	margin: 16px 0 8px;
+	border-bottom: 2px solid var(--line);
+}
+
+.tab {
+	flex: 1 1 0;
+	padding: 10px 6px;
+	border: 0;
+	border-bottom: 3px solid transparent;
+	margin-bottom: -2px;
+	background: none;
+	color: var(--muted);
+	font: inherit;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.tab.active {
+	color: var(--accent);
+	border-bottom-color: var(--accent);
+}
+
+/* Small icons: update not done, records not sent */
+.status-icon {
+	display: inline-flex;
+	align-items: center;
+	padding: 2px 8px;
+	border: 0;
+	border-radius: 999px;
+	font: inherit;
+	font-size: 13px;
+	font-weight: 600;
+	text-decoration: none;
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.status-icon.warn {
+	background: var(--warn-bg);
+	color: var(--warn-text);
+}
+
+.status-icon.pending {
+	background: var(--warn-bg);
+	color: var(--warn-text);
+}
+
+.status-icon.err {
+	background: var(--error-bg);
+	color: var(--error-text);
+}
+
+.sync-icon {
+	display: inline-block;
+	margin-left: 6px;
+	color: var(--warn-text);
+	font-weight: 700;
+}
+
+.sync-icon.err {
+	color: var(--error-text);
+}
+
+.note.install .buttons {
+	margin-top: 8px;
 }
 
 .weather-form .item-sub {
@@ -660,6 +746,16 @@ details.warnings summary {
 	min-height: 44px;
 	margin: -8px -10px -8px auto;
 	color: var(--accent-text);
+}
+
+/* On the info page the "i" becomes X: a second tap closes the page */
+.topbar-info .icon-close,
+.topbar-info.open .icon-info {
+	display: none;
+}
+
+.topbar-info.open .icon-close {
+	display: block;
 }
 
 /* Info page */

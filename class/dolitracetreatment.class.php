@@ -29,6 +29,7 @@ dol_include_once('/dolitrace/lib/dolitrace_inspection.lib.php');
 dol_include_once('/dolifarm/lib/dolifarm_help.lib.php'); // Help texts by role (doliFarm >= 1.5.9)
 dol_include_once('/dolitrace/lib/dolitrace_treatment.lib.php');
 dol_include_once('/dolitrace/lib/dolitrace_weather.lib.php');
+dol_include_once('/dolitrace/lib/dolitrace_period.lib.php');
 //require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 //require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 
@@ -520,6 +521,12 @@ class DoliTraceTreatment extends CommonObject
 		}
 		if (empty($this->fk_dossier) && !empty($cropplan->fk_dossier)) {
 			$this->fk_dossier = (int) $cropplan->fk_dossier;
+		}
+		// Inside the period of the production plan
+		$period = dolitraceRecordPeriodError($this->db, (int) $this->fk_cropplan, $this->date_start, $this->date_end, true);
+		if ($period !== '') {
+			$this->error = $period;
+			return -1;
 		}
 		return 1;
 	}

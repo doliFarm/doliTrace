@@ -1,5 +1,15 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.5.9 (in sviluppo)
+
+Regole di coerenza e app di campo 1.7.0. Dopo l'aggiornamento **riattivare doliTrace** (colonne di `llx_dolitrace_pwa_receipt`, dizionario delle fasi fenologiche); richiede doliFarm 1.5.14.
+
+- Operazioni, trattamenti e raccolte devono avere la data nel periodo del piano di produzione (web, app, import); il piano non accetta una fine prima dell'inizio né date che lascerebbero fuori le sue registrazioni.
+- Piano di produzione: fascicoli e appezzamenti della sola azienda scelta, appezzamenti del fascicolo scelto; controllo al salvataggio.
+- Trattamento: fascicolo, piano, operatore e macchina dell'azienda scelta. Operazione: la macchina è un elenco delle macchine dell'azienda del piano (prima era un numero).
+- Dizionario "Fasi fenologiche (BBCH)", scala generale, creato e completato dal modulo all'attivazione; fase dell'operazione da elenco.
+- App 1.7.0 (API 2): lingua del telefono; "doliFarm" al posto di "Dolibarr"; la "i" diventa X e chiude l'info; meteo che non esce dal riquadro; durata calcolata da inizio e fine; date limitate al piano; tab Appezzamenti / Piani di produzione; ultime 5 registrazioni per tipo con "Vedi tutte" (anche i trattamenti); icone per aggiornamento non riuscito e registrazioni non inviate; modifica e cancellazione delle proprie bozze inviate dall'app finché restano bozze; banner di installazione; "Come funziona senza rete" nell'info; Indietro che torna al livello superiore e conferma prima di lasciare un modulo non salvato; con azienda singola niente nome dell'azienda nelle righe; macchine e operatori solo dell'azienda del piano, avviso per operatore senza patentino.
+
 ## 1.5.8 (2026-11-18)
 
 Menu. Dopo l'aggiornamento **riattivare doliTrace** (menu).

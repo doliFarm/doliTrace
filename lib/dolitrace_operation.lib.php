@@ -109,3 +109,58 @@ function dolitraceoperationPrepareHead($object)
 
 	return $head;
 }
+
+/**
+ * Print the script that keeps in the select of the machine only the machines of the farm of the chosen production plan
+ * (the plan can be a select or a hidden field). The class checks it again on save.
+ *
+ * @param	DoliDB	$db		Database
+ * @return	void
+ */
+function dolitraceOperationMachineFilter($db)
+{
+	$prefix = $db->prefix();
+	$planfarm = array();
+	$resql = $db->query("SELECT rowid, fk_soc FROM ".$prefix."dolitrace_cropplan WHERE entity IN (".getEntity('dolitracecropplan').")");
+	if ($resql) {
+		while ($obj = $db->fetch_object($resql)) {
+			$planfarm[(int) $obj->rowid] = (int) $obj->fk_soc;
+		}
+		$db->free($resql);
+	}
+	$machinefarm = array();
+	$resql = $db->query("SELECT rowid, fk_soc FROM ".$prefix."dolifarm_machine WHERE entity IN (".getEntity('dolifarmmachine').")");
+	if ($resql) {
+		while ($obj = $db->fetch_object($resql)) {
+			$machinefarm[(int) $obj->rowid] = (int) $obj->fk_soc;
+		}
+		$db->free($resql);
+	}
+	print '<script>
+	$(document).ready(function() {
+		var planFarm = '.json_encode((object) $planfarm).';
+		var machineFarm = '.json_encode((object) $machinefarm).';
+		var $machine = $("#fk_machine");
+		var $plan = $("select[name=fk_cropplan], input[name=fk_cropplan]").first();
+		if (!$machine.length || !$plan.length) {
+			return;
+		}
+		var allOptions = $machine.find("option").clone();
+		function filterMachines() {
+			var farm = planFarm[parseInt($plan.val(), 10) || 0] || 0;
+			var current = $machine.val();
+			$machine.empty();
+			allOptions.each(function() {
+				var id = parseInt(this.value, 10) || 0;
+				if (id <= 0 || (farm > 0 && machineFarm[id] === farm)) {
+					$machine.append($(this).clone());
+				}
+			});
+			$machine.val(parseInt(current, 10) > 0 && $machine.find("option[value=\'" + current + "\']").length ? current : "-1");
+			$machine.trigger("change");
+		}
+		$plan.on("change", filterMachines);
+		filterMachines();
+	});
+	</script>'."\n";
+}

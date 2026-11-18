@@ -259,21 +259,22 @@ class modDolitrace extends DolibarrModules
 		// Register of the treatments and fertilizations: adversities (EPPO codes) and units of dose
 		$this->dictionaries = array(
 			'langs' => 'dolitrace@dolitrace',
-			'tabname' => array('dolitrace_c_adversity', 'dolitrace_c_dose_unit', 'dolitrace_c_irrigation_method', 'dolitrace_c_application_method', 'dolitrace_c_justification'),
-			'tablib' => array('DictionaryAdversity', 'DictionaryDoseUnit', 'DictionaryIrrigationMethod', 'DictionaryApplicationMethod', 'DictionaryJustification'),
+			'tabname' => array('dolitrace_c_adversity', 'dolitrace_c_dose_unit', 'dolitrace_c_irrigation_method', 'dolitrace_c_application_method', 'dolitrace_c_justification', 'dolitrace_c_bbch'),
+			'tablib' => array('DictionaryAdversity', 'DictionaryDoseUnit', 'DictionaryIrrigationMethod', 'DictionaryApplicationMethod', 'DictionaryJustification', 'DictionaryBbch'),
 			'tabsql' => array(
 				'SELECT rowid, code, label, category, active, position FROM '.MAIN_DB_PREFIX.'dolitrace_c_adversity',
 				'SELECT rowid, code, label, kind, technical_type, basis, qty_unit, factor, active, position FROM '.MAIN_DB_PREFIX.'dolitrace_c_dose_unit',
 				'SELECT rowid, code, label, agea_value, active, position FROM '.MAIN_DB_PREFIX.'dolitrace_c_irrigation_method',
 				'SELECT rowid, code, label, kind, fert_group, agea_value, active, position FROM '.MAIN_DB_PREFIX.'dolitrace_c_application_method',
 				'SELECT rowid, code, label, active, position FROM '.MAIN_DB_PREFIX.'dolitrace_c_justification',
+				'SELECT rowid, code, label, active, position FROM '.MAIN_DB_PREFIX.'dolitrace_c_bbch',
 			),
-			'tabsqlsort' => array('position ASC, label ASC', 'position ASC, code ASC', 'position ASC, label ASC', 'kind ASC, position ASC, label ASC', 'position ASC, label ASC'),
-			'tabfield' => array('code,label,category,position', 'code,label,kind,technical_type,basis,qty_unit,factor,position', 'code,label,agea_value,position', 'code,label,kind,fert_group,agea_value,position', 'code,label,position'),
-			'tabfieldvalue' => array('code,label,category,position', 'code,label,kind,technical_type,basis,qty_unit,factor,position', 'code,label,agea_value,position', 'code,label,kind,fert_group,agea_value,position', 'code,label,position'),
-			'tabfieldinsert' => array('code,label,category,position', 'code,label,kind,technical_type,basis,qty_unit,factor,position', 'code,label,agea_value,position', 'code,label,kind,fert_group,agea_value,position', 'code,label,position'),
-			'tabrowid' => array('rowid', 'rowid', 'rowid', 'rowid', 'rowid'),
-			'tabcond' => array(isModEnabled('dolitrace'), isModEnabled('dolitrace'), isModEnabled('dolitrace'), isModEnabled('dolitrace'), isModEnabled('dolitrace')),
+			'tabsqlsort' => array('position ASC, label ASC', 'position ASC, code ASC', 'position ASC, label ASC', 'kind ASC, position ASC, label ASC', 'position ASC, label ASC', 'position ASC, code ASC'),
+			'tabfield' => array('code,label,category,position', 'code,label,kind,technical_type,basis,qty_unit,factor,position', 'code,label,agea_value,position', 'code,label,kind,fert_group,agea_value,position', 'code,label,position', 'code,label,position'),
+			'tabfieldvalue' => array('code,label,category,position', 'code,label,kind,technical_type,basis,qty_unit,factor,position', 'code,label,agea_value,position', 'code,label,kind,fert_group,agea_value,position', 'code,label,position', 'code,label,position'),
+			'tabfieldinsert' => array('code,label,category,position', 'code,label,kind,technical_type,basis,qty_unit,factor,position', 'code,label,agea_value,position', 'code,label,kind,fert_group,agea_value,position', 'code,label,position', 'code,label,position'),
+			'tabrowid' => array('rowid', 'rowid', 'rowid', 'rowid', 'rowid', 'rowid'),
+			'tabcond' => array(isModEnabled('dolitrace'), isModEnabled('dolitrace'), isModEnabled('dolitrace'), isModEnabled('dolitrace'), isModEnabled('dolitrace'), isModEnabled('dolitrace')),
 			'tabhelp' => array(
 				array('code' => $langs->trans('AdversityCodeHelp'), 'category' => $langs->trans('AdversityCategoryHelp')),
 				array('code' => $langs->trans('DoseUnitCodeHelp'), 'kind' => $langs->trans('DoseUnitKindHelp'), 'technical_type' => $langs->trans('DoseUnitTechnicalTypeHelp'),
@@ -281,6 +282,7 @@ class modDolitrace extends DolibarrModules
 				array('code' => $langs->trans('IrrigationMethodCodeHelp'), 'agea_value' => $langs->trans('AgeaValueHelp')),
 				array('code' => $langs->trans('ApplicationMethodCodeHelp'), 'kind' => $langs->trans('ApplicationMethodKindHelp'), 'fert_group' => $langs->trans('ApplicationMethodFertGroupHelp'), 'agea_value' => $langs->trans('AgeaValueHelp')),
 				array('code' => $langs->trans('JustificationCodeHelp')),
+				array('code' => $langs->trans('BbchCodeHelp')),
 			),
 		);
 		/* END MODULEBUILDER DICTIONARIES */
@@ -978,6 +980,12 @@ class modDolitrace extends DolibarrModules
 		}
 		$this->initProductionWarehouse();
 		$this->initHarvestUuids();
+		// Growth stages: general BBCH scale (the codes changed or disabled in the dictionary are kept)
+		dol_include_once('/dolitrace/lib/dolitrace_bbch.lib.php');
+		if (dolitraceBbchInitDictionary($this->db, $langs) < 0) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
 
 		return $this->_init($sql, $options);
 	}

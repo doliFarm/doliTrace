@@ -113,14 +113,17 @@ export function weatherCard(h, W, plotId) {
 	const windows = (st.windows || []).filter((w) => w[1] > now).map((w) => [Math.max(w[0], Math.floor(now / 3600) * 3600), w[1]]).filter((w) => w[1] - w[0] >= 3600);
 	return h('div.card.weather', null,
 		h('div.card-title', null, t('Weather')),
+		// One day per line; on narrow phones the values go under the day (they never go out of the card)
 		days.length
-			? h('table.weather-days', null, h('tbody', null, days.map((d) => h('tr', null,
-				h('td.weather-icon', null, symbolIcon(d.symbol)),
-				h('td', null, dayLabel(d.date)),
-				h('td.num', null, n(d.tmin, 0) + '° / ' + n(d.tmax, 0) + '°'),
-				h('td.num', null, '💧 ' + n(d.precip) + ' mm'),
-				h('td.num', null, '💨 ' + n(d.wind_max) + ' m/s'),
-			))))
+			? h('div.weather-days', null, days.map((d) => h('div.weather-day', null,
+				h('span.weather-icon', { 'aria-hidden': 'true' }, symbolIcon(d.symbol)),
+				h('span.weather-date', null, dayLabel(d.date)),
+				h('span.weather-values', null,
+					h('span', null, n(d.tmin, 0) + '° / ' + n(d.tmax, 0) + '°'),
+					h('span', null, '💧 ' + n(d.precip) + ' mm'),
+					h('span', null, '💨 ' + n(d.wind_max) + ' m/s'),
+				),
+			)))
 			: h('p.empty', null, t('WeatherNoForecast')),
 		h('h3', null, t('TreatmentWindows')),
 		windows.length

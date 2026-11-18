@@ -28,6 +28,7 @@ require_once DOL_DOCUMENT_ROOT.'/core/class/commonobject.class.php';
 dol_include_once('/dolitrace/lib/dolitrace_inspection.lib.php');
 dol_include_once('/dolifarm/lib/dolifarm_help.lib.php'); // Help texts by role (doliFarm >= 1.5.9)
 dol_include_once('/dolitrace/lib/dolitrace_weather.lib.php');
+dol_include_once('/dolitrace/lib/dolitrace_period.lib.php');
 //require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 //require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 
@@ -355,8 +356,19 @@ class DoliTraceOperation extends CommonObject
 		$this->picto = dolifarm_get_fa_icon('operation');
 		// Drop-down lists only with the farms the user can see (doliFarm >= 1.3.1)
 		dol_include_once('/dolifarm/lib/dolifarm_access.lib.php');
+		// Growth stage from the BBCH dictionary
+		if (dol_include_once('/dolitrace/lib/dolitrace_bbch.lib.php')) {
+			foreach (dolitraceBbchList($db, $langs) as $code => $label) {
+				if (strlen($code) <= 2) {
+					$this->fields['fk_pheno_stage']['arrayofkeyval'][$code] = $code.' - '.$label;
+				}
+			}
+		}
+		// Machine from the list of the machines in use (the card keeps those of the farm of the plan)
+		$this->fields['fk_machine']['type'] = 'integer:DoliFarmMachine:dolifarm/class/dolifarmmachine.class.php:0:(t.status:=:1)';
+		$this->fields['fk_machine']['picto'] = 'fa-tractor';
 		if (function_exists('dolifarmRestrictLinkFields')) {
-			dolifarmRestrictLinkFields($this, array('fk_cropplan', 'fk_treatment'));
+			dolifarmRestrictLinkFields($this, array('fk_cropplan', 'fk_treatment', 'fk_machine'));
 		}
 
 		if (!getDolGlobalInt('MAIN_SHOW_TECHNICAL_ID') && isset($this->fields['rowid']) && !empty($this->fields['ref'])) {
@@ -1007,6 +1019,24 @@ class DoliTraceOperation extends CommonObject
 		if (!empty($start) && !empty($end) && $end < $start) {
 			$this->error = $langs->trans('ErrorOperationDateEnd');
 			return -1;
+		}
+		// Inside the period of the production plan
+		$period = dolitraceRecordPeriodError($this->db, (int) $this->fk_cropplan, $start, $end, true);
+		if ($period !== '') {
+			$this->error = $period;
+			return -1;
+		}
+		// Machine of the farm of the plan
+		if ((int) $this->fk_machine > 0 && (int) $this->fk_cropplan > 0) {
+			$resql = $this->db->query("SELECT m.fk_soc as machinefarm, cp.fk_soc as planfarm FROM ".$this->db->prefix()."dolifarm_machine as m, ".$this->db->prefix()."dolitrace_cropplan as cp WHERE m.rowid = ".((int) $this->fk_machine)." AND cp.rowid = ".((int) $this->fk_cropplan));
+			$obj = ($resql ? $this->db->fetch_object($resql) : null);
+			if (!$obj || (int) $obj->machinefarm != (int) $obj->planfarm) {
+				$this->error = $langs->trans('ErrorOperationMachineFarm');
+				return -1;
+			}
+		}
+		if ((int) $this->fk_machine <= 0) {
+			$this->fk_machine = null;
 		}
 		// BBCH code: two digits, the first is the main stage
 		$this->fk_pheno_stage = trim((string) $this->fk_pheno_stage);

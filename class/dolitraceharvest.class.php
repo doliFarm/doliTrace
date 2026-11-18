@@ -26,6 +26,7 @@
 // Put here all includes required by your class file
 require_once DOL_DOCUMENT_ROOT.'/core/class/commonobject.class.php';
 dol_include_once('/dolitrace/lib/dolitrace_inspection.lib.php');
+dol_include_once('/dolitrace/lib/dolitrace_period.lib.php');
 dol_include_once('/dolifarm/lib/dolifarm_help.lib.php'); // Help texts by role (doliFarm >= 1.5.9)
 //require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 //require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
@@ -325,6 +326,12 @@ class DoliTraceHarvest extends CommonObject
         if (dolitraceFrozenCheck($this) < 0) {
             return -1;
         }
+        // Inside the period of the production plan
+        $period = dolitraceRecordPeriodError($this->db, (int) $this->fk_cropplan, $this->date_harvest, null, false);
+        if ($period !== '') {
+            $this->error = $period;
+            return -1;
+        }
         // status is not in the create form: without it createCommon() stores NULL
         if ($this->status === null || $this->status === '') {
             $this->status = self::STATUS_DRAFT;
@@ -574,6 +581,12 @@ class DoliTraceHarvest extends CommonObject
     {
         // Registers frozen by a closed inspection of the organic control body
         if (dolitraceFrozenCheck($this) < 0) {
+            return -1;
+        }
+        // Inside the period of the production plan
+        $period = dolitraceRecordPeriodError($this->db, (int) $this->fk_cropplan, $this->date_harvest, null, false);
+        if ($period !== '') {
+            $this->error = $period;
             return -1;
         }
         return $this->updateCommon($user, $notrigger);

@@ -20,6 +20,8 @@
  * the server returns the draft already created (no duplicates).
  *
  * Record: {client_id, kind: operation|harvest|treatment, user_id, created_at, data, status: pending|error, error, message}
+ * A change or the deletion of a draft sent before (API 2) has the same client_id, op: update|delete, base (time of
+ * the last change of the draft downloaded) and revision (identifier of the change, applied once).
  */
 
 import { queueAll, queuePut, queueDelete, kvGet, kvSet } from './store.js';
@@ -76,7 +78,7 @@ export async function sendQueue(session, withErrors) {
 	const done = await loadSent();
 	for (let i = 0; i < todo.length; i += BATCH) {
 		const batch = todo.slice(i, i + BATCH);
-		const payload = batch.map((r) => ({ client_id: r.client_id, kind: r.kind, created_at: r.created_at, data: r.data }));
+		const payload = batch.map((r) => ({ client_id: r.client_id, kind: r.kind, created_at: r.created_at, data: r.data, op: r.op || 'create', base: r.base || 0, revision: r.revision || r.client_id }));
 		let answer;
 		try {
 			answer = await sendRecords(payload, session.token);
@@ -98,7 +100,7 @@ export async function sendQueue(session, withErrors) {
 				await queueDelete(record.client_id);
 				// Treatments: warnings of the register computed by the server
 				const warnings = Array.isArray(result.warnings) ? result.warnings : [];
-				done.unshift({ client_id: record.client_id, kind: record.kind, id: result.id, ref: result.ref, url: result.url, label: record.summary || '', warnings, sent_at: new Date().toISOString() });
+				done.unshift({ client_id: record.client_id, kind: record.kind, op: record.op || 'create', id: result.id, ref: result.ref || record.ref || '', url: result.deleted ? '' : result.url, label: record.summary || '', warnings, sent_at: new Date().toISOString() });
 				sent++;
 				warned += (warnings.length ? 1 : 0);
 			} else {

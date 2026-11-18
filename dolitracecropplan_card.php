@@ -365,6 +365,8 @@ if ($action == 'create') {
         // Sovrascriviamo definizione (=) per evitare errori di sintassi
         $filter_plot_dynamic = "(fk_soc:=:" . ((int)$object->fk_soc) . ") AND (status:=:1)";
         $object->fields['fk_plot']['type'] = "integer:DoliFarmPlot:dolifarm/class/dolifarmplot.class.php:1:" . $filter_plot_dynamic;
+        // Dossiers of the farm only
+        $object->fields['fk_dossier']['type'] = "integer:DoliFarmFarmDossier:dolifarm/class/dolifarmfarmdossier.class.php:1:(fk_soc:=:".((int) $object->fk_soc).")";
     } 
 
     // -------------------------------------------------------------------------
@@ -374,6 +376,10 @@ if ($action == 'create') {
 
     // Common attributes
     include DOL_DOCUMENT_ROOT.'/core/tpl/commonfields_add.tpl.php';
+    // Plots of the chosen dossier
+    if (dol_include_once('/dolifarm/lib/dolifarm_fields.lib.php') && function_exists('dolifarmPrintThirdpartyFilter')) {
+        dolifarmPrintThirdpartyFilter('fk_plot', 'dolifarm_plot', 'dolifarmplot', true, 'fk_dossier', 'fk_dossier');
+    }
 
     // Other attributes
     include DOL_DOCUMENT_ROOT.'/core/tpl/extrafields_add.tpl.php';
@@ -441,6 +447,8 @@ if (($id || $ref) && $action == 'edit') {
     if ($object->fk_soc > 0 && dolifarmUserCanSeeSoc($user, (int) $object->fk_soc)) {
         $filter_plot_dynamic = "(fk_soc:=:" . ((int)$object->fk_soc) . ") AND (status:=:1)";
         $object->fields['fk_plot']['type'] = "integer:DoliFarmPlot:dolifarm/class/dolifarmplot.class.php:1:" . $filter_plot_dynamic;
+        // Dossiers of the farm only
+        $object->fields['fk_dossier']['type'] = "integer:DoliFarmFarmDossier:dolifarm/class/dolifarmfarmdossier.class.php:1:(fk_soc:=:".((int) $object->fk_soc).")";
     } else {
         $object->fields['fk_plot']['type'] = "integer:DoliFarmPlot:dolifarm/class/dolifarmplot.class.php:1:(rowid:=:-1)";
     }
@@ -470,6 +478,10 @@ if (($id || $ref) && $action == 'edit') {
 
     // Common attributes
     include DOL_DOCUMENT_ROOT.'/core/tpl/commonfields_edit.tpl.php';
+    // Plots of the chosen dossier
+    if (dol_include_once('/dolifarm/lib/dolifarm_fields.lib.php') && function_exists('dolifarmPrintThirdpartyFilter')) {
+        dolifarmPrintThirdpartyFilter('fk_plot', 'dolifarm_plot', 'dolifarmplot', true, 'fk_dossier', 'fk_dossier');
+    }
 
     // Other attributes
     include DOL_DOCUMENT_ROOT.'/core/tpl/extrafields_edit.tpl.php';
