@@ -27,7 +27,7 @@ import { MAX_PHOTOS, reducePhoto, newPhoto, loadPhotos, removePhoto, savePhotos,
 import { treatmentFields, checkTreatment, treatmentSummary } from './treatment.js';
 import { weatherCard, formWeather } from './weather.js';
 
-export const APP_VERSION = '1.4.0';
+export const APP_VERSION = '1.4.1';
 
 /** Days without update after which the app warns (Safari deletes the data of the apps not used for about 7 days) */
 const OLD_DATA_DAYS = 5;
@@ -151,18 +151,32 @@ function findPlotByRef(ref) {
 	return plots().find((p) => String(p.ref).toUpperCase() === key) || null;
 }
 
-/** Reference of a plot read from a QR code: address of the card (?ref=...) or the reference itself */
+/**
+ * Plot read from a QR code: address of the card of the plot (sign: ?ref=..., card and PDF sheet: ?id=...) or the
+ * reference itself. Returns the reference (empty when the plot of an ?id= is not in the data of the phone) and the
+ * address, when the QR code is one, to open the card online.
+ */
 function refFromQr(text) {
 	const value = String(text || '').trim();
+	let url = null;
 	try {
-		const ref = new URL(value).searchParams.get('ref');
-		if (ref) {
-			return ref;
-		}
+		url = new URL(value);
 	} catch (e) {
-		// not an address
+		return { ref: value, url: '' };
 	}
-	return value;
+	if (!/^https?:$/.test(url.protocol)) {
+		return { ref: value, url: '' };
+	}
+	const ref = url.searchParams.get('ref');
+	if (ref) {
+		return { ref: ref, url: value };
+	}
+	const id = parseInt(url.searchParams.get('id') || '', 10);
+	if (id > 0 && /dolifarmplot_card\.php$/.test(url.pathname)) {
+		const plot = plots().find((p) => Number(p.id) === id);
+		return { ref: plot ? String(plot.ref) : '', url: value };
+	}
+	return { ref: '', url: value };
 }
 
 function daysSince(iso) {
@@ -368,7 +382,11 @@ function viewHome() {
 		},
 	});
 	fill();
+	// Samsung Internet installs the app as an Android package that Play Protect flags as made for an old Android
+	// version: the installation is to be done with Chrome
+	const standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
 	show(
+		(/SamsungBrowser/i.test(navigator.userAgent) && !standalone) ? h('p.note.warn', null, t('InstallWithChrome')) : null,
 		h('div.actions', null,
 			h('a.btn.big', { href: '#/scan' }, h('span.icon.qr', { 'aria-hidden': 'true' }), t('ScanQr')),
 			h('a.btn.big', { href: '#/near' }, h('span.icon.pin', { 'aria-hidden': 'true' }), t('NearMe')),
@@ -496,12 +514,28 @@ function viewScan() {
 	const message = h('p.empty');
 	const video = h('video.scanner', { playsinline: true, muted: true, autoplay: true });
 	const input = h('input.search', { type: 'text', placeholder: t('TypeRef'), autocomplete: 'off', autocapitalize: 'characters', 'aria-label': t('TypeRef') });
+	// Plot of a QR code or of the typed reference: the reference goes in the field, the card opens when the plot is
+	// in the data of the phone, else the message says so with the link to the card online (when the QR is an address)
+	const openRead = (text) => {
+		const read = refFromQr(text);
+		if (read.ref) {
+			input.value = read.ref;
+		}
+		if (read.ref && openRef(read.ref)) {
+			return true;
+		}
+		message.replaceChildren(
+			t('PlotNotFound', read.ref || read.url || String(text || '').trim()),
+			read.url ? h('br') : null,
+			read.url ? h('a', { href: read.url, target: '_blank', rel: 'noopener' }, t('OpenCardOnline')) : null
+		);
+		return false;
+	};
 	const form = h('form.inline', {
 		onsubmit: (e) => {
 			e.preventDefault();
-			const ref = refFromQr(input.value);
-			if (ref && !openRef(ref)) {
-				message.textContent = t('PlotNotFound', ref);
+			if (input.value.trim()) {
+				openRead(input.value);
 			}
 		},
 	}, input, h('button.btn', { type: 'submit' }, t('Open')));
@@ -528,6 +562,7 @@ function viewScan() {
 			return;
 		}
 		video.srcObject = s;
+		let lastText = '';
 		const tick = async () => {
 			if (stopped) {
 				return;
@@ -535,15 +570,15 @@ function viewScan() {
 			try {
 				if (video.readyState >= 2) {
 					const text = await read();
-					if (text) {
-						const ref = refFromQr(text);
+					// the same QR code stays in front of the camera: read it once
+					if (text && text !== lastText) {
+						lastText = text;
 						if (navigator.vibrate) {
 							navigator.vibrate(80);
 						}
-						if (openRef(ref)) {
+						if (openRead(text)) {
 							return;
 						}
-						message.textContent = t('PlotNotFound', ref);
 					}
 				}
 			} catch (e) {

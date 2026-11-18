@@ -79,7 +79,7 @@ class modDolitrace extends DolibarrModules
 		$this->editor_squarred_logo = '';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@dolitrace'
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = '1.5.4';
+		$this->version = '1.5.5';
 		// Url to the file with your last numberversion of this module
 		//$this->url_last_version = 'http://www.example.com/versionmodule.txt';
 
@@ -439,7 +439,7 @@ class modDolitrace extends DolibarrModules
 			'leftmenu' => '',
 			'url' => '/dolitrace/dolitraceindex.php',
 			'langs' => 'dolitrace@dolitrace', // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
-			'position' => 1000 + $r,
+			'position' => 1002,	// Top menu of the suite: Farm dossiers (1001), Field notebook (1002), Field of doliField (1003)
 			'enabled' => "isModEnabled('dolitrace')", // Define condition to show or hide menu entry. Use "isModEnabled('dolitrace')" if entry must be visible if module is enabled (those quote marks are importants).
 			'perms' => '1', // Use 'perms'=>'$user->hasRight("dolitrace", "dolitraceharvest", "read")' if you want your menu with a permission rules
 			'target' => '',
@@ -747,7 +747,7 @@ class modDolitrace extends DolibarrModules
 			'target' => '',
 			'user' => 2,
 		);
-		// Field app (PWA) for the phone: page with the QR code of the app and how to install it
+		// Field app (PWA) for the phone, at the bottom of the left menu of the three modules of the suite (before "Help me")
 		$this->menu[$r++] = array(
 			'fk_menu' => 'fk_mainmenu=dolitrace',
 			'type' => 'left',
@@ -757,11 +757,27 @@ class modDolitrace extends DolibarrModules
 			'leftmenu' => 'dolitrace_pwa',
 			'url' => '/dolitrace/dolitrace_pwa.php',
 			'langs' => 'dolitrace@dolitrace',
-			'position' => 1000 + $r,
-			'enabled' => 'isModEnabled("dolitrace")',
+			'position' => 9001,	// Bottom of the left menu, after a separator (dolifarm/css/dolifarm.css); one position for each module (unique key of llx_menu)
+			'enabled' => 'isModEnabled("dolitrace") && isModEnabled("dolifarm")',
 			'perms' => '$user->hasRight("dolitrace", "dolitracepwa", "use") || $user->hasRight("dolitrace", "dolitraceoperation", "write") || $user->hasRight("dolitrace", "dolitraceharvest", "write")',
 			'target' => '',
 			'user' => 2,
+		);
+		// "Help me" (getting started of doliFarm): last entry of the left menu of the three modules of the suite
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolitrace',
+			'type' => 'left',
+			'titre' => 'StartTitle',
+			'prefix' => img_picto('', 'fa-question-circle', 'class="paddingright pictofixedwidth valignmiddle"'),
+			'mainmenu' => 'dolitrace',
+			'leftmenu' => 'dolifarm_start',
+			'url' => '/dolifarm/dolifarm_start.php',
+			'langs' => 'dolifarm@dolifarm',
+			'position' => 9011,	// Last entry of the left menu; one position for each module (unique key of llx_menu)
+			'enabled' => 'isModEnabled("dolifarm")',
+			'perms' => '1',
+			'target' => '',
+			'user' => 0,
 		);
 		/* END MODULEBUILDER LEFTMENU DOLITRACETREATMENT */
 		/* BEGIN MODULEBUILDER LEFTMENU MYOBJECT */
