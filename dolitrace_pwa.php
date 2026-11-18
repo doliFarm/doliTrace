@@ -59,6 +59,7 @@ if (!$res) {
  * @var User $user
  */
 dol_include_once('/dolitrace/lib/dolitrace_pwa.lib.php');
+dol_include_once('/dolifarm/lib/dolifarm_help.lib.php'); // Help texts by role (doliFarm >= 1.5.9)
 
 $langs->loadLangs(array('dolitrace@dolitrace'));
 
@@ -92,7 +93,7 @@ print '</ul>';
 print '<p class="opacitymedium">'.$langs->trans('PwaPrivacy').'</p>';
 // Service worker, camera and position need https (localhost excepted)
 if (!preg_match('/^https:/i', $appurl) && !preg_match('/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i', $appurl)) {
-	print info_admin($langs->trans('PwaNeedsHttps'), 0, 0, 'warning');
+	print info_admin($langs->trans((function_exists('dolifarmHelpKey') ? dolifarmHelpKey('PwaNeedsHttps') : 'PwaNeedsHttps')), 0, 0, 'warning');
 }
 print '<div class="center"><a class="butAction" href="'.dol_escape_htmltag($appurl).'" target="_blank" rel="noopener">'.img_picto('', 'fa-external-link-alt', 'class="pictofixedwidth"').$langs->trans('PwaOpen').'</a></div>';
 print '</div><div class="fichehalfright"><div class="center">';

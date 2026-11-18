@@ -26,6 +26,7 @@
 // Put here all includes required by your class file
 require_once DOL_DOCUMENT_ROOT.'/core/class/commonobject.class.php';
 dol_include_once('/dolitrace/lib/dolitrace_inspection.lib.php');
+dol_include_once('/dolifarm/lib/dolifarm_help.lib.php'); // Help texts by role (doliFarm >= 1.5.9)
 dol_include_once('/dolitrace/lib/dolitrace_treatment.lib.php');
 dol_include_once('/dolitrace/lib/dolitrace_weather.lib.php');
 //require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
@@ -2337,7 +2338,7 @@ class DoliTraceTreatment extends CommonObject
 			if (!$reverse) {
 				$rowwarehouse = $warehouseid;
 				if ($warehouseid <= 0) {
-					$error = $langs->transnoentitiesnoconv('ErrorTreatmentNoWarehouse');
+					$error = $langs->transnoentitiesnoconv((function_exists('dolifarmHelpKey') ? dolifarmHelpKey('ErrorTreatmentNoWarehouse') : 'ErrorTreatmentNoWarehouse'));
 				} elseif (!($product->qty_total > 0)) {
 					$error = $langs->transnoentitiesnoconv('ErrorTreatmentQtyTotal', $product->product_label);
 				} elseif ($prod->hasbatch() && $batch === '') {

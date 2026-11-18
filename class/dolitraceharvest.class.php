@@ -26,6 +26,7 @@
 // Put here all includes required by your class file
 require_once DOL_DOCUMENT_ROOT.'/core/class/commonobject.class.php';
 dol_include_once('/dolitrace/lib/dolitrace_inspection.lib.php');
+dol_include_once('/dolifarm/lib/dolifarm_help.lib.php'); // Help texts by role (doliFarm >= 1.5.9)
 //require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 //require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 
@@ -258,6 +259,7 @@ class DoliTraceHarvest extends CommonObject
 		// Units of the quantity: dictionary "Units" of Dolibarr (labels already translated)
 		dol_include_once('/dolitrace/lib/dolitrace_units.lib.php');
 		$this->fields['qty_unit']['arrayofkeyval'] = dolitraceUnitOptions($this->db);
+		$this->fields['qty_unit']['help'] = (function_exists('dolifarmHelpKey') ? dolifarmHelpKey('HarvestUnitHelp') : 'HarvestUnitHelp');
 
         if (!getDolGlobalInt('MAIN_SHOW_TECHNICAL_ID') && isset($this->fields['rowid']) && !empty($this->fields['ref'])) {
             $this->fields['rowid']['visible'] = 0;

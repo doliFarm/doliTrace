@@ -207,7 +207,8 @@ OperationStockMovement = Stock movement
 OperationStockTaken = Sowing %s: seed taken out
 OperationStockReversal = Reversal of sowing %s
 OperationStockStillToRegularize = The seed is still to regularize: correct the stock or the lot and try again
-ErrorTreatmentNoWarehouse = No inputs warehouse for the farm: set it in the farm dossier or in the doliFarm setup
+ErrorTreatmentNoWarehouse = No inputs warehouse for the farm: set it in the farm dossier
+ErrorTreatmentNoWarehouseAdmin = No inputs warehouse for the farm: set it in the farm dossier or in the doliFarm setup
 ErrorTreatmentBatchRequired = The product is managed by lots: give the lot
 ErrorTreatmentStockMovement = Stock movement failed
 ErrorTreatmentStockUnit = The unit of the product %s (%s) cannot be converted from the unit of the record (%s): kg and t need a weight unit on the product, l and m³ a volume unit (no conversion between weight and volume)
@@ -606,7 +607,8 @@ ErrorHarvestLotSuffixStatus = The lot %s is a lot of %s product: a %s harvest go
 HarvestLotHarvest = 1 harvest
 
 # Units of the harvests
-HarvestUnitHelp = Unit of the Dolibarr dictionary "Units" (Setup > Dictionaries), where more units can be added. The unit of the product is proposed: q and t are converted into kg, hl into L for the stock; a unit that cannot be converted (e.g. crates for a product in kg) is refused at validation.
+HarvestUnitHelp = The unit of the product is proposed: q and t are converted into kg, hl into L for the stock; a unit that cannot be converted (e.g. crates for a product in kg) is refused at validation.
+HarvestUnitHelpAdmin = The unit of the product is proposed: q and t are converted into kg, hl into L for the stock; a unit that cannot be converted (e.g. crates for a product in kg) is refused at validation. More units in Setup > Dictionaries > Units.
 ErrorHarvestUnitNotConvertible = The quantity is in "%s" but the product is stocked in "%s": give the quantity in a convertible unit (same type, weight or volume) or change the unit of the product.
 
 # Costs of the production plans
@@ -702,7 +704,8 @@ DOLITRACE_PUBLIC_MAPHelp = Shows where the plot is on an OpenStreetMap map (load
 DolitracePublicStory = Story (public page)
 DolitracePublicStoryHelp = Text published on the traceability page opened by the QR code on the label (doliTrace)
 TracePublicLink = Public page
-TracePublicDisabled = Public page not enabled: the QR code opens the internal page (setup of doliTrace)
+TracePublicDisabled = Public page not enabled: the QR code opens the internal page
+TracePublicDisabledAdmin = Public page not enabled: the QR code opens the internal page (enable it in the setup of doliTrace)
 TraceLabels = QR labels
 TraceLabelsTitle = Labels with QR code - harvest %s
 TraceLabelsHelp = PDF to print on A4 sheets of adhesive labels. The QR code opens the public page of the harvest, or the internal one if the public page is not enabled. The mandatory label statements (organic, origin, ...) remain the responsibility of the farm
@@ -767,7 +770,8 @@ PwaInstall = Installation
 PwaInstallAndroid = Android (Chrome): open the app, log in, then menu ⋮ → "Install app" or "Add to Home screen".
 PwaInstalliPhone = iPhone (Safari): open the app, log in, then Share → "Add to Home Screen". Open it at least once a week: Safari deletes the data of the apps not used for about 7 days.
 PwaPrivacy = The downloaded data stay on the phone until they are deleted from the app (at the bottom of the start page). If another user logs in from the same phone, the data of the previous one are deleted.
-PwaNeedsHttps = The field app needs an https address: without it, the phone does not install it and does not use the camera and the position.
+PwaNeedsHttps = The field app does not work on this address (https is needed): tell the administrator.
+PwaNeedsHttpsAdmin = The field app needs an https address: without it, the phone does not install it and does not use the camera and the position.
 PwaOpen = Open the field app
 PwaQrHelp = Frame it with the phone to open the app
 PwaErrorForbidden = You are not allowed to use the field app

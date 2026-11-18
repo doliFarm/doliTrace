@@ -272,7 +272,8 @@ OperationStockMovement = Movimento di magazzino
 OperationStockTaken = Semina %s: scarico del seme
 OperationStockReversal = Storno semina %s
 OperationStockStillToRegularize = Il seme è ancora da regolarizzare: correggi la giacenza o il lotto e riprova
-ErrorTreatmentNoWarehouse = Nessun magazzino mezzi tecnici per l'azienda: indicarlo nel fascicolo aziendale o nelle impostazioni di doliFarm
+ErrorTreatmentNoWarehouse = Nessun magazzino mezzi tecnici per l'azienda: indicarlo nel fascicolo aziendale
+ErrorTreatmentNoWarehouseAdmin = Nessun magazzino mezzi tecnici per l'azienda: indicarlo nel fascicolo aziendale o nelle impostazioni di doliFarm
 ErrorTreatmentBatchRequired = Il prodotto è gestito a lotti: indicare il lotto
 ErrorTreatmentStockMovement = Movimento di magazzino non riuscito
 ErrorTreatmentStockUnit = L'unità del prodotto %s (%s) non è convertibile dall'unità della registrazione (%s): per kg e t serve sul prodotto un'unità di peso, per l e m³ un'unità di volume (non c'è conversione tra peso e volume)
@@ -617,7 +618,8 @@ ErrorHarvestLotSuffixStatus = Il lotto %s è un lotto di prodotto %s: una raccol
 HarvestLotHarvest = 1 raccolta
 
 # Units of the harvests
-HarvestUnitHelp = Unità del dizionario "Unità" di Dolibarr (Impostazioni > Dizionari), dove si possono aggiungere altre unità. Viene proposta l'unità del prodotto: q e t si convertono in kg, hl in L per il magazzino; un'unità non convertibile (es. cassette per un prodotto in kg) è rifiutata alla convalida.
+HarvestUnitHelp = Viene proposta l'unità del prodotto: q e t si convertono in kg, hl in L per il magazzino; un'unità non convertibile (es. cassette per un prodotto in kg) è rifiutata alla convalida.
+HarvestUnitHelpAdmin = Viene proposta l'unità del prodotto: q e t si convertono in kg, hl in L per il magazzino; un'unità non convertibile (es. cassette per un prodotto in kg) è rifiutata alla convalida. Altre unità in Impostazioni > Dizionari > Unità.
 ErrorHarvestUnitNotConvertible = La quantità è in "%s" ma il prodotto è a magazzino in "%s": indicare la quantità in un'unità convertibile (stesso tipo, peso o volume) o cambiare l'unità del prodotto.
 
 # Costs of the production plans
@@ -713,7 +715,8 @@ DOLITRACE_PUBLIC_MAPHelp = Mostra la posizione dell'appezzamento su una mappa Op
 DolitracePublicStory = Storia (pagina pubblica)
 DolitracePublicStoryHelp = Testo pubblicato nella pagina di tracciabilità aperta dal QR in etichetta (doliTrace)
 TracePublicLink = Pagina pubblica
-TracePublicDisabled = Pagina pubblica non attiva: il QR apre la pagina interna (setup di doliTrace)
+TracePublicDisabled = Pagina pubblica non attiva: il QR apre la pagina interna
+TracePublicDisabledAdmin = Pagina pubblica non attiva: il QR apre la pagina interna (si attiva nel setup di doliTrace)
 TraceLabels = Etichette QR
 TraceLabelsTitle = Etichette con QR - raccolta %s
 TraceLabelsHelp = PDF da stampare su fogli A4 di etichette adesive. Il QR apre la pagina pubblica della raccolta, o quella interna se la pagina pubblica non è attiva. Le diciture obbligatorie dell'etichetta (biologico, origine, ...) restano a cura dell'azienda
@@ -778,7 +781,8 @@ PwaInstall = Installazione
 PwaInstallAndroid = Android (Chrome): apri l'app, accedi, poi menu ⋮ → "Installa app" o "Aggiungi a schermata Home".
 PwaInstalliPhone = iPhone (Safari): apri l'app, accedi, poi Condividi → "Aggiungi alla schermata Home". Aprila almeno una volta alla settimana: Safari cancella i dati delle app non usate per circa 7 giorni.
 PwaPrivacy = I dati scaricati restano nel telefono finché non si cancellano dall'app (in fondo alla pagina iniziale). Se un altro utente accede dallo stesso telefono, i dati del precedente vengono cancellati.
-PwaNeedsHttps = L'app di campo richiede un indirizzo https: senza, il telefono non la installa e non usa fotocamera e posizione.
+PwaNeedsHttps = L'app di campo non funziona su questo indirizzo (serve https): avvisare l'amministratore.
+PwaNeedsHttpsAdmin = L'app di campo richiede un indirizzo https: senza, il telefono non la installa e non usa fotocamera e posizione.
 PwaOpen = Apri l'app di campo
 PwaQrHelp = Inquadra con il telefono per aprire l'app
 PwaErrorForbidden = Non hai il permesso di usare l'app di campo
