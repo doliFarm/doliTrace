@@ -1,10 +1,17 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-## 1.5.3 (in sviluppo)
+## 1.5.3 (2026-11-18)
 
-Foto dall'app di campo. Dopo l'aggiornamento **riattivare doliTrace**: lo script `sql/update_dolitrace_draft_ref.sql` sistema le bozze e l'indice dei documenti esistenti.
+Trattamenti e foto dall'app di campo. Dopo l'aggiornamento **riattivare doliTrace**: registra il nuovo permesso e lo script `sql/update_dolitrace_draft_ref.sql` sistema le bozze e l'indice dei documenti esistenti. Poi assegnare "Usare l'app di campo: bozze di trattamenti" a chi registra i trattamenti dal telefono.
 
-- App di campo 1.2.0: fino a 5 foto per operazione o raccolta, dalla fotocamera o dalla galleria. Le foto vengono ridotte sul telefono (lato lungo 1600 px, JPEG sotto 1 MB) e restano nel telefono finché non vengono inviate. Si inviano dopo la loro registrazione e arrivano nella scheda Documenti della bozza. Inviata due volte, una foto non si duplica. Con foto in attesa non si possono cancellare i dati del telefono.
+- App di campo 1.3.0: trattamenti fitosanitari e fertilizzazioni dal campo, come bozze sull'appezzamento del piano di produzione. Si indicano superficie, BBCH, operatore (proposto quello collegato all'utente), macchina, volume d'acqua e uno o più prodotti della stessa botte, ognuno con dose e unità, quantità totale (calcolata se lasciata vuota) e lotto.
+  - Prodotti: per i fitosanitari quelli autorizzati sulla coltura del piano, con "Mostra anche i prodotti non autorizzati". Avversità proposte dagli impieghi dell'etichetta, oppure scelte dal dizionario.
+  - Lotti: quelli del magazzino mezzi tecnici dell'azienda, con la giacenza al momento dello scaricamento. Il lotto resta modificabile in ufficio e la convalida controlla la giacenza vera.
+  - Avvisi sul telefono, anche senza rete: impiego non autorizzato su coltura o avversità, dose fuori etichetta o oltre la massima, prodotto revocato, sospeso o scaduto, non ammesso in biologico su un appezzamento bio, patentino o controllo della macchina scaduti, giacenza del lotto insufficiente. Non bloccano il salvataggio. Dopo l'invio l'app mostra gli avvisi completi del registro (gruppi FRAC, carenza, azoto, meteo).
+- Nuovo permesso "Usare l'app di campo: bozze di trattamenti", separato da quello di operazioni e raccolte: il trattamento entra nel registro. Chi ha la scrittura del registro può usare l'app anche senza.
+- Pagina "App di campo": elenco delle funzioni aggiornato; agli amministratori, i permessi da assegnare.
+- App: l'avviso "Nuova versione pronta" compare anche quando l'aggiornamento è stato scaricato mentre l'app era aperta in un'altra pagina.
+- App di campo 1.2.0 (foto): fino a 5 foto per operazione, raccolta o trattamento, dalla fotocamera o dalla galleria. Le foto vengono ridotte sul telefono (lato lungo 1600 px, JPEG sotto 1 MB) e restano nel telefono finché non vengono inviate. Si inviano dopo la loro registrazione e arrivano nella scheda Documenti della bozza. Inviata due volte, una foto non si duplica. Con foto in attesa non si possono cancellare i dati del telefono.
 - Server: nuova chiamata `photo` dell'endpoint dell'app. Accetta solo JPEG fino a 4 MB, solo su registrazioni inviate dall'app dallo stesso utente, al massimo 5 per registrazione.
 - Bozze di operazioni e raccolte: ricevono il riferimento provvisorio `(PROVid)` alla creazione, come gli altri oggetti di Dolibarr. Prima restavano senza riferimento e i loro documenti finivano in una cartella comune. Anche la copia di una registrazione nasce come bozza `(PROVid)` e non più come "Copy_Of_...".
 - Convalida di piani di produzione, operazioni, raccolte e trattamenti: l'indice dei documenti (`ecm_files`) restava sul percorso `(PROVid)` e i file non comparivano più nella scheda Documenti. Il modello di ModuleBuilder cercava il percorso senza la cartella del modulo. Ora l'indice segue la cartella rinominata.
