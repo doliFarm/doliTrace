@@ -35,6 +35,10 @@ define('DOLITRACE_PWA_API', 1);
 define('DOLITRACE_PWA_MAXBATCH', 50);
 /** Last operations and harvests kept by the phone for each crop plan */
 define('DOLITRACE_PWA_LASTRECORDS', 10);
+/** Photos of a record sent by the app */
+define('DOLITRACE_PWA_MAXPHOTOS', 5);
+/** Size of a photo (the app reduces them under 1 MB) */
+define('DOLITRACE_PWA_PHOTOSIZE', 4194304);
 
 /**
  * What the user can do with the field app
@@ -43,14 +47,16 @@ define('DOLITRACE_PWA_LASTRECORDS', 10);
  * operations and harvests; who has the write permission can use the app too.
  *
  * @param	User	$user	User
- * @return	array{use:bool,operation:bool,harvest:bool}
+ * @return	array{use:bool,operation:bool,harvest:bool,treatment:bool}
  */
 function dolitracePwaRights($user)
 {
 	$pwa = $user->hasRight('dolitrace', 'dolitracepwa', 'use');
 	$operation = ($pwa || $user->hasRight('dolitrace', 'dolitraceoperation', 'write'));
 	$harvest = ($pwa || $user->hasRight('dolitrace', 'dolitraceharvest', 'write'));
-	return array('use' => ($operation || $harvest), 'operation' => $operation, 'harvest' => $harvest);
+	// Treatments enter the register: a permission of their own (or the right to write them in the office)
+	$treatment = ($user->hasRight('dolitrace', 'dolitracepwa', 'treatment') || $user->hasRight('dolitrace', 'dolitracetreatment', 'write'));
+	return array('use' => ($operation || $harvest || $treatment), 'operation' => $operation, 'harvest' => $harvest, 'treatment' => $treatment);
 }
 
 /**
@@ -230,18 +236,24 @@ function dolitracePwaData($db, $user, $langs)
 		$data['units'][] = array('code' => (string) $short, 'label' => html_entity_decode((string) $unit['label'], ENT_QUOTES | ENT_HTML5, 'UTF-8'), 'type' => (string) $unit['type']);
 	}
 	$data['machines'] = array();
-	$sql = "SELECT m.rowid, m.ref, m.label, m.fk_soc FROM ".$prefix."dolifarm_machine as m";
+	$sql = "SELECT m.rowid, m.ref, m.label, m.fk_soc, m.date_sprayer_check_end FROM ".$prefix."dolifarm_machine as m";
 	$sql .= " WHERE m.entity IN (".getEntity('dolifarmmachine').") AND m.status = 1";
 	$sql .= dolifarmSqlSocFilter($user, 'm.fk_soc');
 	$sql .= " ORDER BY m.label, m.ref";
 	$resql = $db->query($sql);
 	if ($resql) {
 		while ($obj = $db->fetch_object($resql)) {
-			$data['machines'][] = array('id' => (int) $obj->rowid, 'ref' => (string) $obj->ref, 'label' => (string) $obj->label, 'farm_id' => (int) $obj->fk_soc);
+			$data['machines'][] = array('id' => (int) $obj->rowid, 'ref' => (string) $obj->ref, 'label' => (string) $obj->label, 'farm_id' => (int) $obj->fk_soc,
+				'check_end' => dolitracePwaDate($db->jdate($obj->date_sprayer_check_end)));
 		}
 		$db->free($resql);
 	}
 	$data['weather_available'] = (dol_include_once('/dolitrace/lib/dolitrace_weather.lib.php') && function_exists('dolitraceWeatherAvailable') && dolitraceWeatherAvailable());
+	// Treatments (phase P3): only for who can make their drafts
+	$rights = dolitracePwaRights($user);
+	if ($rights['treatment']) {
+		$data['treatment'] = dolitracePwaTreatmentData($db, $user, $langs);
+	}
 	return $data;
 }
 
@@ -264,13 +276,13 @@ function dolitracePwaResult($clientid, $error, $message = '', $more = array())
  *
  * @param	DoliDB	$db			Database handler
  * @param	string	$clientid	Identifier
- * @return	array{element:string,id:int}|null
+ * @return	array{element:string,id:int,user:int}|null
  */
 function dolitracePwaReceipt($db, $clientid)
 {
 	global $conf;
 
-	$sql = "SELECT element, fk_object FROM ".$db->prefix()."dolitrace_pwa_receipt";
+	$sql = "SELECT element, fk_object, fk_user FROM ".$db->prefix()."dolitrace_pwa_receipt";
 	$sql .= " WHERE entity = ".((int) $conf->entity)." AND client_id = '".$db->escape($clientid)."'";
 	$resql = $db->query($sql);
 	if (!$resql) {
@@ -279,7 +291,117 @@ function dolitracePwaReceipt($db, $clientid)
 	}
 	$obj = $db->fetch_object($resql);
 	$db->free($resql);
-	return ($obj ? array('element' => (string) $obj->element, 'id' => (int) $obj->fk_object) : null);
+	return ($obj ? array('element' => (string) $obj->element, 'id' => (int) $obj->fk_object, 'user' => (int) $obj->fk_user) : null);
+}
+
+/**
+ * Photo of a record sent by the app: added to the documents of the draft (tab Documents)
+ *
+ * POST multipart: record (identifier of the record on the phone), photo_id (identifier of the photo), created_at,
+ * photo (JPEG). Only on a record sent from the app by the same user; the same photo sent again is not added twice.
+ *
+ * @param	DoliDB		$db		Database handler
+ * @param	User		$user	User
+ * @param	Translate	$langs	Language
+ * @return	array<string,mixed>	Result (dolitracePwaResult), client_id = photo_id
+ */
+function dolitracePwaPhoto($db, $user, $langs)
+{
+	global $conf;
+
+	require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+
+	$photoid = GETPOST('photo_id', 'alphanohtml');
+	$recordid = GETPOST('record', 'alphanohtml');
+	if (!preg_match('/^[A-Za-z0-9_-]{8,64}$/', $photoid) || !preg_match('/^[A-Za-z0-9_-]{8,64}$/', $recordid)) {
+		return dolitracePwaResult('', 'client_id', $langs->transnoentities('PwaErrorClientId'));
+	}
+
+	// Sent again: already in the documents
+	$done = dolitracePwaReceipt($db, $photoid);
+	if ($done) {
+		if (strpos($done['element'], 'photo_') !== 0) {
+			return dolitracePwaResult($photoid, 'client_id', $langs->transnoentities('PwaErrorClientId'));
+		}
+		return dolitracePwaResult($photoid, '', '', array('duplicate' => true));
+	}
+
+	// The record: sent from the app by the same user
+	$receipt = dolitracePwaReceipt($db, $recordid);
+	if (!$receipt || !in_array($receipt['element'], array('operation', 'harvest', 'treatment')) || $receipt['user'] != (int) $user->id) {
+		return dolitracePwaResult($photoid, 'record', $langs->transnoentities('PwaErrorPhotoRecord'));
+	}
+	$kind = $receipt['element'];
+	$rights = dolitracePwaRights($user);
+	if (empty($rights[$kind])) {
+		return dolitracePwaResult($photoid, 'forbidden', $langs->transnoentities('PwaErrorForbidden'));
+	}
+	$class = dolitracePwaClass($kind);
+	$object = new $class($db);
+	if ($object->fetch($receipt['id']) <= 0 || (int) $object->status == $class::STATUS_CANCELED) {
+		return dolitracePwaResult($photoid, 'record', $langs->transnoentities('PwaErrorPhotoRecord'));
+	}
+
+	// The file: a JPEG made by the app
+	$file = (isset($_FILES['photo']) && is_array($_FILES['photo']) ? $_FILES['photo'] : null);
+	if (!$file || is_array($file['name']) || !empty($file['error']) || empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
+		return dolitracePwaResult($photoid, 'file', $langs->transnoentities('PwaErrorPhotoFile'));
+	}
+	if ((int) $file['size'] > DOLITRACE_PWA_PHOTOSIZE) {
+		return dolitracePwaResult($photoid, 'size', $langs->transnoentities('PwaErrorPhotoSize', dol_print_size(DOLITRACE_PWA_PHOTOSIZE)));
+	}
+	$info = @getimagesize($file['tmp_name']);
+	if (!is_array($info) || $info[2] !== IMAGETYPE_JPEG) {
+		return dolitracePwaResult($photoid, 'file', $langs->transnoentities('PwaErrorPhotoFile'));
+	}
+
+	// At most DOLITRACE_PWA_MAXPHOTOS photos for a record
+	$sql = "SELECT COUNT(rowid) as nb FROM ".$db->prefix()."dolitrace_pwa_receipt";
+	$sql .= " WHERE entity = ".((int) $conf->entity)." AND element = 'photo_".$db->escape($kind)."' AND fk_object = ".((int) $object->id);
+	$resql = $db->query($sql);
+	$obj = ($resql ? $db->fetch_object($resql) : null);
+	if (!$obj) {
+		dol_syslog(__FUNCTION__.' '.$db->lasterror(), LOG_ERR);
+		return dolitracePwaResult($photoid, 'create', $langs->transnoentities('Error'));
+	}
+	if ((int) $obj->nb >= DOLITRACE_PWA_MAXPHOTOS) {
+		return dolitracePwaResult($photoid, 'max', $langs->transnoentities('PwaErrorPhotoMax', DOLITRACE_PWA_MAXPHOTOS));
+	}
+
+	// Drafts of operations and harvests made before doliTrace 1.5.3 have no ref, the name of the directory of their
+	// documents (treatments have (PROVid) since their creation)
+	if (method_exists($object, 'setProvisionalRef')) {
+		$object->setProvisionalRef();
+	}
+	$made = dolitracePwaParseDate(GETPOST('created_at', 'alphanohtml'));
+
+	// Receipt first (unique identifier): two sendings of the same photo at the same time add it once
+	$db->begin();
+	$sql = "INSERT INTO ".$db->prefix()."dolitrace_pwa_receipt (entity, client_id, element, fk_object, fk_user, date_client, datec)";
+	$sql .= " VALUES (".((int) $conf->entity).", '".$db->escape($photoid)."', 'photo_".$db->escape($kind)."', ".((int) $object->id).", ".((int) $user->id).",";
+	$sql .= " ".($made ? "'".$db->idate($made)."'" : "NULL").", '".$db->idate(dol_now())."')";
+	if (!$db->query($sql)) {
+		$db->rollback();
+		$done = dolitracePwaReceipt($db, $photoid);
+		if ($done && strpos($done['element'], 'photo_') === 0) {
+			return dolitracePwaResult($photoid, '', '', array('duplicate' => true));
+		}
+		dol_syslog(__FUNCTION__.' '.$db->lasterror(), LOG_ERR);
+		return dolitracePwaResult($photoid, 'create', $langs->transnoentities('Error'));
+	}
+	$dir = (empty($conf->dolitrace->multidir_output[$conf->entity]) ? $conf->dolitrace->dir_output : $conf->dolitrace->multidir_output[$conf->entity]);
+	$dir .= '/dolitrace'.$kind.'/'.get_exdir(0, 0, 0, 1, $object);
+	$_FILES['photo']['name'] = 'photo_'.dol_print_date($made ? $made : dol_now(), '%Y%m%d_%H%M', 'tzuserrel').'_'.substr(str_replace('-', '', $photoid), 0, 8).'.jpg';
+	$result = dol_add_file_process($dir, 0, 1, 'photo', '', null, '', 1, $object);
+	// Messages of the page of documents: not for the app
+	unset($_SESSION['dol_events']);
+	if ($result <= 0) {
+		$db->rollback();
+		dol_syslog(__FUNCTION__.' '.$kind.' '.$object->id.' '.$dir, LOG_ERR);
+		return dolitracePwaResult($photoid, 'file', $langs->transnoentities('PwaErrorPhotoFile'));
+	}
+	$db->commit();
+	return dolitracePwaResult($photoid, '', '', array('duplicate' => false, 'file' => $_FILES['photo']['name'], 'ref' => (string) $object->ref, 'url' => dol_buildpath('/dolitrace/dolitrace'.$kind.'_document.php', 2).'?id='.((int) $object->id)));
 }
 
 /**
@@ -291,7 +413,22 @@ function dolitracePwaReceipt($db, $clientid)
  */
 function dolitracePwaCardUrl($element, $id)
 {
-	return dol_buildpath('/dolitrace/dolitrace'.($element == 'harvest' ? 'harvest' : 'operation').'_card.php', 2).'?id='.((int) $id);
+	return dol_buildpath('/dolitrace/dolitrace'.(in_array($element, array('harvest', 'treatment')) ? $element : 'operation').'_card.php', 2).'?id='.((int) $id);
+}
+
+/**
+ * Class of a kind of record of the app
+ *
+ * @param	string	$kind	operation, harvest or treatment
+ * @return	string			Class, loaded
+ */
+function dolitracePwaClass($kind)
+{
+	if ($kind == 'treatment') {
+		dol_include_once('/dolitrace/class/dolitracetreatment.class.php');
+		return 'DoliTraceTreatment';
+	}
+	return ($kind == 'harvest' ? 'DoliTraceHarvest' : 'DoliTraceOperation');
 }
 
 /**
@@ -316,7 +453,7 @@ function dolitracePwaCreate($db, $user, $langs, $record)
 	$kind = (string) ($record['kind'] ?? '');
 	$data = (is_array($record['data'] ?? null) ? $record['data'] : array());
 	$rights = dolitracePwaRights($user);
-	if (!in_array($kind, array('operation', 'harvest'))) {
+	if (!in_array($kind, array('operation', 'harvest', 'treatment'))) {
 		return dolitracePwaResult($clientid, 'kind', $langs->transnoentities('PwaErrorValue', 'kind'));
 	}
 	if (empty($rights[$kind])) {
@@ -329,7 +466,7 @@ function dolitracePwaCreate($db, $user, $langs, $record)
 		if ($receipt['element'] != $kind) {
 			return dolitracePwaResult($clientid, 'client_id', $langs->transnoentities('PwaErrorClientId'));
 		}
-		$class = ($kind == 'harvest' ? 'DoliTraceHarvest' : 'DoliTraceOperation');
+		$class = dolitracePwaClass($kind);
 		$object = new $class($db);
 		$object->fetch($receipt['id']);
 		return dolitracePwaResult($clientid, '', '', array('duplicate' => true, 'id' => $receipt['id'], 'ref' => (string) $object->ref, 'url' => dolitracePwaCardUrl($kind, $receipt['id'])));
@@ -361,7 +498,13 @@ function dolitracePwaCreate($db, $user, $langs, $record)
 	$note .= ($note !== '' ? "\n" : '').$langs->transnoentities('PwaNoteFromApp', $user->getFullName($langs), dol_print_date($made ? $made : dol_now(), 'dayhour', 'tzuserrel'));
 	$maxdate = dol_now() + 86400;
 
-	if ($kind == 'operation') {
+	if ($kind == 'treatment') {
+		// Treatment or fertilization on the plot of the plan
+		$object = dolitracePwaTreatmentObject($db, $user, $langs, $clientid, $data, $plan, $entity, $note);
+		if (is_array($object)) {
+			return $object;
+		}
+	} elseif ($kind == 'operation') {
 		$object = new DoliTraceOperation($db);
 		$types = (array) ($object->fields['fk_operation_type']['arrayofkeyval'] ?? array());
 		$type = (string) ($data['type'] ?? '');
@@ -429,6 +572,9 @@ function dolitracePwaCreate($db, $user, $langs, $record)
 
 	$db->begin();
 	$id = $object->create($user);
+	if ($id > 0 && $kind == 'treatment' && dolitracePwaTreatmentLines($user, $object) < 0) {
+		$id = -1;
+	}
 	if ($id <= 0) {
 		$db->rollback();
 		$error = trim($object->error.' '.implode(' ', (array) $object->errors));
@@ -449,5 +595,370 @@ function dolitracePwaCreate($db, $user, $langs, $record)
 		return dolitracePwaResult($clientid, 'create', $langs->transnoentities('Error'));
 	}
 	$db->commit();
-	return dolitracePwaResult($clientid, '', '', array('duplicate' => false, 'id' => (int) $id, 'ref' => (string) $object->ref, 'url' => dolitracePwaCardUrl($kind, $id)));
+	$more = array('duplicate' => false, 'id' => (int) $id, 'ref' => (string) $object->ref, 'url' => dolitracePwaCardUrl($kind, $id));
+	if ($kind == 'treatment') {
+		// Warnings of the register (uses, doses, FRAC groups, pre-harvest interval, organic, nitrogen...): shown by the app
+		$more['warnings'] = array_values(array_unique($object->getWarnings()));
+	}
+	return dolitracePwaResult($clientid, '', '', $more);
+}
+
+/**
+ * Data of the treatments kept by the phone (phase P3): products with their authorised uses on the crops of the open
+ * production plans, adversities, units of dose, operators, lots of the warehouse of technical inputs of the farms,
+ * organic plots. Only for the users who can make drafts of treatments.
+ *
+ * Checks needing the whole register (FRAC groups, pre-harvest interval, nitrogen) are done by the server after the
+ * sending: the app shows them on the record sent.
+ *
+ * @param	DoliDB		$db		Database handler
+ * @param	User		$user	User
+ * @param	Translate	$langs	Language
+ * @return	array<string,mixed>
+ */
+function dolitracePwaTreatmentData($db, $user, $langs)
+{
+	$prefix = $db->prefix();
+	$now = dol_now();
+	$langs->loadLangs(array('dolitrace@dolitrace', 'dolifarm@dolifarm'));
+	dol_include_once('/dolitrace/class/dolitracetreatment.class.php');
+	dol_include_once('/dolitrace/lib/dolitrace_treatment.lib.php');
+	dol_include_once('/dolifarm/class/dolifarmagrodruguse.class.php');
+	$hasorganic = (dol_include_once('/dolifarm/lib/dolifarm_organic.lib.php') && function_exists('dolifarmOrganicAgroDrugCheck'));
+	$hastaxonomy = (dol_include_once('/dolifarm/lib/dolifarm_eppo.lib.php') && function_exists('dolifarmEppoCovers'));
+	$data = array('agrodrugs' => array(), 'uses' => array(), 'fertilizers' => array(), 'adversities' => array(), 'dose_units' => array(),
+		'operators' => array(), 'lots' => array(), 'organic_plots' => array(), 'stock_date' => dolitracePwaDate($now, true));
+
+	// Plans not closed of the farms of the user: crops, farms and plots
+	$crops = array();
+	$farms = array();
+	$plots = array();
+	$sql = "SELECT cp.rowid, cp.fk_plot, cp.fk_soc, c.eppo_code FROM ".$prefix."dolitrace_cropplan as cp";
+	$sql .= " LEFT JOIN ".$prefix."dolifarm_crops as c ON c.rowid = cp.fk_crop";
+	$sql .= " WHERE cp.entity IN (".getEntity('dolitracecropplan').") AND cp.status IN (".DoliTraceCropplan::STATUS_DRAFT.", ".DoliTraceCropplan::STATUS_VALIDATED.")";
+	$sql .= dolifarmSqlSocFilter($user, 'cp.fk_soc');
+	$resql = $db->query($sql);
+	if ($resql) {
+		while ($obj = $db->fetch_object($resql)) {
+			$code = strtoupper(trim((string) $obj->eppo_code));
+			if ($code !== '') {
+				$crops[$code] = true;
+			}
+			$farms[(int) $obj->fk_soc] = true;
+			$plots[(int) $obj->fk_plot] = true;
+		}
+		$db->free($resql);
+	} else {
+		dol_syslog(__FUNCTION__.' '.$db->lasterror(), LOG_ERR);
+	}
+
+	// Plant protection products, with the status of the catalogue and the organic check of today
+	$products = array();
+	foreach (dolitraceTreatmentAgroDrugs($db) as $agrodrug) {
+		$rows = dolitraceTreatmentFetchRows($db, "SELECT rowid, auth_expiration_date, admin_status, date_revocation FROM ".$prefix."dolifarm_agrodrug WHERE rowid = ".((int) $agrodrug->rowid));
+		$row = reset($rows);
+		$warning = '';
+		$authend = ($row ? $db->jdate($row->auth_expiration_date) : null);
+		$status = ($row ? strtolower(trim((string) $row->admin_status)) : '');
+		$revoked = ($row ? $db->jdate($row->date_revocation) : null);
+		if (str_starts_with($status, 'revocat') && (empty($revoked) || $revoked <= $now)) {
+			$warning = $langs->transnoentities('WarningTreatmentRevoked', $agrodrug->label, $revoked ? dol_print_date($revoked, 'day') : '-');
+		} elseif (str_starts_with($status, 'sospes')) {
+			$warning = $langs->transnoentities('WarningTreatmentSuspended', $agrodrug->label);
+		} elseif (!empty($authend) && $authend < $now) {
+			$warning = $langs->transnoentities('WarningTreatmentAuthExpired', $agrodrug->label, dol_print_date($authend, 'day'));
+		}
+		$check = ($hasorganic ? dolifarmOrganicAgroDrugCheck($db, (int) $agrodrug->rowid) : null);
+		$uses = (class_exists('DoliFarmAgroDrugUse') ? DoliFarmAgroDrugUse::fetchAllForAgroDrug($db, (int) $agrodrug->rowid) : array());
+		$data['agrodrugs'][] = array(
+			'id' => (int) $agrodrug->rowid, 'label' => (string) $agrodrug->label, 'reg' => (string) $agrodrug->reg_number,
+			'product_id' => (int) $agrodrug->fk_product, 'max_dose_ha' => ($agrodrug->max_dose_ha > 0 ? (float) $agrodrug->max_dose_ha : null),
+			'organic' => ($check ? (string) $check['result'] : ''), 'warning' => $warning,
+			// Without uses on the card the register does not check crop, adversity and dose
+			'has_uses' => (count($uses) > 0),
+		);
+		if ($agrodrug->fk_product > 0) {
+			$products[(int) $agrodrug->fk_product] = true;
+		}
+		// Uses on the crops of the plans (a use on a group of the EPPO taxonomy covers its species)
+		foreach ($uses as $use) {
+			$usecode = strtoupper((string) $use->crop_eppo);
+			foreach (array_keys($crops) as $code) {
+				if ($usecode !== $code && !($hastaxonomy && dolifarmEppoCovers($db, $usecode, $code))) {
+					continue;
+				}
+				$data['uses'][] = array(
+					'agrodrug_id' => (int) $agrodrug->rowid, 'crop' => $code,
+					'adversity' => strtoupper((string) $use->adversity_code), 'adversity_label' => (string) $use->adversity_label,
+					'dose_min' => ($use->dose_min !== null ? (float) $use->dose_min : null), 'dose_max' => ($use->dose_max !== null ? (float) $use->dose_max : null),
+					'dose_unit' => (string) $use->dose_unit, 'safety_days' => (int) $use->safety_days,
+				);
+			}
+		}
+	}
+
+	// Fertilizers, with their organic check
+	foreach (dolitraceTreatmentFertilizers($db) as $fertilizer) {
+		$check = ($hasorganic && function_exists('dolifarmOrganicFertilizerCheck') ? dolifarmOrganicFertilizerCheck($db, (int) $fertilizer->rowid) : null);
+		$data['fertilizers'][] = array(
+			'id' => (int) $fertilizer->rowid, 'label' => (string) $fertilizer->label, 'product_id' => (int) $fertilizer->fk_product,
+			'organic' => ($check ? (string) $check['result'] : ''),
+		);
+		if ($fertilizer->fk_product > 0) {
+			$products[(int) $fertilizer->fk_product] = true;
+		}
+	}
+
+	foreach (dolitraceTreatmentAdversities($db) as $adversity) {
+		$data['adversities'][] = array('code' => (string) $adversity->code, 'label' => (string) $adversity->label);
+	}
+	foreach (array(DoliTraceTreatment::KIND_PLANTPROTECTION, DoliTraceTreatment::KIND_FERTILIZATION) as $kind) {
+		foreach (dolitraceTreatmentDoseUnits($db, $kind, DoliTraceTreatmentTarget::TYPE_PLOT) as $unit) {
+			$data['dose_units'][] = array(
+				'id' => (int) $unit->rowid, 'kind' => $kind, 'code' => (string) $unit->code,
+				'label' => html_entity_decode((string) $unit->label, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+				'basis' => (string) $unit->basis, 'qty_unit' => (string) $unit->qty_unit, 'factor' => (float) $unit->factor,
+			);
+		}
+	}
+
+	// Operators of the farms, and the operator linked to the user (a contractor works on other farms)
+	$sql = "SELECT o.rowid, o.label, o.fk_soc, o.fk_user, o.license_end FROM ".$prefix."dolifarm_operator as o";
+	$sql .= " WHERE o.entity IN (".getEntity('dolifarmoperator').") AND o.status = 1";
+	$sql .= " AND (o.fk_user = ".((int) $user->id).(count($farms) ? " OR o.fk_soc IN (".$db->sanitize(implode(',', array_keys($farms))).")" : '').")";
+	$sql .= " ORDER BY o.label";
+	$resql = $db->query($sql);
+	if ($resql) {
+		while ($obj = $db->fetch_object($resql)) {
+			$data['operators'][] = array(
+				'id' => (int) $obj->rowid, 'label' => (string) $obj->label, 'farm_id' => (int) $obj->fk_soc, 'user_id' => (int) $obj->fk_user,
+				'license_end' => dolitracePwaDate($db->jdate($obj->license_end)),
+			);
+		}
+		$db->free($resql);
+	} else {
+		dol_syslog(__FUNCTION__.' '.$db->lasterror(), LOG_ERR);
+	}
+
+	// Lots in the warehouse of technical inputs of each farm, as of now (the validation checks the real stock)
+	if (isModEnabled('stock') && isModEnabled('productbatch') && count($products) && dol_include_once('/dolifarm/lib/dolifarm_warehouse.lib.php') && function_exists('dolifarmGetFarmWarehouse')) {
+		foreach (array_keys($farms) as $farm) {
+			$warehouse = dolifarmGetFarmWarehouse($db, $farm, 'inputs');
+			if ($warehouse <= 0) {
+				continue;
+			}
+			$sql = "SELECT ps.fk_product, pb.batch, pb.qty, pl.eatby FROM ".$prefix."product_batch as pb";
+			$sql .= " INNER JOIN ".$prefix."product_stock as ps ON ps.rowid = pb.fk_product_stock";
+			$sql .= " LEFT JOIN ".$prefix."product_lot as pl ON pl.fk_product = ps.fk_product AND pl.batch = pb.batch";
+			$sql .= " WHERE ps.fk_entrepot = ".((int) $warehouse)." AND pb.qty > 0";
+			$sql .= " AND ps.fk_product IN (".$db->sanitize(implode(',', array_keys($products))).")";
+			$sql .= " ORDER BY pl.eatby, pb.batch";
+			$resql = $db->query($sql);
+			if ($resql) {
+				while ($obj = $db->fetch_object($resql)) {
+					$data['lots'][] = array(
+						'farm_id' => $farm, 'product_id' => (int) $obj->fk_product, 'batch' => (string) $obj->batch,
+						'qty' => (float) $obj->qty, 'eatby' => dolitracePwaDate($db->jdate($obj->eatby)),
+					);
+				}
+				$db->free($resql);
+			} else {
+				dol_syslog(__FUNCTION__.' '.$db->lasterror(), LOG_ERR);
+			}
+		}
+	}
+
+	// Plots in conversion or organic today
+	if (count($plots) && dol_include_once('/dolifarm/lib/dolifarm_bio.lib.php') && function_exists('dolifarmBioStatusAt')) {
+		foreach (array_keys($plots) as $plot) {
+			if (dolifarmBioIsOrganic(dolifarmBioStatusAt($db, $plot, $now))) {
+				$data['organic_plots'][] = $plot;
+			}
+		}
+	}
+	return $data;
+}
+
+/**
+ * Draft of a treatment or of a fertilization sent by the app, on the plot of a production plan (not saved yet)
+ *
+ * data: {cropplan_id, kind: 1|2, date, date_end, area_ha, bbch, operator_id, machine_id, water_volume, note,
+ * products: [{item_id, adversity, dose, unit_id, qty_total, batch}]}. The office completes and validates it (stock,
+ * hash, weather).
+ *
+ * @param	DoliDB		$db			Database handler
+ * @param	User		$user		User
+ * @param	Translate	$langs		Language
+ * @param	string		$clientid	Identifier of the phone
+ * @param	array<string,mixed>	$data	Data of the record
+ * @param	DoliTraceCropplan	$plan	Production plan, already checked
+ * @param	int			$entity		Entity of the plan
+ * @param	string		$note		Note of the record, with the origin
+ * @return	DoliTraceTreatment|array<string,mixed>	Object to create, or the result of an error
+ */
+function dolitracePwaTreatmentObject($db, $user, $langs, $clientid, $data, $plan, $entity, $note)
+{
+	dol_include_once('/dolitrace/class/dolitracetreatment.class.php');
+	dol_include_once('/dolitrace/lib/dolitrace_treatment.lib.php');
+	$langs->loadLangs(array('dolitrace@dolitrace', 'dolifarm@dolifarm'));
+	$maxdate = dol_now() + 86400;
+
+	$kind = (int) ($data['kind'] ?? 0);
+	if (!in_array($kind, array(DoliTraceTreatment::KIND_PLANTPROTECTION, DoliTraceTreatment::KIND_FERTILIZATION))) {
+		return dolitracePwaResult($clientid, 'kind', $langs->transnoentities('PwaErrorValue', $langs->transnoentities('TreatmentKind')));
+	}
+	$start = dolitracePwaParseDate($data['date'] ?? null);
+	if ($start === null || $start > $maxdate) {
+		return dolitracePwaResult($clientid, 'date', $langs->transnoentities('PwaErrorValue', $langs->transnoentities('TreatmentDateStart')));
+	}
+	$end = null;
+	if (!empty($data['date_end'])) {
+		$end = dolitracePwaParseDate($data['date_end']);
+		if ($end === null || $end < $start || $end > $maxdate) {
+			return dolitracePwaResult($clientid, 'date_end', $langs->transnoentities('PwaErrorValue', $langs->transnoentities('TreatmentDateEnd')));
+		}
+	}
+	// Operator: of the farm, or the one linked to the user
+	$operator = (int) ($data['operator_id'] ?? 0);
+	if ($operator > 0) {
+		$resql = $db->query("SELECT fk_soc, fk_user FROM ".$db->prefix()."dolifarm_operator WHERE rowid = ".$operator." AND status = 1 AND entity IN (".getEntity('dolifarmoperator').")");
+		$obj = ($resql ? $db->fetch_object($resql) : null);
+		if (!$obj || ((int) $obj->fk_soc > 0 && (int) $obj->fk_soc != (int) $plan->fk_soc && (int) $obj->fk_user != (int) $user->id)) {
+			return dolitracePwaResult($clientid, 'operator', $langs->transnoentities('PwaErrorValue', $langs->transnoentities('TreatmentOperator')));
+		}
+	}
+	$machine = (int) ($data['machine_id'] ?? 0);
+	if ($machine > 0) {
+		$resql = $db->query("SELECT fk_soc FROM ".$db->prefix()."dolifarm_machine WHERE rowid = ".$machine." AND entity IN (".getEntity('dolifarmmachine').")");
+		$obj = ($resql ? $db->fetch_object($resql) : null);
+		if (!$obj || ((int) $obj->fk_soc > 0 && (int) $obj->fk_soc != (int) $plan->fk_soc)) {
+			return dolitracePwaResult($clientid, 'machine', $langs->transnoentities('PwaErrorValue', $langs->transnoentities('TreatmentMachine')));
+		}
+	}
+	$area = (float) ($data['area_ha'] ?? 0);
+	if ($area < 0 || $area >= 100000) {
+		return dolitracePwaResult($clientid, 'area_ha', $langs->transnoentities('PwaErrorValue', $langs->transnoentities('TreatmentTreatedQty')));
+	}
+	$bbch = trim((string) (is_scalar($data['bbch'] ?? null) ? $data['bbch'] : ''));
+	if ($bbch !== '' && !preg_match('/^[0-9]{1,3}$/', $bbch)) {
+		return dolitracePwaResult($clientid, 'bbch', $langs->transnoentities('ErrorTreatmentBbch'));
+	}
+	$water = (float) ($data['water_volume'] ?? 0);
+	if ($water < 0 || $water >= 100000) {
+		return dolitracePwaResult($clientid, 'water_volume', $langs->transnoentities('PwaErrorValue', $langs->transnoentities('TreatmentWaterVolume')));
+	}
+
+	// Products: at least one, from the registries (the lines are created after the record)
+	$itemlabel = $langs->transnoentities($kind == DoliTraceTreatment::KIND_PLANTPROTECTION ? 'TreatmentAgroDrug' : 'TreatmentFertilizer');
+	$lines = (is_array($data['products'] ?? null) ? array_values($data['products']) : array());
+	if (!count($lines) || count($lines) > 20) {
+		return dolitracePwaResult($clientid, 'products', $langs->transnoentities('PwaErrorValue', $itemlabel));
+	}
+	$items = ($kind == DoliTraceTreatment::KIND_PLANTPROTECTION ? dolitraceTreatmentAgroDrugs($db) : dolitraceTreatmentFertilizers($db));
+	$units = dolitraceTreatmentDoseUnits($db, $kind, DoliTraceTreatmentTarget::TYPE_PLOT);
+	$products = array();
+	foreach ($lines as $i => $line) {
+		$line = (is_array($line) ? $line : array());
+		$item = $items[(int) ($line['item_id'] ?? 0)] ?? null;
+		if (!$item) {
+			return dolitracePwaResult($clientid, 'product', $langs->transnoentities('PwaErrorValue', $itemlabel).' ('.($i + 1).')');
+		}
+		$product = new DoliTraceTreatmentProduct($db);
+		$product->rang = $i + 1;
+		$product->fk_product = ($item->fk_product > 0 ? (int) $item->fk_product : null);
+		$product->product_label = $item->label;
+		if ($kind == DoliTraceTreatment::KIND_PLANTPROTECTION) {
+			$product->fk_agrodrug = (int) $item->rowid;
+			$product->reg_number = $item->reg_number;
+			// Adversity by EPPO code: from the uses of the label, or any code of the EPPO data (added to the dictionary)
+			$error = '';
+			$adversity = dolitraceTreatmentAdversityByCode($db, (string) (is_scalar($line['adversity'] ?? null) ? $line['adversity'] : ''), $error);
+			if (!$adversity) {
+				return dolitracePwaResult($clientid, 'adversity', ($error !== '' ? $error : $langs->transnoentities('ErrorFieldRequired', $langs->transnoentities('TreatmentAdversity'))).' ('.$item->label.')');
+			}
+			$product->fk_adversity = (int) $adversity->rowid;
+			$product->adversity_code = $adversity->code;
+			$product->adversity_label = $adversity->label;
+		} else {
+			$product->fk_fertilizer = (int) $item->rowid;
+			$product->reg_number = $item->registration_number;
+			$product->n_content = $item->n_content;
+			$product->p2o5_content = $item->p2o5_content;
+			$product->k2o_content = $item->k2o_content;
+		}
+		$unit = $units[(int) ($line['unit_id'] ?? 0)] ?? null;
+		$dose = (float) ($line['dose'] ?? 0);
+		if (!$unit || $dose <= 0 || $dose >= 1e9) {
+			return dolitracePwaResult($clientid, 'dose', $langs->transnoentities('PwaErrorValue', $langs->transnoentities('TreatmentDose')).' ('.$item->label.')');
+		}
+		$product->dose = $dose;
+		$product->fk_dose_unit = (int) $unit->rowid;
+		$product->dose_unit_label = $unit->label;
+		$product->qty_unit = $unit->qty_unit;
+		// Total quantity: given on the phone, otherwise computed from the dose and the treated surface
+		$qty = (float) ($line['qty_total'] ?? 0);
+		$product->qty_auto = ($qty > 0 && $qty < 1e9 ? 0 : 1);
+		$product->qty_total = ($product->qty_auto ? null : $qty);
+		$batch = trim((string) (is_scalar($line['batch'] ?? null) ? $line['batch'] : ''));
+		$product->batch = dol_trunc(dol_string_nohtmltag($batch), 128, 'right', 'UTF-8', 1);
+		$product->stock_status = DoliTraceTreatmentProduct::STOCK_NONE;
+		$products[] = $product;
+	}
+
+	$object = new DoliTraceTreatment($db);
+	$object->entity = $entity;
+	$object->kind = $kind;
+	$object->technical_type = DoliTraceTreatmentTarget::TYPE_PLOT;
+	$object->fk_soc = (int) $plan->fk_soc;
+	$object->fk_cropplan = (int) $plan->id;
+	$object->date_start = $start;
+	$object->date_end = $end;
+	$object->fk_operator = ($operator > 0 ? $operator : null);
+	$object->fk_machine = ($machine > 0 ? $machine : null);
+	$object->water_volume = ($water > 0 ? $water : null);
+	$object->note_private = $note;
+	$object->status = DoliTraceTreatment::STATUS_DRAFT;
+	$object->context['pwa'] = array('products' => $products, 'area_ha' => ($area > 0 ? $area : null), 'bbch' => $bbch);
+	return $object;
+}
+
+/**
+ * Lines of a draft of a treatment made by the app: surface of the plan (with the area and the BBCH of the phone) and
+ * products, then the computed quantities. In the transaction of the creation.
+ *
+ * @param	User				$user	User
+ * @param	DoliTraceTreatment	$object	Record just created
+ * @return	int							<0 if KO, >0 if OK
+ */
+function dolitracePwaTreatmentLines($user, $object)
+{
+	$pwa = $object->context['pwa'];
+	if ($object->fetchLines() < 0) {
+		return -1;
+	}
+	foreach ($object->targets as $target) {
+		if ($pwa['area_ha'] !== null) {
+			$target->treated_qty = $pwa['area_ha'];
+		}
+		if ($pwa['bbch'] !== '') {
+			$target->bbch = $pwa['bbch'];
+		}
+		if ($target->update($user) < 0) {
+			$object->error = $target->error;
+			$object->errors = (array) $target->errors;
+			return -1;
+		}
+	}
+	foreach ($pwa['products'] as $product) {
+		$product->fk_treatment = $object->id;
+		if ($product->create($user) < 0) {
+			$object->error = $product->error;
+			$object->errors = (array) $product->errors;
+			return -1;
+		}
+	}
+	if ($object->fetchLines() < 0 || $object->updateAutoQuantities($user) < 0) {
+		return -1;
+	}
+	return 1;
 }

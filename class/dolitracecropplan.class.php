@@ -703,15 +703,15 @@ class DoliTraceCropplan extends CommonObject
             // Rename directory if dir was a temporary ref
             if (preg_match('/^[\(]?PROV/i', $this->ref)) {
                 // Now we rename also files into index
-                $sql = 'UPDATE '.$this->db->prefix()."ecm_files set filename = CONCAT('".$this->db->escape($this->newref)."', SUBSTR(filename, ".(strlen($this->ref) + 1).")), filepath = 'dolitracecropplan/".$this->db->escape($this->newref)."'";
-                $sql .= " WHERE filename LIKE '".$this->db->escape($this->ref)."%' AND filepath = 'dolitracecropplan/".$this->db->escape($this->ref)."' and entity = ".$conf->entity;
+                $sql = 'UPDATE '.$this->db->prefix()."ecm_files set filename = CONCAT('".$this->db->escape($this->newref)."', SUBSTR(filename, ".(strlen($this->ref) + 1).")), filepath = CONCAT(SUBSTR(filepath, 1, LENGTH(filepath) - ".strlen($this->ref)."), '".$this->db->escape($this->newref)."')";
+                $sql .= " WHERE filename LIKE '".$this->db->escape($this->ref)."%' AND filepath IN ('dolitrace/dolitracecropplan/".$this->db->escape($this->ref)."', 'dolitracecropplan/".$this->db->escape($this->ref)."') and entity = ".$conf->entity;
                 $resql = $this->db->query($sql);
                 if (!$resql) {
                     $error++;
                     $this->error = $this->db->lasterror();
                 }
-                $sql = 'UPDATE '.$this->db->prefix()."ecm_files set filepath = 'dolitracecropplan/".$this->db->escape($this->newref)."'";
-                $sql .= " WHERE filepath = 'dolitracecropplan/".$this->db->escape($this->ref)."' and entity = ".$conf->entity;
+                $sql = 'UPDATE '.$this->db->prefix()."ecm_files set filepath = CONCAT(SUBSTR(filepath, 1, LENGTH(filepath) - ".strlen($this->ref)."), '".$this->db->escape($this->newref)."')";
+                $sql .= " WHERE filepath IN ('dolitrace/dolitracecropplan/".$this->db->escape($this->ref)."', 'dolitracecropplan/".$this->db->escape($this->ref)."') and entity = ".$conf->entity;
                 $resql = $this->db->query($sql);
                 if (!$resql) {
                     $error++;

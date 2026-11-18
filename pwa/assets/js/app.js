@@ -23,8 +23,10 @@ import { kvGet, kvSet, kvClear } from './store.js';
 import { API_VERSION, LOGIN_URL, OfflineError, LoginError, ApiError, getSession, getData } from './api.js';
 import { t, setLang, fmtDate, fmtNumber } from './i18n.js';
 import { newClientId, saveRecord, loadQueue, removeRecord, loadSent, sendQueue } from './queue.js';
+import { MAX_PHOTOS, reducePhoto, newPhoto, loadPhotos, removePhoto, savePhotos, deletePhotosOf, sendPhotos } from './photos.js';
+import { treatmentFields, checkTreatment, treatmentSummary } from './treatment.js';
 
-export const APP_VERSION = '1.1.1';
+export const APP_VERSION = '1.3.0';
 
 /** Days without update after which the app warns (Safari deletes the data of the apps not used for about 7 days) */
 const OLD_DATA_DAYS = 5;
@@ -36,6 +38,7 @@ const state = {
 	data: null,		// answer of action=data
 	syncedAt: null,	// ISO date of the last update
 	queue: [],		// records waiting to be sent
+	photos: [],		// photos waiting to be sent
 	sent: [],		// records sent recently
 	syncing: false,
 	problem: '',	// login, forbidden, api, otheruser, or a message
@@ -186,8 +189,13 @@ async function loadLocal() {
 
 async function reloadQueue() {
 	state.queue = await loadQueue();
+	state.photos = await loadPhotos();
 	state.sent = await loadSent();
 }
+
+/** Something waits on the phone: records or photos */
+const waiting = () => state.queue.length + state.photos.length;
+const photosOf = (recordId) => state.photos.filter((p) => p.record_id === recordId);
 
 /**
  * Send the records waiting on the phone, then update the data from the server. Without network or without session
@@ -206,10 +214,11 @@ async function sync(manual = false) {
 		// Another user on the same phone: the records of the previous one must be sent first (with his login),
 		// then his data are deleted
 		const others = state.queue.filter((r) => r.user_id !== session.user.id);
-		if (others.length) {
+		const otherPhotos = state.photos.filter((p) => p.user_id !== session.user.id);
+		if (others.length || otherPhotos.length) {
 			state.problem = 'otheruser';
-			state.otherUser = others[0].user_name || ('#' + others[0].user_id);
-			state.otherCount = others.length;
+			state.otherUser = others.length ? (others[0].user_name || ('#' + others[0].user_id)) : ('#' + otherPhotos[0].user_id);
+			state.otherCount = others.length + otherPhotos.length;
 			return;
 		}
 		if (state.session && state.session.user && state.session.user.id !== session.user.id) {
@@ -225,8 +234,23 @@ async function sync(manual = false) {
 			if (result.sent) {
 				toast(t('SentOk', result.sent));
 			}
+			if (result.warned) {
+				toast(t('SentWithWarnings', result.warned));
+			}
 			if (result.errors) {
 				toast(t('SentErrors', result.errors));
+			}
+		}
+		// Photos after their records: the photos of a record still in the queue wait for it
+		if (state.photos.length) {
+			const result = await sendPhotos(session, new Set(state.queue.map((r) => r.client_id)), manual);
+			session = result.session;
+			await reloadQueue();
+			if (result.sent) {
+				toast(t('PhotosSentOk', result.sent));
+			}
+			if (result.errors) {
+				toast(t('PhotosSentErrors', result.errors));
 			}
 		}
 		const data = await getData();
@@ -299,7 +323,15 @@ function renderStatus() {
 		const cls = errors ? 'div.note.error.queue' : (oldest !== null && oldest >= OLD_QUEUE_DAYS ? 'div.note.warn.queue' : 'div.note.info.queue');
 		notes.push(h(cls, null,
 			h('a', { href: '#/queue' }, t('QueueCount', state.queue.length)),
+			state.photos.length ? ' · ' + t('PhotosCount', state.photos.length) : '',
 			oldest ? ' · ' + t('QueueOldest', oldest) : '',
+			errors ? ' · ' + t('QueueErrors', errors) : '',
+		));
+	} else if (state.photos.length) {
+		// Records sent, photos still on the phone
+		const errors = state.photos.filter((p) => p.status === 'error').length;
+		notes.push(h(errors ? 'div.note.error.queue' : 'div.note.info.queue', null,
+			h('a', { href: '#/queue' }, t('PhotosWaiting', state.photos.length)),
 			errors ? ' · ' + t('QueueErrors', errors) : '',
 		));
 	}
@@ -355,8 +387,8 @@ function footer() {
 		h('button.link', {
 			type: 'button',
 			onclick: async () => {
-				if (state.queue.length) {
-					toast(t('ClearBlocked', state.queue.length));
+				if (waiting()) {
+					toast(t('ClearBlocked', waiting()));
 					return;
 				}
 				if (window.confirm(t('ClearConfirm'))) {
@@ -428,9 +460,10 @@ function planCard(plan) {
 	return h('div.card', null,
 		h('div.card-title', null, [plan.crop, plan.variety].filter(Boolean).join(' - ') || plan.label || plan.ref),
 		h('div.item-sub', null, [plan.ref, plan.season ? t('Season', plan.season) : '', plan.status === 0 ? t('Draft') : t('Validated')].filter(Boolean).join(' · ')),
-		(rights.operation || rights.harvest) ? h('div.buttons', null,
+		(rights.operation || rights.harvest || canTreat()) ? h('div.buttons', null,
 			rights.operation ? h('a.btn.primary', { href: '#/new/operation/' + plan.id }, '+ ' + t('NewOperation')) : null,
 			rights.harvest ? h('a.btn.primary', { href: '#/new/harvest/' + plan.id }, '+ ' + t('NewHarvest')) : null,
+			canTreat() ? h('a.btn.primary', { href: '#/new/treatment/' + plan.id }, '+ ' + t('NewTreatment')) : null,
 		) : null,
 		waiting.length ? h('div.note.info', null, h('strong', null, t('WaitingHere', waiting.length)), h('ul.records', null, waiting.map((r) => h('li', null, h('a', { href: '#/edit/' + encodeURIComponent(r.client_id) }, recordSummary(r)), r.status === 'error' ? h('span.badge.err', null, t('Error')) : null)))) : null,
 		safety.length
@@ -631,6 +664,9 @@ function viewNear() {
 const planById = (id) => ((state.data && state.data.cropplans) || []).find((p) => p.id === Number(id)) || null;
 const plotById = (id) => plots().find((p) => p.id === Number(id)) || null;
 const typeLabel = (code) => (((state.data && state.data.operation_types) || []).find((x) => x.code === code) || {}).label || code;
+/** Drafts of treatments: permission of the server, and its data downloaded (doliTrace 1.5.3 or later) */
+const canTreat = () => Boolean(state.session && state.session.rights && state.session.rights.treatment && state.data && state.data.treatment);
+const formTitle = (kind) => (kind === 'harvest' ? t('NewHarvest') : (kind === 'treatment' ? t('NewTreatment') : t('NewOperation')));
 
 /** One line describing a record of the queue */
 function recordSummary(r) {
@@ -640,7 +676,7 @@ function recordSummary(r) {
 	const where = plot ? (plot.label || plot.ref) : (plan ? plan.ref : '');
 	const what = (r.kind === 'harvest'
 		? t('HarvestOf', fmtNumber(Number(d.qty) || 0) + ' ' + (d.unit || ''))
-		: typeLabel(d.type)) + (d.label ? ' - ' + d.label : '');
+		: (r.kind === 'treatment' ? treatmentSummary(state.data && state.data.treatment, d) : typeLabel(d.type))) + (d.label ? ' - ' + d.label : '');
 	return [fmtDate(d.date), what, where].filter(Boolean).join(' · ');
 }
 
@@ -666,6 +702,9 @@ function decimalValue(text) {
 
 function checkRecord(kind, d) {
 	const limit = isoLocal(new Date(Date.now() + 86400000).toISOString());
+	if (kind === 'treatment') {
+		return checkTreatment(d, limit);
+	}
 	if (kind === 'operation') {
 		if (!d.type) {
 			return t('Required', t('OperationType'));
@@ -730,10 +769,25 @@ function viewForm(kind, planId, record) {
 		return;
 	}
 	const plot = plotById(plan.plot_id);
-	document.title = kind === 'harvest' ? t('NewHarvest') : t('NewOperation');
+	document.title = formTitle(kind);
 	const error = h('div.note.error', { hidden: !(record && record.message) }, record && record.message ? record.message : '');
 	let fields;
-	if (kind === 'operation') {
+	let treatment = null;
+	if (kind === 'treatment') {
+		if (!canTreat()) {
+			show(backLink(), h('p.empty', null, t('TreatmentNotAvailable')));
+			return;
+		}
+		const T = state.data.treatment;
+		treatment = treatmentFields({ h, select, formRow, decimalValue, nowLocal }, T, {
+			plan,
+			plot,
+			machines: ((state.data && state.data.machines) || []).filter((m) => !m.farm_id || m.farm_id === plan.farm_id),
+			organic: (T.organic_plots || []).includes(plan.plot_id),
+			userId: state.session.user.id,
+		}, d);
+		fields = treatment.fields;
+	} else if (kind === 'operation') {
 		const machines = ((state.data && state.data.machines) || []).filter((m) => !m.farm_id || m.farm_id === plan.farm_id);
 		fields = [
 			formRow(t('OperationType'), select('type', ((state.data && state.data.operation_types) || []).map((x) => ({ value: x.code, label: x.label })), d.type, t('Choose')), true),
@@ -757,6 +811,68 @@ function viewForm(kind, planId, record) {
 			formRow(t('Note'), h('textarea.search', { name: 'note', rows: 3, maxlength: 2000 }, d.note || '')),
 		];
 	}
+	/** Values of the form as data of the record */
+	const readForm = (values) => {
+		const data = { cropplan_id: plan.id };
+		for (const [k, v] of Object.entries(values)) {
+			if (v !== '') {
+				data[k] = (['duration_min', 'machine_id', 'operator_id', 'kind'].includes(k) ? parseInt(v, 10) : (['qty', 'area_ha', 'water_volume'].includes(k) ? decimalValue(v) : v));
+			}
+		}
+		return data;
+	};
+
+	// Photos: reduced when added, saved with the record, sent after it
+	const photos = record ? photosOf(record.client_id).map((p) => Object.assign({}, p)) : [];
+	const urls = [];
+	const photoList = h('div.photos');
+	const photoNote = h('div.item-sub');
+	const fileInput = h('input.visually-hidden', { type: 'file', accept: 'image/*', multiple: true });
+	const addLabel = h('span', null, t('AddPhoto'));
+	const addButton = h('label.btn', null, addLabel, fileInput);
+	const drawPhotos = () => {
+		urls.splice(0).forEach((u) => URL.revokeObjectURL(u));
+		photoList.replaceChildren(...photos.map((p, i) => {
+			const url = URL.createObjectURL(p.blob);
+			urls.push(url);
+			return h('div.photo', null,
+				h('img', { src: url, alt: t('Photo') + ' ' + (i + 1) }),
+				h('button.photo-remove', {
+					type: 'button',
+					title: t('RemovePhoto'),
+					'aria-label': t('RemovePhoto'),
+					onclick: () => {
+						photos.splice(i, 1);
+						drawPhotos();
+					},
+				}, '×'),
+				p.status === 'error' ? h('div.photo-error', null, p.message || p.error) : null,
+			);
+		}));
+		addButton.hidden = photos.length >= MAX_PHOTOS;
+		photoNote.textContent = t('PhotosHelp', photos.length, MAX_PHOTOS);
+	};
+	fileInput.addEventListener('change', async (e) => {
+		const files = Array.from(e.target.files || []);
+		e.target.value = '';
+		const room = MAX_PHOTOS - photos.length;
+		if (files.length > room) {
+			toast(t('PhotosMax', MAX_PHOTOS));
+		}
+		addLabel.textContent = t('PhotoProcessing');
+		for (const file of files.slice(0, Math.max(0, room))) {
+			try {
+				photos.push(Object.assign(newPhoto(await reducePhoto(file)), { created_at: nowLocal() }));
+			} catch (err) {
+				toast(t('PhotoError'));
+			}
+		}
+		addLabel.textContent = t('AddPhoto');
+		drawPhotos();
+	});
+	drawPhotos();
+	const photoBox = h('div.form-row', null, h('span.form-label', null, t('Photos')), photoList, addButton, photoNote);
+
 	const form = h('form.form', {
 		onsubmit: async (e) => {
 			e.preventDefault();
@@ -764,11 +880,9 @@ function viewForm(kind, planId, record) {
 			new FormData(form).forEach((v, k) => {
 				values[k] = String(v).trim();
 			});
-			const data = { cropplan_id: plan.id };
-			for (const [k, v] of Object.entries(values)) {
-				if (v !== '') {
-					data[k] = (['duration_min', 'machine_id'].includes(k) ? parseInt(v, 10) : (['qty', 'area_ha'].includes(k) ? decimalValue(v) : v));
-				}
+			const data = readForm(values);
+			if (treatment) {
+				data.products = treatment.products();
 			}
 			const problem = checkRecord(kind, data);
 			if (problem) {
@@ -789,6 +903,7 @@ function viewForm(kind, planId, record) {
 			});
 			saved.summary = recordSummary(saved);
 			await saveRecord(saved);
+			await savePhotos(saved, photos);
 			await reloadQueue();
 			toast(navigator.onLine ? t('SavedSending') : t('SavedOnPhone'));
 			location.hash = plot ? '#/plot/' + plot.id : '#/queue';
@@ -799,17 +914,32 @@ function viewForm(kind, planId, record) {
 	},
 	error,
 	fields,
+	photoBox,
 	h('div.buttons', null,
 		h('button.btn.primary', { type: 'submit' }, t('Save')),
 		record ? h('button.btn.danger', { type: 'button', onclick: () => deleteRecord(record) }, t('Delete')) : null,
 	));
+	if (treatment) {
+		// Warnings and quantities follow the header (date, surface, water, operator, machine)
+		const header = () => {
+			const values = {};
+			new FormData(form).forEach((v, k) => {
+				values[k] = String(v).trim();
+			});
+			return readForm(values);
+		};
+		treatment.setReader(header);
+		form.addEventListener('input', () => treatment.refresh());
+		form.addEventListener('change', () => treatment.refresh());
+	}
 	show(
 		backLink(),
-		h('h1', null, kind === 'harvest' ? t('NewHarvest') : t('NewOperation')),
+		h('h1', null, formTitle(kind)),
 		h('div.item-sub', null, [plot ? (plot.label || plot.ref) : '', [plan.crop, plan.variety].filter(Boolean).join(' - '), plan.ref].filter(Boolean).join(' · ')),
 		h('p.empty', null, t('DraftOnly')),
 		form,
 	);
+	cleanup = () => urls.splice(0).forEach((u) => URL.revokeObjectURL(u));
 }
 
 async function deleteRecord(record) {
@@ -817,9 +947,48 @@ async function deleteRecord(record) {
 		return;
 	}
 	await removeRecord(record.client_id);
+	await deletePhotosOf(record.client_id);
 	await reloadQueue();
 	renderStatus();
 	location.hash = '#/queue';
+}
+
+/**
+ * Photos of records already sent, still on the phone: waiting, or refused by the server (they can be deleted)
+ *
+ * @param {boolean} online
+ * @returns {HTMLElement[]|null}
+ */
+function photosOfSent(online) {
+	const inQueue = new Set(state.queue.map((r) => r.client_id));
+	const list = state.photos.filter((p) => !inQueue.has(p.record_id));
+	if (!list.length) {
+		return null;
+	}
+	const record = (p) => state.sent.find((s) => s.client_id === p.record_id);
+	return [
+		h('h2', null, t('PhotosWaiting', list.length)),
+		state.queue.length ? null : h('div.buttons', null, h('button.btn.primary', { type: 'button', disabled: !online || state.syncing, onclick: () => sync(true) }, state.syncing ? t('Sending') : t('SendNow'))),
+		h('div.list', null, list.map((p) => {
+			const sent = record(p);
+			return h('div.item', null,
+				h('div.item-title', null, t('Photo'), sent ? ' · ' + (sent.ref || ('#' + sent.id)) + (sent.label ? ' · ' + sent.label : '') : ''),
+				h('div.item-sub', null, fmtDate(p.created_at), p.status === 'error' ? '' : ' · ' + t('Pending')),
+				p.status === 'error' ? h('div.note.error', null, t('ErrorLabel', p.message || p.error), ' ',
+					h('button.btn.small.danger', {
+						type: 'button',
+						onclick: async () => {
+							if (window.confirm(t('DeletePhotoConfirm'))) {
+								await removePhoto(p.photo_id);
+								await reloadQueue();
+								renderStatus();
+								viewQueue();
+							}
+						},
+					}, t('Delete'))) : null,
+			);
+		})),
+	];
 }
 
 function viewQueue() {
@@ -834,18 +1003,25 @@ function viewQueue() {
 				online ? null : h('p.empty', null, t('SendWhenOnline')),
 				h('div.list', null, state.queue.map((r) => h('a.item', { href: '#/edit/' + encodeURIComponent(r.client_id) },
 					h('div.item-title', null, recordSummary(r)),
-					h('div.item-sub', null, t('SavedAt', fmtDate(isoLocal(r.saved_at || r.created_at))), r.status === 'error' ? '' : ' · ' + t('Pending')),
+					h('div.item-sub', null, t('SavedAt', fmtDate(isoLocal(r.saved_at || r.created_at))), r.status === 'error' ? '' : ' · ' + t('Pending'),
+						photosOf(r.client_id).length ? ' · ' + t('PhotosCount', photosOf(r.client_id).length) : ''),
 					r.status === 'error' ? h('div.note.error', null, t('ErrorLabel', r.message || r.error)) : null,
 				))),
 			]
-			: h('p.empty', null, t('QueueEmpty')),
+			: (state.photos.length ? null : h('p.empty', null, t('QueueEmpty'))),
+		photosOfSent(online),
 		state.sent.length ? [
 			h('h2', null, t('RecentSent')),
 			h('ul.records', null, state.sent.map((s) => h('li', null,
 				h('span.date', null, fmtDate(isoLocal(s.sent_at))), ' ',
-				s.kind === 'harvest' ? t('Harvest') : t('Operation'), ' ',
+				s.kind === 'harvest' ? t('Harvest') : (s.kind === 'treatment' ? t('Treatment') : t('Operation')), ' ',
 				h('a', { href: s.url, target: '_blank', rel: 'noopener' }, s.ref || ('#' + s.id)),
 				s.label ? ' · ' + s.label : '',
+				// Warnings of the register for a treatment: to see before the validation in the office
+				(s.warnings || []).length ? h('details.warnings', null,
+					h('summary', null, h('span.badge.warn', null, t('WarningsCount', s.warnings.length))),
+					h('ul', null, s.warnings.map((w) => h('li', null, w))),
+				) : null,
 			))),
 		] : null,
 	);
@@ -856,7 +1032,7 @@ function viewQueue() {
 function route() {
 	const hash = location.hash || '#/';
 	const m = /^#\/plot\/(\d+)$/.exec(hash);
-	const n = /^#\/new\/(operation|harvest)\/(\d+)$/.exec(hash);
+	const n = /^#\/new\/(operation|harvest|treatment)\/(\d+)$/.exec(hash);
 	const e = /^#\/edit\/(.+)$/.exec(hash);
 	if (m) {
 		viewPlot(Number(m[1]));
@@ -886,7 +1062,12 @@ function registerServiceWorker() {
 	if (!('serviceWorker' in navigator)) {
 		return;
 	}
+	const ready = (worker) => statusBar.appendChild(h('div.note.ok', null, t('UpdateReady'), ' ', h('button.btn.small', { type: 'button', onclick: () => worker.postMessage('skipWaiting') }, t('Reload'))));
 	navigator.serviceWorker.register('service-worker.js').then((reg) => {
+		// New version installed before this opening (another page of the app was open)
+		if (reg.waiting && navigator.serviceWorker.controller) {
+			ready(reg.waiting);
+		}
 		reg.addEventListener('updatefound', () => {
 			const worker = reg.installing;
 			if (!worker) {
@@ -894,7 +1075,7 @@ function registerServiceWorker() {
 			}
 			worker.addEventListener('statechange', () => {
 				if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-					statusBar.appendChild(h('div.note.ok', null, t('UpdateReady'), ' ', h('button.btn.small', { type: 'button', onclick: () => worker.postMessage('skipWaiting') }, t('Reload'))));
+					ready(worker);
 				}
 			});
 		});
@@ -929,13 +1110,13 @@ async function start() {
 	// Records waiting: try again every minute while the app is open (the network may come back without the
 	// "online" event, e.g. a weak signal in the field)
 	setInterval(() => {
-		if (navigator.onLine && !state.syncing && state.queue.some((r) => r.status !== 'error')) {
+		if (navigator.onLine && !state.syncing && (state.queue.some((r) => r.status !== 'error') || state.photos.some((p) => p.status !== 'error'))) {
 			sync();
 		}
 	}, 60000);
 	// Back to the app (iPhone suspends it): send and update
 	document.addEventListener('visibilitychange', () => {
-		if (document.visibilityState === 'visible' && navigator.onLine && state.queue.length) {
+		if (document.visibilityState === 'visible' && navigator.onLine && waiting()) {
 			sync();
 		}
 	});

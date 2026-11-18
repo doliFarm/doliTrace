@@ -39,8 +39,8 @@ export class ApiError extends Error {
 /**
  * Call the endpoint
  *
- * @param {string} action session, data or send
- * @param {{token?: string, body?: any}} [options]
+ * @param {string} action session, data, send or photo
+ * @param {{token?: string, body?: any, form?: FormData}} [options]
  * @returns {Promise<any>} Answer
  */
 async function call(action, options = {}) {
@@ -49,7 +49,11 @@ async function call(action, options = {}) {
 		url += '&token=' + encodeURIComponent(options.token);
 	}
 	const init = { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' } };
-	if (options.body !== undefined) {
+	if (options.form !== undefined) {
+		// multipart: the browser sets the Content-Type with the boundary
+		init.method = 'POST';
+		init.body = options.form;
+	} else if (options.body !== undefined) {
 		init.method = 'POST';
 		init.headers['Content-Type'] = 'application/json';
 		init.body = JSON.stringify(options.body);
@@ -78,6 +82,22 @@ async function call(action, options = {}) {
 export const getSession = () => call('session');
 export const getData = () => call('data');
 export const sendRecords = (records, token) => call('send', { token, body: { records } });
+
+/**
+ * Send a photo of a record already sent
+ *
+ * @param {Object} photo {photo_id, record_id, created_at, blob}
+ * @param {string} token
+ * @returns {Promise<any>} Answer, with .result
+ */
+export function sendPhoto(photo, token) {
+	const form = new FormData();
+	form.append('record', photo.record_id);
+	form.append('photo_id', photo.photo_id);
+	form.append('created_at', photo.created_at || '');
+	form.append('photo', photo.blob, 'photo.jpg');
+	return call('photo', { token, form });
+}
 
 /** Page that asks the login of Dolibarr and comes back to the app */
 export const LOGIN_URL = new URL('login.php', self.location.href).href;

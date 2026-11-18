@@ -79,7 +79,7 @@ class modDolitrace extends DolibarrModules
 		$this->editor_squarred_logo = '';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@dolitrace'
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = '1.5.2';
+		$this->version = '1.5.3';
 		// Url to the file with your last numberversion of this module
 		//$this->url_last_version = 'http://www.example.com/versionmodule.txt';
 
@@ -415,6 +415,11 @@ class modDolitrace extends DolibarrModules
 		$this->rights[$r][1] = 'Use the field app: create drafts of operations and harvests on the farms the user can see (no update, no delete)';
 		$this->rights[$r][4] = 'dolitracepwa';
 		$this->rights[$r][5] = 'use';
+		$r++;
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', (5 * 10) + 1 + 1);
+		$this->rights[$r][1] = 'Use the field app: create drafts of treatments and fertilizations (they enter the register only when the office validates them)';
+		$this->rights[$r][4] = 'dolitracepwa';
+		$this->rights[$r][5] = 'treatment';
 		$r++;
 
 		/* END MODULEBUILDER PERMISSIONS */
