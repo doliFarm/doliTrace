@@ -2,7 +2,7 @@
 <!--
   Copyright (C) 2026 Luigi Grillo - doliFarm.com <info@dolifarm.com>
   Licence: GNU AGPL v3 or later (see COPYING)
-  Field app of doliTrace: static page, the data come from ajax/pwa.php with the session of Dolibarr.
+  Field app of doliFarm (module doliTrace): static page, the data come from ajax/pwa.php with the session of Dolibarr.
 -->
 <html lang="it">
 <head>
@@ -13,8 +13,9 @@
 	<meta name="apple-mobile-web-app-capable" content="yes">
 	<meta name="mobile-web-app-capable" content="yes">
 	<meta name="apple-mobile-web-app-status-bar-style" content="default">
-	<meta name="apple-mobile-web-app-title" content="Campo">
-	<title>App di campo</title>
+	<meta name="apple-mobile-web-app-title" content="doliFarm">
+	<meta name="application-name" content="doliFarm">
+	<title>doliFarm</title>
 	<link rel="manifest" href="manifest.json">
 	<link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png">
 	<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
@@ -23,8 +24,15 @@
 </head>
 <body>
 	<header class="topbar">
-		<a href="#/" class="brand"><img src="assets/img/icon-192.png" alt="" width="28" height="28"><span>doliTrace</span></a>
+		<a href="#/" class="brand"><img src="assets/img/icon-192.png" alt="" width="28" height="28"><span>doliFarm</span></a>
 	</header>
+	<!-- Opening page: shown before the scripts, hidden by app.js when the app is ready -->
+	<div id="splash" class="splash" role="status">
+		<div class="splash-logo"><img src="assets/img/dolifarm-logo.jpg" alt="doliFarm" width="160" height="160"></div>
+		<div class="splash-title">App di campo</div>
+		<div class="splash-sub">doliFarm.com</div>
+		<div id="splash-version" class="splash-sub"></div>
+	</div>
 	<div id="status" class="status" aria-live="polite"></div>
 	<main id="view" class="view">
 		<noscript>JavaScript is required.</noscript>

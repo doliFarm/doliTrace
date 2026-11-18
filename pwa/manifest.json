@@ -1,7 +1,7 @@
 {
-	"name": "doliTrace - App di campo",
-	"short_name": "Campo",
-	"description": "Appezzamenti, piani di produzione e registrazioni di campo di doliTrace, anche senza rete",
+	"name": "doliFarm",
+	"short_name": "doliFarm",
+	"description": "App di campo di doliFarm: appezzamenti, piani di produzione, operazioni, raccolte e trattamenti, anche senza rete",
 	"lang": "it",
 	"start_url": "./index.html",
 	"scope": "./",

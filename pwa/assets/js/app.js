@@ -25,8 +25,9 @@ import { t, setLang, fmtDate, fmtNumber } from './i18n.js';
 import { newClientId, saveRecord, loadQueue, removeRecord, loadSent, sendQueue } from './queue.js';
 import { MAX_PHOTOS, reducePhoto, newPhoto, loadPhotos, removePhoto, savePhotos, deletePhotosOf, sendPhotos } from './photos.js';
 import { treatmentFields, checkTreatment, treatmentSummary } from './treatment.js';
+import { weatherCard, formWeather } from './weather.js';
 
-export const APP_VERSION = '1.3.0';
+export const APP_VERSION = '1.4.0';
 
 /** Days without update after which the app warns (Safari deletes the data of the apps not used for about 7 days) */
 const OLD_DATA_DAYS = 5;
@@ -445,6 +446,7 @@ function viewPlot(id) {
 			field(t('Area'), plot.area_ha ? fmtNumber(plot.area_ha, 4) + ' ha' : ''),
 			h('div.buttons', null, links),
 		),
+		weatherCard(h, state.data && state.data.weather, plot.id),
 		h('h2', null, t('ProductionPlans')),
 		plans.length ? plans.map(planCard) : h('p.empty', null, t('NoPlan')),
 	);
@@ -822,6 +824,9 @@ function viewForm(kind, planId, record) {
 		return data;
 	};
 
+	// Weather expected at the hour of the record (operations and treatments; warnings for plant protection)
+	const weather = (kind !== 'harvest' && plot) ? formWeather(h, state.data && state.data.weather, plot.id) : null;
+
 	// Photos: reduced when added, saved with the record, sent after it
 	const photos = record ? photosOf(record.client_id).map((p) => Object.assign({}, p)) : [];
 	const urls = [];
@@ -914,11 +919,24 @@ function viewForm(kind, planId, record) {
 	},
 	error,
 	fields,
+	weather ? weather.box : null,
 	photoBox,
 	h('div.buttons', null,
 		h('button.btn.primary', { type: 'submit' }, t('Save')),
 		record ? h('button.btn.danger', { type: 'button', onclick: () => deleteRecord(record) }, t('Delete')) : null,
 	));
+	if (weather) {
+		const refreshWeather = () => {
+			const values = {};
+			new FormData(form).forEach((v, k) => {
+				values[k] = String(v).trim();
+			});
+			weather.refresh(values, kind === 'treatment' && values.kind === '1');
+		};
+		form.addEventListener('input', refreshWeather);
+		form.addEventListener('change', refreshWeather);
+		refreshWeather();
+	}
 	if (treatment) {
 		// Warnings and quantities follow the header (date, surface, water, operator, machine)
 		const header = () => {
@@ -1089,7 +1107,31 @@ function registerServiceWorker() {
 	});
 }
 
+/**
+ * Opening page with the logo of doliFarm: at least 1.5 s, then it fades (a tap closes it before)
+ *
+ * @param {number} shownAt Time the page was shown
+ */
+function hideSplash(shownAt) {
+	const splash = document.getElementById('splash');
+	if (!splash) {
+		return;
+	}
+	const close = () => {
+		splash.classList.add('hide');
+		setTimeout(() => splash.remove(), 500);
+	};
+	splash.addEventListener('click', close, { once: true });
+	setTimeout(close, Math.max(0, 1500 - (Date.now() - shownAt)));
+}
+
 async function start() {
+	const shownAt = Date.now();
+	const splashTitle = document.querySelector('.splash-title');
+	if (splashTitle) {
+		splashTitle.textContent = t('SplashTitle');
+		document.getElementById('splash-version').textContent = t('Version', APP_VERSION);
+	}
 	await loadLocal();
 	renderStatus();
 	// Opened from the address of a sign (?ref=...)
@@ -1101,6 +1143,7 @@ async function start() {
 		}
 	}
 	route();
+	hideSplash(shownAt);
 	window.addEventListener('hashchange', route);
 	window.addEventListener('online', () => {
 		renderStatus();

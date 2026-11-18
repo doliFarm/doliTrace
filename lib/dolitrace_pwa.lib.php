@@ -249,6 +249,8 @@ function dolitracePwaData($db, $user, $langs)
 		$db->free($resql);
 	}
 	$data['weather_available'] = (dol_include_once('/dolitrace/lib/dolitrace_weather.lib.php') && function_exists('dolitraceWeatherAvailable') && dolitraceWeatherAvailable());
+	// Weather of the plots (doliField): forecast, windows for the treatments, hourly values for the forms
+	$data['weather'] = ($data['weather_available'] ? dolitracePwaWeatherData($db, $data['plots']) : null);
 	// Treatments (phase P3): only for who can make their drafts
 	$rights = dolitracePwaRights($user);
 	if ($rights['treatment']) {
@@ -961,4 +963,76 @@ function dolitracePwaTreatmentLines($user, $object)
 		return -1;
 	}
 	return 1;
+}
+
+/**
+ * Weather of doliField for the phone: forecast by day, windows for the treatments and hourly values of the weather
+ * points of the plots (from the day before to 3 days ahead), so the app shows them also without network
+ *
+ * @param	DoliDB					$db		Database handler
+ * @param	array<int,array<string,mixed>>	$plots	Plots of the data of the app
+ * @return	?array<string,mixed>			null if doliField is not available or no plot has a weather point
+ */
+function dolitracePwaWeatherData($db, $plots)
+{
+	global $conf;
+
+	if (!dol_include_once('/dolitrace/lib/dolitrace_weather.lib.php') || !dolitraceWeatherAvailable() || !count($plots)) {
+		return null;
+	}
+	$weather = new DoliFieldWeather($db);
+	$stations = $weather->getStations();
+	if (!is_array($stations) || !count($stations)) {
+		return null;
+	}
+	// Weather point of each plot: the first by priority and distance, as DoliFieldWeather::getConditions()
+	$ids = array_map('intval', array_column($plots, 'id'));
+	$map = array();
+	$sql = "SELECT fk_plot, fk_station FROM ".$db->prefix()."dolifield_weather_plot";
+	$sql .= " WHERE entity = ".((int) $conf->entity)." AND fk_plot IN (".$db->sanitize(implode(',', $ids)).")";
+	$sql .= " ORDER BY fk_plot, priority, distance_km";
+	$resql = $db->query($sql);
+	if ($resql) {
+		while ($obj = $db->fetch_object($resql)) {
+			if (!isset($map[(int) $obj->fk_plot]) && isset($stations[(int) $obj->fk_station])) {
+				$map[(int) $obj->fk_plot] = (int) $obj->fk_station;
+			}
+		}
+		$db->free($resql);
+	} else {
+		dol_syslog(__FUNCTION__.' '.$db->lasterror(), LOG_ERR);
+	}
+	if (!count($map)) {
+		return null;
+	}
+	$limit = DoliFieldWeather::thresholds();
+	$now = (int) (floor(dol_now() / 3600) * 3600);
+	$data = array('thresholds' => $limit, 'plots' => $map, 'stations' => array());
+	foreach (array_unique(array_values($map)) as $stationid) {
+		$run = 0;
+		$hours = array();
+		foreach ($weather->getBestHours($stationid, $now - 24 * 3600, $now + (72 + $limit['rainhours'] + 6) * 3600) as $time => $h) {
+			// [time, kind, temperature, wind, precipitation, hours of the precipitation]
+			$hours[] = array($time, (int) $h['kind'], $h['temp'], $h['wind'], $h['precip'], (int) $h['precip_hours']);
+			if ($h['kind'] == DoliFieldWeather::KIND_FORECAST) {
+				$run = max($run, (int) $h['run']);
+			}
+		}
+		$days = array();
+		foreach (array_slice($weather->getForecastDays($stationid), 0, 4, true) as $day => $d) {
+			$days[] = array('date' => $day, 'tmin' => $d['tmin'], 'tmax' => $d['tmax'], 'precip' => $d['precip'], 'wind_max' => $d['wind_max'], 'symbol' => $d['symbol']);
+		}
+		$windows = array();
+		foreach ($weather->getTreatmentWindows($stationid, 48) as $w) {
+			$windows[] = array($w['from'], $w['to']);
+		}
+		$data['stations'][$stationid] = array(
+			'label' => (string) $stations[$stationid]['label'],
+			'run' => ($run ? dolitracePwaDate($run, true) : null),
+			'days' => $days,
+			'windows' => $windows,
+			'hours' => $hours,
+		);
+	}
+	return $data;
 }
