@@ -1,5 +1,13 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.5.5 (2026-11-18)
+
+Menu e app di campo 1.4.1. Dopo l'aggiornamento **riattivare doliTrace** (menu); richiede doliFarm 1.5.10.
+
+- "App di campo" e "Aiutami" in fondo al menu a sinistra, dopo un separatore; QdC secondo nel top menu.
+- App di campo 1.4.1: la scansione legge anche il QR della scheda e del PDF dell'appezzamento (`?id=`), compila il campo Riferimento e apre la scheda; se l'appezzamento non è nei dati del telefono mostra il link alla scheda in Dolibarr. Lo stesso QR viene letto una volta sola.
+- Installazione su Android: usare Chrome. Da Samsung Internet Android segnala l'app come "creata per una versione precedente di Android"; l'app lo ricorda quando è aperta da Samsung Internet.
+
 ## 1.5.4 (2026-11-18)
 
 Trattamenti, foto e meteo dall'app di campo, che ora si chiama doliFarm (la 1.5.3 non è stata pubblicata ed è inclusa qui). Dopo l'aggiornamento **riattivare doliTrace**: registra il nuovo permesso e lo script `sql/update_dolitrace_draft_ref.sql` sistema le bozze e l'indice dei documenti esistenti. Poi assegnare "Usare l'app di campo: bozze di trattamenti" a chi registra i trattamenti dal telefono.
