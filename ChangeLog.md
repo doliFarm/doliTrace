@@ -1,8 +1,8 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-## Non rilasciato
+## 1.5.11 (2026-11-24)
 
-Menu della suite. Dopo l'aggiornamento **riattivare doliTrace** (menu); da usare con doliFarm successivo alla 1.6.0.
+Menu della suite. Dopo l'aggiornamento **riattivare doliTrace** (menu); da usare con doliFarm 1.6.1.
 
 - Niente più top menu "QdC": le voci sono la sezione **Quaderno di campagna** del menu a sinistra di doliFarm (piani di produzione, operazioni, raccolte, registro trattamenti, biologico, tracciabilità). "Aiutami" e "App di campo" sono dichiarati solo da doliFarm.
 - I link dei riquadri della Home (trattamenti e raccolte in bozza) aprono il menu doliFarm.
