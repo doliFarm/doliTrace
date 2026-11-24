@@ -99,7 +99,7 @@ class ActionsDolitrace extends CommonHookActions
 			$board->img = img_picto('', 'fa-clipboard-list');
 			$board->label = $langs->trans('DashboardTreatmentsDraft');
 			$board->labelShort = $langs->trans('DashboardTreatmentsDraftShort');
-			$board->url = dol_buildpath('/dolitrace/dolitracetreatment_list.php', 1).'?mainmenu=dolitrace&search_status=0';
+			$board->url = dol_buildpath('/dolitrace/dolitracetreatment_list.php', 1).'?mainmenu=dolifarm&search_status=0';
 			$board->warning_delay = 30;
 			$this->countInto($board, $sql);
 			$this->results['dolitrace_treatment_draft'] = $board;
@@ -113,7 +113,7 @@ class ActionsDolitrace extends CommonHookActions
 			$board = new WorkboardResponse();
 			$board->img = img_picto('', 'fa-tractor');
 			$board->label = $langs->trans('DashboardHarvestsDraft');
-			$board->url = dol_buildpath('/dolitrace/dolitraceharvest_list.php', 1).'?mainmenu=dolitrace&search_status=0';
+			$board->url = dol_buildpath('/dolitrace/dolitraceharvest_list.php', 1).'?mainmenu=dolifarm&search_status=0';
 			$this->countInto($board, $sql);
 			$this->results['dolitrace_harvest_draft'] = $board;
 		}

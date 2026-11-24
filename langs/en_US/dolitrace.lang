@@ -863,3 +863,6 @@ ErrorWeatherObsValue = %s: value outside the allowed range (from %s to %s)
 ErrorWeatherObsDate = The time of the weather reading (%s) must be near the work: from 12 hours before the start to 12 hours after the end, not in the future
 WarningWeatherObsWind = Wind observed in the field %s m/s, over the threshold of %s m/s: drift risk
 WarningWeatherObsTemp = Temperature observed in the field %s °C, over the threshold of %s °C
+
+# Left menu of the suite (24/11/2026)
+MenuFieldNotebook = Field notebook

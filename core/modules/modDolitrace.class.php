@@ -79,7 +79,7 @@ class modDolitrace extends DolibarrModules
 		$this->editor_squarred_logo = '';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@dolitrace'
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = '1.5.10';
+		$this->version = '1.5.11';
 		// Url to the file with your last numberversion of this module
 		//$this->url_last_version = 'http://www.example.com/versionmodule.txt';
 
@@ -431,50 +431,35 @@ class modDolitrace extends DolibarrModules
 		$this->menu = array();
 		$r = 0;
 		// Add here entries to declare new menus
-		/* BEGIN MODULEBUILDER TOPMENU */
-		$this->menu[$r++] = array(
-			'fk_menu' => '', // Will be stored into mainmenu + leftmenu. Use '' if this is a top menu. For left menu, use 'fk_mainmenu=xxx' or 'fk_mainmenu=xxx,fk_leftmenu=yyy' where xxx is mainmenucode and yyy is a leftmenucode
-			'type' => 'top', // This is a Top menu entry
-			'titre' => 'Dolitrace',
-			'prefix' => img_picto('', dolifarm_get_fa_icon('dolitrace'), 'class="pictofixedwidth valignmiddle"'),
-			'mainmenu' => 'dolitrace',
-			'leftmenu' => '',
-			'url' => '/dolitrace/dolitraceindex.php',
-			'langs' => 'dolitrace@dolitrace', // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
-			'position' => 1002,	// Top menu of the suite: Farm dossiers (1001), Field notebook (1002), Field of doliField (1003)
-			'enabled' => "isModEnabled('dolitrace')", // Define condition to show or hide menu entry. Use "isModEnabled('dolitrace')" if entry must be visible if module is enabled (those quote marks are importants).
-			'perms' => '1', // Use 'perms'=>'$user->hasRight("dolitrace", "dolitraceharvest", "read")' if you want your menu with a permission rules
-			'target' => '',
-			'user' => 2, // 0=Menu for internal users, 1=external users, 2=both
-		);
-		/* END MODULEBUILDER TOPMENU */
+		// No top menu: the entries are a section of the left menu of the only top menu of the suite, "dolifarm" (doliTrace
+		// depends on doliFarm), after the Farm dossier (positions 1100+) and before the Field data of doliField (3000+)
 		/* BEGIN MODULEBUILDER LEFTMENU DOLITRACECROPPLAN */
 		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace',
+			'fk_menu' => 'fk_mainmenu=dolifarm',	// Head of the section "Field notebook"
 			'type' => 'left',
-			'titre' => 'DolitraceArea',
+			'titre' => 'MenuFieldNotebook',
 			'prefix' => img_picto('', dolifarm_get_fa_icon('dolitrace'), 'class="paddingright pictofixedwidth valignmiddle"'),
-			'mainmenu' => 'dolitrace',
-			'leftmenu' => 'dolitracecropplan',
+			'mainmenu' => 'dolifarm',
+			'leftmenu' => 'dolitrace',
 			'url' => '/dolitrace/dolitraceindex.php',
 			'langs' => 'dolitrace@dolitrace',
-			'position' => 1000 + $r,
+			'position' => 2000 + $r,
 			'enabled' => 'isModEnabled("dolitrace")',
-			'perms' => '$user->hasRight("dolitrace", "dolitracecropplan", "read")',
+			'perms' => '$user->hasRight("dolitrace", "dolitracecropplan", "read") || $user->hasRight("dolitrace", "dolitraceoperation", "read") || $user->hasRight("dolitrace", "dolitraceharvest", "read") || $user->hasRight("dolitrace", "dolitracetreatment", "read") || $user->hasRight("dolitrace", "dolitracebioinspection", "read")',	// Dolibarr shows the entries under it only if it is enabled
 			'target' => '',
 			'user' => 2,
 			'object' => 'DoliTraceCropplan'
 		);
 		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace',
+			'fk_menu' => 'fk_mainmenu=dolifarm,fk_leftmenu=dolitrace',
 			'type' => 'left',
 			'titre' => 'DoliTraceCropplans',
 			'prefix' => img_picto('', dolifarm_get_fa_icon('cropplan'), 'class="paddingright pictofixedwidth valignmiddle"'),
-			'mainmenu' => 'dolitrace',
+			'mainmenu' => 'dolifarm',
 			'leftmenu' => 'dolitracecropplan',
 			'url' => '/dolitrace/dolitracecropplan_list.php',
 			'langs' => 'dolitrace@dolitrace',
-			'position' => 1000 + $r,
+			'position' => 2000 + $r,
 			'enabled' => 'isModEnabled("dolitrace")',
 			'perms' => '$user->hasRight("dolitrace", "dolitracecropplan", "read")',
 			'target' => '',
@@ -483,14 +468,14 @@ class modDolitrace extends DolibarrModules
 		);
 		/*
 		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitracecropplan',
+			'fk_menu' => 'fk_mainmenu=dolifarm,fk_leftmenu=dolitracecropplan',
 			'type' => 'left',
 			'titre' => 'ListDoliTraceCropplan',
-			'mainmenu' => 'dolitrace',
+			'mainmenu' => 'dolifarm',
 			'leftmenu' => 'dolitrace_cropplan_list',
 			'url' => '/dolitrace/dolitracecropplan_list.php',
 			'langs' => 'dolitrace@dolitrace',
-			'position' => 1000 + $r,
+			'position' => 2000 + $r,
 			'enabled' => 'isModEnabled("dolitrace")',
 			'perms' => '$user->hasRight("dolitrace", "dolitracecropplan", "read")',
 			'target' => '',
@@ -498,14 +483,14 @@ class modDolitrace extends DolibarrModules
 			'object' => 'DoliTraceCropplan'
 		);
 		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitracecropplan',
+			'fk_menu' => 'fk_mainmenu=dolifarm,fk_leftmenu=dolitracecropplan',
 			'type' => 'left',
 			'titre' => 'NewDoliTraceCropplan',
-			'mainmenu' => 'dolitrace',
+			'mainmenu' => 'dolifarm',
 			'leftmenu' => 'dolitrace_cropplan_new',
 			'url' => '/dolitrace/dolitracecropplan_card.php?action=create',
 			'langs' => 'dolitrace@dolitrace',
-			'position' => 1000 + $r,
+			'position' => 2000 + $r,
 			'enabled' => 'isModEnabled("dolitrace")',
 			'perms' => '$user->hasRight("dolitrace", "dolitracecropplan", "write")',
 			'target' => '',
@@ -513,66 +498,17 @@ class modDolitrace extends DolibarrModules
 			'object' => 'DoliTraceCropplan'
 		);
 		*/
-			/* BEGIN MODULEBUILDER LEFTMENU DOLITRACEHARVEST */
-		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace',
-			'type' => 'left',
-			'titre' => 'DoliTraceHarvests',
-			'prefix' => img_picto('', dolifarm_get_fa_icon('harvest'), 'class="paddingright pictofixedwidth valignmiddle"'),
-			'mainmenu' => 'dolitrace',
-			'leftmenu' => 'dolitraceharvest',
-			'url' => '/dolitrace/dolitraceharvest_list.php',
-			'langs' => 'dolitrace@dolitrace',
-			'position' => 1000 + $r,
-			'enabled' => 'isModEnabled("dolitrace")',
-			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "read")',
-			'target' => '',
-			'user' => 2,
-			'object' => 'DoliTraceHarvest'
-		);
-		/*
-		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitraceharvest',
-			'type' => 'left',
-			'titre' => 'ListDoliTraceHarvests',
-			'mainmenu' => 'dolitrace',
-			'leftmenu' => 'dolitrace_harvest_list',
-			'url' => '/dolitrace/dolitraceharvest_list.php',
-			'langs' => 'dolitrace@dolitrace',
-			'position' => 1000 + $r,
-			'enabled' => 'isModEnabled("dolitrace")',
-			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "read")',
-			'target' => '',
-			'user' => 2,
-			'object' => 'DoliTraceHarvest'
-		);
-		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitraceharvest',
-			'type' => 'left',
-			'titre' => 'NewDoliTraceHarvest',
-			'mainmenu' => 'dolitrace',
-			'leftmenu' => 'dolitrace_harvest_new',
-			'url' => '/dolitrace/dolitraceharvest_card.php?action=create',
-			'langs' => 'dolitrace@dolitrace',
-			'position' => 1000 + $r,
-			'enabled' => 'isModEnabled("dolitrace")',
-			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "write")',
-			'target' => '',
-			'user' => 2,
-			'object' => 'DoliTraceHarvest'
-		);
-		*/
 		/* BEGIN MODULEBUILDER LEFTMENU DOLITRACEOPERATION */
 		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace',
+			'fk_menu' => 'fk_mainmenu=dolifarm,fk_leftmenu=dolitrace',
 			'type' => 'left',
 			'titre' => 'DoliTraceOperations',
 			'prefix' => img_picto('', dolifarm_get_fa_icon('operation'), 'class="paddingright pictofixedwidth valignmiddle"'),
-			'mainmenu' => 'dolitrace',
+			'mainmenu' => 'dolifarm',
 			'leftmenu' => 'dolitraceoperation',
 			'url' => '/dolitrace/dolitraceoperation_list.php',
 			'langs' => 'dolitrace@dolitrace',
-			'position' => 1000 + $r,
+			'position' => 2000 + $r,
 			'enabled' => 'isModEnabled("dolitrace")',
 			'perms' => '$user->hasRight("dolitrace", "dolitraceoperation", "read")',
 			'target' => '',
@@ -581,14 +517,14 @@ class modDolitrace extends DolibarrModules
 		);
 		/*
 		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitraceoperation',
+			'fk_menu' => 'fk_mainmenu=dolifarm,fk_leftmenu=dolitraceoperation',
 			'type' => 'left',
 			'titre' => 'ListDoliTraceOperation',
-			'mainmenu' => 'dolitrace',
+			'mainmenu' => 'dolifarm',
 			'leftmenu' => 'dolitrace_operation_list',
 			'url' => '/dolitrace/dolitraceoperation_list.php',
 			'langs' => 'dolitrace@dolitrace',
-			'position' => 1000 + $r,
+			'position' => 2000 + $r,
 			'enabled' => 'isModEnabled("dolitrace")',
 			'perms' => '$user->hasRight("dolitrace", "dolitraceoperation", "read")',
 			'target' => '',
@@ -596,14 +532,14 @@ class modDolitrace extends DolibarrModules
 			'object' => 'DoliTraceOperation'
 		);
 		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitraceoperation',
+			'fk_menu' => 'fk_mainmenu=dolifarm,fk_leftmenu=dolitraceoperation',
 			'type' => 'left',
 			'titre' => 'NewDoliTraceOperation',
-			'mainmenu' => 'dolitrace',
+			'mainmenu' => 'dolifarm',
 			'leftmenu' => 'dolitrace_operation_new',
 			'url' => '/dolitrace/dolitraceoperation_card.php?action=create',
 			'langs' => 'dolitrace@dolitrace',
-			'position' => 1000 + $r,
+			'position' => 2000 + $r,
 			'enabled' => 'isModEnabled("dolitrace")',
 			'perms' => '$user->hasRight("dolitrace", "dolitraceoperation", "write")',
 			'target' => '',
@@ -611,17 +547,66 @@ class modDolitrace extends DolibarrModules
 			'object' => 'DoliTraceOperation'
 		);
 		*/
+		/* BEGIN MODULEBUILDER LEFTMENU DOLITRACEHARVEST */
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolifarm,fk_leftmenu=dolitrace',
+			'type' => 'left',
+			'titre' => 'DoliTraceHarvests',
+			'prefix' => img_picto('', dolifarm_get_fa_icon('harvest'), 'class="paddingright pictofixedwidth valignmiddle"'),
+			'mainmenu' => 'dolifarm',
+			'leftmenu' => 'dolitraceharvest',
+			'url' => '/dolitrace/dolitraceharvest_list.php',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 2000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "read")',
+			'target' => '',
+			'user' => 2,
+			'object' => 'DoliTraceHarvest'
+		);
+		/*
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolifarm,fk_leftmenu=dolitraceharvest',
+			'type' => 'left',
+			'titre' => 'ListDoliTraceHarvests',
+			'mainmenu' => 'dolifarm',
+			'leftmenu' => 'dolitrace_harvest_list',
+			'url' => '/dolitrace/dolitraceharvest_list.php',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 2000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "read")',
+			'target' => '',
+			'user' => 2,
+			'object' => 'DoliTraceHarvest'
+		);
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=dolifarm,fk_leftmenu=dolitraceharvest',
+			'type' => 'left',
+			'titre' => 'NewDoliTraceHarvest',
+			'mainmenu' => 'dolifarm',
+			'leftmenu' => 'dolitrace_harvest_new',
+			'url' => '/dolitrace/dolitraceharvest_card.php?action=create',
+			'langs' => 'dolitrace@dolitrace',
+			'position' => 2000 + $r,
+			'enabled' => 'isModEnabled("dolitrace")',
+			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "write")',
+			'target' => '',
+			'user' => 2,
+			'object' => 'DoliTraceHarvest'
+		);
+		*/
 		/* BEGIN MODULEBUILDER LEFTMENU DOLITRACETREATMENT */
 		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace',
+			'fk_menu' => 'fk_mainmenu=dolifarm,fk_leftmenu=dolitrace',
 			'type' => 'left',
 			'titre' => 'TreatmentRegister',
 			'prefix' => img_picto('', 'fa-spray-can', 'class="paddingright pictofixedwidth valignmiddle"'),
-			'mainmenu' => 'dolitrace',
+			'mainmenu' => 'dolifarm',
 			'leftmenu' => 'dolitracetreatment',
 			'url' => '/dolitrace/dolitracetreatment_list.php',
 			'langs' => 'dolitrace@dolitrace',
-			'position' => 1000 + $r,
+			'position' => 2000 + $r,
 			'enabled' => 'isModEnabled("dolitrace")',
 			'perms' => '$user->hasRight("dolitrace", "dolitracetreatment", "read")',
 			'target' => '',
@@ -629,14 +614,14 @@ class modDolitrace extends DolibarrModules
 			'object' => 'DoliTraceTreatment'
 		);
 		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitracetreatment',
+			'fk_menu' => 'fk_mainmenu=dolifarm,fk_leftmenu=dolitracetreatment',
 			'type' => 'left',
 			'titre' => 'NewTreatmentRecord',
-			'mainmenu' => 'dolitrace',
+			'mainmenu' => 'dolifarm',
 			'leftmenu' => 'dolitrace_treatment_new',
 			'url' => '/dolitrace/dolitracetreatment_card.php?action=create',
 			'langs' => 'dolitrace@dolitrace',
-			'position' => 1000 + $r,
+			'position' => 2000 + $r,
 			'enabled' => 'isModEnabled("dolitrace")',
 			'perms' => '$user->hasRight("dolitrace", "dolitracetreatment", "write")',
 			'target' => '',
@@ -644,14 +629,14 @@ class modDolitrace extends DolibarrModules
 			'object' => 'DoliTraceTreatment'
 		);
 		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitracetreatment',
+			'fk_menu' => 'fk_mainmenu=dolifarm,fk_leftmenu=dolitracetreatment',
 			'type' => 'left',
 			'titre' => 'TreatmentExport',
-			'mainmenu' => 'dolitrace',
+			'mainmenu' => 'dolifarm',
 			'leftmenu' => 'dolitrace_treatment_export',
 			'url' => '/dolitrace/dolitracetreatment_export.php',
 			'langs' => 'dolitrace@dolitrace',
-			'position' => 1000 + $r,
+			'position' => 2000 + $r,
 			'enabled' => 'isModEnabled("dolitrace")',
 			'perms' => '$user->hasRight("dolitrace", "dolitracetreatment", "read")',
 			'target' => '',
@@ -659,14 +644,14 @@ class modDolitrace extends DolibarrModules
 			'object' => 'DoliTraceTreatment'
 		);
 		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitracetreatment',
+			'fk_menu' => 'fk_mainmenu=dolifarm,fk_leftmenu=dolitracetreatment',
 			'type' => 'left',
 			'titre' => 'TreatmentImport',
-			'mainmenu' => 'dolitrace',
+			'mainmenu' => 'dolifarm',
 			'leftmenu' => 'dolitrace_treatment_import',
 			'url' => '/dolitrace/dolitracetreatment_import.php',
 			'langs' => 'dolitrace@dolitrace',
-			'position' => 1000 + $r,
+			'position' => 2000 + $r,
 			'enabled' => 'isModEnabled("dolitrace")',
 			'perms' => '$user->hasRight("dolitrace", "dolitracetreatment", "write")',
 			'target' => '',
@@ -675,15 +660,15 @@ class modDolitrace extends DolibarrModules
 		);
 		// Section "Organic": registers of organic production (all the data of the farm, not only the harvests) and inspections of the control body
 		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace',
+			'fk_menu' => 'fk_mainmenu=dolifarm,fk_leftmenu=dolitrace',
 			'type' => 'left',
 			'titre' => 'DolitraceMenuOrganic',
 			'prefix' => img_picto('', 'fa-leaf', 'class="paddingright pictofixedwidth valignmiddle"'),
-			'mainmenu' => 'dolitrace',
+			'mainmenu' => 'dolifarm',
 			'leftmenu' => 'dolitrace_bio',
 			'url' => '/dolitrace/dolitrace_bioregister.php',
 			'langs' => 'dolitrace@dolitrace',
-			'position' => 1000 + $r,
+			'position' => 2000 + $r,
 			'enabled' => 'isModEnabled("dolitrace")',
 			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "read") || $user->hasRight("dolitrace", "dolitracebioinspection", "read")',
 			'target' => '',
@@ -691,14 +676,14 @@ class modDolitrace extends DolibarrModules
 		);
 		// Registers of organic production: stock in and out, mass balance, summary by plot, seeds, inputs, treatments, purchases, harvests, sales (read only)
 		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitrace_bio',
+			'fk_menu' => 'fk_mainmenu=dolifarm,fk_leftmenu=dolitrace_bio',
 			'type' => 'left',
 			'titre' => 'BioRegister',
-			'mainmenu' => 'dolitrace',
+			'mainmenu' => 'dolifarm',
 			'leftmenu' => 'dolitrace_bioregister',
 			'url' => '/dolitrace/dolitrace_bioregister.php',
 			'langs' => 'dolitrace@dolitrace',
-			'position' => 1000 + $r,
+			'position' => 2000 + $r,
 			'enabled' => 'isModEnabled("dolitrace")',
 			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "read")',
 			'target' => '',
@@ -706,28 +691,28 @@ class modDolitrace extends DolibarrModules
 		);
 		// Inspections of the organic control body: closing one freezes the registers of the farm up to its date
 		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitrace_bio',
+			'fk_menu' => 'fk_mainmenu=dolifarm,fk_leftmenu=dolitrace_bio',
 			'type' => 'left',
 			'titre' => 'BioInspections',
-			'mainmenu' => 'dolitrace',
+			'mainmenu' => 'dolifarm',
 			'leftmenu' => 'dolitrace_bioinspection',
 			'url' => '/dolitrace/dolitracebioinspection_list.php',
 			'langs' => 'dolitrace@dolitrace',
-			'position' => 1000 + $r,
+			'position' => 2000 + $r,
 			'enabled' => 'isModEnabled("dolitrace")',
 			'perms' => '$user->hasRight("dolitrace", "dolitracebioinspection", "read")',
 			'target' => '',
 			'user' => 2,
 		);
 		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitrace_bio',
+			'fk_menu' => 'fk_mainmenu=dolifarm,fk_leftmenu=dolitrace_bio',
 			'type' => 'left',
 			'titre' => 'NewBioInspection',
-			'mainmenu' => 'dolitrace',
+			'mainmenu' => 'dolifarm',
 			'leftmenu' => 'dolitrace_bioinspection_new',
 			'url' => '/dolitrace/dolitracebioinspection_card.php?action=create',
 			'langs' => 'dolitrace@dolitrace',
-			'position' => 1000 + $r,
+			'position' => 2000 + $r,
 			'enabled' => 'isModEnabled("dolitrace")',
 			'perms' => '$user->hasRight("dolitrace", "dolitracebioinspection", "write")',
 			'target' => '',
@@ -735,50 +720,17 @@ class modDolitrace extends DolibarrModules
 		);
 		// Traceability of a harvested product: search by UUID, short code or lot, history upstream and downstream
 		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace',
+			'fk_menu' => 'fk_mainmenu=dolifarm,fk_leftmenu=dolitrace',
 			'type' => 'left',
 			'titre' => 'TraceTitle',
 			'prefix' => img_picto('', 'fa-route', 'class="paddingright pictofixedwidth valignmiddle"'),
-			'mainmenu' => 'dolitrace',
+			'mainmenu' => 'dolifarm',
 			'leftmenu' => 'dolitrace_trace',
 			'url' => '/dolitrace/dolitrace_trace.php',
 			'langs' => 'dolitrace@dolitrace',
-			'position' => 1000 + $r,
+			'position' => 2000 + $r,
 			'enabled' => 'isModEnabled("dolitrace")',
 			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "read")',
-			'target' => '',
-			'user' => 2,
-		);
-		// "Help me" (getting started of doliFarm): last section of the left menu of the three modules of the suite, after a
-		// separator (dolifarm/css/dolifarm.css), with the field app under it (declared after it: the parent must exist)
-		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace',
-			'type' => 'left',
-			'titre' => 'StartTitle',
-			'prefix' => img_picto('', 'fa-question-circle', 'class="paddingright pictofixedwidth valignmiddle"'),
-			'mainmenu' => 'dolitrace',
-			'leftmenu' => 'dolifarm_start',
-			'url' => '/dolifarm/dolifarm_start.php',
-			'langs' => 'dolifarm@dolifarm',
-			'position' => 9011,	// Last entry of the left menu; one position for each module (unique key of llx_menu)
-			'enabled' => 'isModEnabled("dolifarm")',
-			'perms' => '1',
-			'target' => '',
-			'user' => 0,
-		);
-		// Field app (PWA) for the phone: under "Help me", in the same section at the bottom of the left menu of the three modules
-		$this->menu[$r++] = array(
-			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolifarm_start',
-			'type' => 'left',
-			'titre' => 'PwaTitle',
-			'prefix' => img_picto('', 'fa-mobile-alt', 'class="paddingright pictofixedwidth valignmiddle"'),
-			'mainmenu' => 'dolitrace',
-			'leftmenu' => 'dolitrace_pwa',
-			'url' => '/dolitrace/dolitrace_pwa.php',
-			'langs' => 'dolitrace@dolitrace',
-			'position' => 9021,	// After "Help me": Dolibarr looks for the parent only among the entries with a lower position; one position for each module (unique key of llx_menu)
-			'enabled' => 'isModEnabled("dolitrace") && isModEnabled("dolifarm")',
-			'perms' => '$user->hasRight("dolitrace", "dolitracepwa", "use") || $user->hasRight("dolitrace", "dolitraceoperation", "write") || $user->hasRight("dolitrace", "dolitraceharvest", "write")',
 			'target' => '',
 			'user' => 2,
 		);
@@ -786,15 +738,15 @@ class modDolitrace extends DolibarrModules
 		/* BEGIN MODULEBUILDER LEFTMENU MYOBJECT */
 		/*
 		$this->menu[$r++]=array(
-			'fk_menu' => 'fk_mainmenu=dolitrace',      // '' if this is a top menu. For left menu, use 'fk_mainmenu=xxx' or 'fk_mainmenu=xxx,fk_leftmenu=yyy' where xxx is mainmenucode and yyy is a leftmenucode
+			'fk_menu' => 'fk_mainmenu=dolifarm,fk_leftmenu=dolitrace',      // '' if this is a top menu. For left menu, use 'fk_mainmenu=xxx' or 'fk_mainmenu=xxx,fk_leftmenu=yyy' where xxx is mainmenucode and yyy is a leftmenucode
 			'type' => 'left',                          // This is a Left menu entry
 			'titre' => 'DoliTraceHarvest',
 			'prefix' => img_picto('', $this->picto, 'class="pictofixedwidth valignmiddle paddingright"'),
-			'mainmenu' => 'dolitrace',
+			'mainmenu' => 'dolifarm',
 			'leftmenu' => 'dolitraceharvest',
 			'url' => '/dolitrace/dolitraceindex.php',
 			'langs' => 'dolitrace@dolitrace',	        // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
-			'position' => 1000 + $r,
+			'position' => 2000 + $r,
 			'enabled' => "isModEnabled('dolitrace')", // Define condition to show or hide menu entry. Use isModEnabled("dolitrace") if entry must be visible if module is enabled.
 			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "read")',
 			'target' => '',
@@ -802,14 +754,14 @@ class modDolitrace extends DolibarrModules
 			'object' => 'DoliTraceHarvest'
 		);
 		$this->menu[$r++]=array(
-			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitraceharvest',	    // '' if this is a top menu. For left menu, use 'fk_mainmenu=xxx' or 'fk_mainmenu=xxx,fk_leftmenu=yyy' where xxx is mainmenucode and yyy is a leftmenucode
+			'fk_menu' => 'fk_mainmenu=dolifarm,fk_leftmenu=dolitraceharvest',	    // '' if this is a top menu. For left menu, use 'fk_mainmenu=xxx' or 'fk_mainmenu=xxx,fk_leftmenu=yyy' where xxx is mainmenucode and yyy is a leftmenucode
 			'type' => 'left',			                // This is a Left menu entry
 			'titre' => 'New_DoliTraceHarvest',
-			'mainmenu' => 'dolitrace',
+			'mainmenu' => 'dolifarm',
 			'leftmenu' => 'dolitrace_harvest_new',
 			'url' => '/dolitrace/dolitraceharvest_card.php?action=create',
 			'langs' => 'dolitrace@dolitrace',	        // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
-			'position' => 1000 + $r,
+			'position' => 2000 + $r,
 			'enabled' => "isModEnabled('dolitrace')", // Define condition to show or hide menu entry. Use isModEnabled("dolitrace") if entry must be visible if module is enabled. Use '$leftmenu==\'system\'' to show if leftmenu system is selected.
 			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "write")'
 			'target' => '',
@@ -817,14 +769,14 @@ class modDolitrace extends DolibarrModules
 			'object' => 'DoliTraceHarvest'
 		);
 		$this->menu[$r++]=array(
-			'fk_menu' => 'fk_mainmenu=dolitrace,fk_leftmenu=dolitraceharvest',	    // '' if this is a top menu. For left menu, use 'fk_mainmenu=xxx' or 'fk_mainmenu=xxx,fk_leftmenu=yyy' where xxx is mainmenucode and yyy is a leftmenucode
+			'fk_menu' => 'fk_mainmenu=dolifarm,fk_leftmenu=dolitraceharvest',	    // '' if this is a top menu. For left menu, use 'fk_mainmenu=xxx' or 'fk_mainmenu=xxx,fk_leftmenu=yyy' where xxx is mainmenucode and yyy is a leftmenucode
 			'type' => 'left',			                // This is a Left menu entry
 			'titre' => 'List_DoliTraceHarvest',
-			'mainmenu' => 'dolitrace',
+			'mainmenu' => 'dolifarm',
 			'leftmenu' => 'dolitrace_harvest_list',
 			'url' => '/dolitrace/dolitraceharvest_list.php',
 			'langs' => 'dolitrace@dolitrace',	        // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
-			'position' => 1000 + $r,
+			'position' => 2000 + $r,
 			'enabled' => "isModEnabled('dolitrace')", // Define condition to show or hide menu entry. Use isModEnabled("dolitrace") if entry must be visible if module is enabled.
 			'perms' => '$user->hasRight("dolitrace", "dolitraceharvest", "read")'
 			'target' => '',

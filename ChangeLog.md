@@ -1,5 +1,12 @@
 # CHANGELOG MODULE DOLITRACE FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.5.11 (2026-11-24)
+
+Menu della suite. Dopo l'aggiornamento **riattivare doliTrace** (menu); da usare con doliFarm 1.6.1.
+
+- Niente più top menu "QdC": le voci sono la sezione **Quaderno di campagna** del menu a sinistra di doliFarm (piani di produzione, operazioni, raccolte, registro trattamenti, biologico, tracciabilità). "Aiutami" e "App di campo" sono dichiarati solo da doliFarm.
+- I link dei riquadri della Home (trattamenti e raccolte in bozza) aprono il menu doliFarm.
+
 ## 1.5.10 (2026-11-18)
 
 - Piano di produzione nuovo: il controllo di unicità del codice di tracciabilità (UUID) interrogava la tabella senza prefisso ed era sempre saltato (errore "Table ... dolitrace_cropplan doesn't exist" nel log).
