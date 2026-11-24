@@ -874,3 +874,6 @@ ErrorWeatherObsValue = %s: valore fuori dall'intervallo ammesso (da %s a %s)
 ErrorWeatherObsDate = L'ora della rilevazione del meteo (%s) deve essere vicina all'intervento: da 12 ore prima dell'inizio a 12 ore dopo la fine, non nel futuro
 WarningWeatherObsWind = Vento rilevato in campo %s m/s, oltre la soglia di %s m/s: rischio di deriva
 WarningWeatherObsTemp = Temperatura rilevata in campo %s °C, oltre la soglia di %s °C
+
+# Left menu of the suite (24/11/2026)
+MenuFieldNotebook = Quaderno di campagna
